@@ -45,4 +45,26 @@ check "others unaffected" True "$(q "d['mods']['other']['enabled']")"
 s1=$(q "d['serial']"); sleep 0.01; eng publish-state
 check "every publish has a new serial" yes "$([ "$(q "d['serial']")" != "$s1" ] && echo yes)"
 eng apply; has "apply publishes too" "state published" "$out"
+
+# A custom/nested code JAR must be readable to the app-part loader too.
+mod custom ', "hooks": {"jar": "code/ev.jar", "entry": "example.Ev"}'
+mkdir -p "$R/data/hmgapi/mods/custom/code"
+echo jar > "$R/data/hmgapi/mods/custom/code/ev.jar"
+chmod 700 "$R/data/hmgapi/mods/custom/code"
+chmod 600 "$R/data/hmgapi/mods/custom/code/ev.jar"
+eng publish-state; check "publish custom hook JAR" 0 $rc
+check "declared JAR readable" "-rw-r--r--" "$(ls -l "$R/data/hmgapi/mods/custom/code/ev.jar" | cut -c1-10)"
+check "declared JAR parent traversable only" "drwx--x--x" "$(ls -ld "$R/data/hmgapi/mods/custom/code" | cut -c1-10)"
+check "unused default JAR stays private" "-rw-------" "$(ls -l "$R/data/hmgapi/mods/custom/hooks.jar" | cut -c1-10)"
+check "custom mod's private payload stays private" "-rw-------" "$(ls -l "$R/data/hmgapi/mods/custom/private.bin" | cut -c1-10)"
+
+# Declared paths and symlinks must not disclose files outside the mod.
+echo private > "$R/data/hmgapi/mods/private.jar"
+chmod 600 "$R/data/hmgapi/mods/private.jar"
+mod escape ', "hooks": {"jar": "../private.jar", "entry": "example.Bad"}'
+mod link ', "hooks": {"jar": "linked.jar", "entry": "example.Bad"}'
+ln -s "$R/data/hmgapi/mods/private.jar" "$R/data/hmgapi/mods/link/linked.jar"
+mod absolute ", \"hooks\": {\"jar\": \"$R/data/hmgapi/mods/private.jar\", \"entry\": \"example.Bad\"}"
+eng publish-state
+check "path escapes and symlinks do not expose private files" "-rw-------" "$(ls -l "$R/data/hmgapi/mods/private.jar" | cut -c1-10)"
 exit $fail

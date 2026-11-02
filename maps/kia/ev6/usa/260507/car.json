@@ -116,5 +116,13 @@
         "/system/app/ThemeSettings.odex"
       ]
     }
+  },
+  "missing": {
+    "iap2.service.on_destroy": "Not yet validated on EV6; mapped on NEEV23 USA 260507 only",
+    "iap2.service.on_bind": "Not yet validated on EV6; mapped on NEEV23 USA 260507 only",
+    "iap2.service.native_handle": "Not yet validated on EV6; mapped on NEEV23 USA 260507 only",
+    "iap2.service.native_lock": "Not yet validated on EV6; mapped on NEEV23 USA 260507 only",
+    "iap2.init_info.use_vehicle_information": "Not yet validated on EV6; mapped on NEEV23 USA 260507 only",
+    "iap2.init_info.use_vehicle_status": "Not yet validated on EV6; mapped on NEEV23 USA 260507 only"
   }
 }
