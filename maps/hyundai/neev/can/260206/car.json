@@ -1,0 +1,120 @@
+{
+  "make": "hyundai",
+  "model": "neev",
+  "name": "Ioniq 5",
+  "region": "can",
+  "firmware": "260206",
+  "products": [
+    "NEEV.CAN."
+  ],
+  "status": "mapped",
+  "verified": null,
+  "files": {
+    "/system/app/HKMC_BtSettings.odex": "8acbf4eb3ee222f521335f6e799ec690",
+    "/system/app/ButtonSettings.odex": "21c7ae0f9590796f865f531740fb5796",
+    "/system/app/HKMC_DiPO.odex": "528ebc9a58b567a1b283dcc2bf6b457b",
+    "/system/framework/com.tcc.iap2.odex": "7ea7fee267ffdce1a526f040ba6a5801",
+    "/system/framework/com.broadcom.bt.jar": "dbf374aa8bde80fad95746a67719ce51",
+    "/system/framework/framework.odex": "55c9837ab22a4dcd452a861199295cad",
+    "/system/framework/core.odex": "99e082b84f97970911e6cdfb9cb9b0dc",
+    "/system/framework/framework2.odex": "4fffcdc65d1e128527fff602c9538b50",
+    "/system/framework/automotive.odex": "6835278a0bf38a81aaf54c6b4387c9f8",
+    "/system/framework/com.hkmc.ext.hcan.odex": "9e4e76638ef31b80db93a549cc14a329",
+    "/system/framework/automotive-service.odex": "668b1ac2f8e469934479fe718982ebaf",
+    "/system/app/HKMC_GPM.odex": "d994d696db846d93713138854a9837f3",
+    "/system/app/HKMC_HomeSetting_WP.odex": "8f5a7a9e4ec9b052675d139f290058bd",
+    "/system/app/Iap2ServerApp.odex": "43c40662352937dd2c25a154dfa60b9d",
+    "/system/app/Launcher_WP3.odex": "b3889a0965e03d2f166c7ac3f440ed2b",
+    "/system/app/RightScreenHome.odex": "413a157864dae6df381bc3ebd404d63f",
+    "/system/app/Settings_W.odex": "7200707ab2f925db116279558a02d687",
+    "/system/app/ThemeSettings.odex": "adfe07b9f09e694de6ec29b81bc2accc"
+  },
+  "apps": [
+    "btsettings",
+    "buttonsettings",
+    "dipo",
+    "framework",
+    "gpm",
+    "homesetting",
+    "iap2",
+    "launcher",
+    "panel",
+    "settings",
+    "themesettings"
+  ],
+  "app_files": {
+    "btsettings": {
+      "package": "com.android.btsettings",
+      "files": [
+        "/system/app/HKMC_BtSettings.odex"
+      ]
+    },
+    "buttonsettings": {
+      "package": "com.android.buttonsettings",
+      "files": [
+        "/system/app/ButtonSettings.odex"
+      ]
+    },
+    "dipo": {
+      "package": "com.daudio.app.dipo",
+      "files": [
+        "/system/app/HKMC_DiPO.odex",
+        "/system/framework/com.tcc.iap2.odex",
+        "/system/framework/com.broadcom.bt.jar"
+      ]
+    },
+    "framework": {
+      "package": null,
+      "files": [
+        "/system/framework/framework.odex",
+        "/system/framework/core.odex",
+        "/system/framework/framework2.odex",
+        "/system/framework/automotive.odex",
+        "/system/framework/com.hkmc.ext.hcan.odex",
+        "/system/framework/automotive-service.odex"
+      ]
+    },
+    "gpm": {
+      "package": "com.google.android.projection.sink",
+      "files": [
+        "/system/app/HKMC_GPM.odex"
+      ]
+    },
+    "homesetting": {
+      "package": "com.hkmc.system.app.homesetting",
+      "files": [
+        "/system/app/HKMC_HomeSetting_WP.odex"
+      ]
+    },
+    "iap2": {
+      "package": "com.tcc.iap2server",
+      "files": [
+        "/system/app/Iap2ServerApp.odex"
+      ]
+    },
+    "launcher": {
+      "package": "com.android.launcher3",
+      "files": [
+        "/system/app/Launcher_WP3.odex"
+      ]
+    },
+    "panel": {
+      "package": "com.mobis.splitscreen.right",
+      "files": [
+        "/system/app/RightScreenHome.odex"
+      ]
+    },
+    "settings": {
+      "package": "com.android.settings",
+      "files": [
+        "/system/app/Settings_W.odex"
+      ]
+    },
+    "themesettings": {
+      "package": "com.android.themesettings",
+      "files": [
+        "/system/app/ThemeSettings.odex"
+      ]
+    }
+  }
+}
