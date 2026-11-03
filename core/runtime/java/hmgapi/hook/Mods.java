@@ -76,7 +76,7 @@ final class Mods {
             List<String> ex = exportsOf.get(d.id);
             if (l != null && ex != null) parent.exports.add(new ApiLoader.Export(d.id, ex, l));
         }
-        DexClassLoader cl = new DexClassLoader(jar.getPath(), optDir.getPath(), null, parent);
+        DexClassLoader cl = new DexClassLoader(jar.getPath(), ModDexCache.directory(optDir, id).getPath(), null, parent);
         loaders.put(id, cl);
         List<String> ex = new ArrayList<String>();
         Object api = raw.get("api");
@@ -103,7 +103,7 @@ final class Mods {
         if (cl == null) {
             Map<String, Object> hooks = (Map<String, Object>) rawOf.get(ctx.id).get("hooks");
             File jar = new File(ctx.dir, String.valueOf(hooks.containsKey("jar") ? hooks.get("jar") : "hooks.jar"));
-            cl = new DexClassLoader(jar.getPath(), app.context.getDir("hmgapi-dex", 0).getPath(), null,
+            cl = new DexClassLoader(jar.getPath(), ModDexCache.directory(app.context.getDir("hmgapi-dex", 0), ctx.id).getPath(), null,
                     new AppPartLoader(pkg, main, app.classLoader));
             parts.put(key, cl);
             HmgApi.i("mods: " + ctx.id + " app part " + pkg + " loaded in " + app.processName);
