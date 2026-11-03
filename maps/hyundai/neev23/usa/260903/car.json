@@ -1,0 +1,135 @@
+{
+  "make": "hyundai",
+  "model": "neev23",
+  "name": "Ioniq 5",
+  "region": "usa",
+  "firmware": "260903",
+  "products": [
+    "NEEV23.USA."
+  ],
+  "status": "probed",
+  "verified": null,
+  "files": {
+    "/system/app/ButtonSettings.odex": "f0867c1b46d33fdc6849d7128e9661c3",
+    "/system/app/HKMC_BtSettings.odex": "2bf9327137ccabfbbd5a2664cbbfb7bd",
+    "/system/app/HKMC_DiPO.odex": "92ff2fce2914aa3194c94aaf44f208be",
+    "/system/app/HKMC_GPM.odex": "4978a2e09ce8473551236abd45a49112",
+    "/system/app/HKMC_HomeSetting_WP.odex": "7b79fee8c0a4e2efaf97f8d3f48da272",
+    "/system/app/Iap2ServerApp.odex": "46f392ece018bb218d180035b28e658b",
+    "/system/app/Launcher_WP3.odex": "735bedb88a4ef14cb509fb0663da6a4c",
+    "/system/app/RightScreenHome.odex": "4789932842938078386a21aecc77c984",
+    "/system/app/Settings_W.odex": "9d1c28688f30acb710af157330dba566",
+    "/system/app/ThemeSettings.odex": "e3891d74450d1fdd041343e9f9c40f67",
+    "/system/framework/automotive-service.odex": "4a5baf6ace323955362e431835859af2",
+    "/system/framework/automotive.odex": "031c413cad00994e47abf7b0cb0a1b91",
+    "/system/framework/com.broadcom.bt.jar": "dbf374aa8bde80fad95746a67719ce51",
+    "/system/framework/com.hkmc.ext.hcan.odex": "1cab9265954bbf48a5dddb67a1e6f2bc",
+    "/system/framework/com.tcc.iap2.odex": "4a5748a26caabf2e84ad994fe0ac3d14",
+    "/system/framework/core.odex": "708d846a8fc3a86c1f75d47be61dc2b1",
+    "/system/framework/framework.odex": "609320d659e7629328f49d960ce8ec56",
+    "/system/framework/framework2.odex": "96e3d3923b985278b951850de8ea5648"
+  },
+  "apps": [
+    "btsettings",
+    "buttonsettings",
+    "dipo",
+    "framework",
+    "gpm",
+    "homesetting",
+    "iap2",
+    "launcher",
+    "panel",
+    "settings",
+    "themesettings"
+  ],
+  "app_files": {
+    "btsettings": {
+      "package": "com.android.btsettings",
+      "files": [
+        "/system/app/HKMC_BtSettings.odex"
+      ]
+    },
+    "buttonsettings": {
+      "package": "com.android.buttonsettings",
+      "files": [
+        "/system/app/ButtonSettings.odex"
+      ]
+    },
+    "dipo": {
+      "package": "com.daudio.app.dipo",
+      "files": [
+        "/system/app/HKMC_DiPO.odex",
+        "/system/framework/com.tcc.iap2.odex",
+        "/system/framework/com.broadcom.bt.jar"
+      ]
+    },
+    "framework": {
+      "package": null,
+      "files": [
+        "/system/framework/framework.odex",
+        "/system/framework/core.odex",
+        "/system/framework/framework2.odex",
+        "/system/framework/automotive.odex",
+        "/system/framework/com.hkmc.ext.hcan.odex",
+        "/system/framework/automotive-service.odex"
+      ]
+    },
+    "gpm": {
+      "package": "com.google.android.projection.sink",
+      "files": [
+        "/system/app/HKMC_GPM.odex"
+      ]
+    },
+    "homesetting": {
+      "package": "com.hkmc.system.app.homesetting",
+      "files": [
+        "/system/app/HKMC_HomeSetting_WP.odex"
+      ]
+    },
+    "iap2": {
+      "package": "com.tcc.iap2server",
+      "files": [
+        "/system/app/Iap2ServerApp.odex"
+      ]
+    },
+    "launcher": {
+      "package": "com.android.launcher3",
+      "files": [
+        "/system/app/Launcher_WP3.odex"
+      ]
+    },
+    "panel": {
+      "package": "com.mobis.splitscreen.right",
+      "files": [
+        "/system/app/RightScreenHome.odex"
+      ]
+    },
+    "settings": {
+      "package": "com.android.settings",
+      "files": [
+        "/system/app/Settings_W.odex"
+      ]
+    },
+    "themesettings": {
+      "package": "com.android.themesettings",
+      "files": [
+        "/system/app/ThemeSettings.odex"
+      ]
+    }
+  },
+  "by_reference": [
+    "btsettings.projection_helper",
+    "btsettings.projection_helper.device_connections_available",
+    "btsettings.projection_helper.open_device_connections",
+    "btsettings.projection_helper.open_other_page",
+    "btsettings.projection_helper.open_wireless_page",
+    "dipo.iap2.bt_address",
+    "dipo.iap2.set_notify_on",
+    "panel.home.build_views",
+    "panel.home.test_page",
+    "panel.test_gate",
+    "panel.test_gate.on",
+    "panel.test_page",
+    "themesettings.split_item.type"
+  ]
+}
