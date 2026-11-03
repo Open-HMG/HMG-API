@@ -47,6 +47,8 @@ final class Mods {
         final int icon, iconDisabled, titleId;
         /** the mod's own tile pictures (mod.json "icon", "icon_night"), read in the zygote; null: the activity's icon */
         byte[] iconDay, iconNight;
+        /** the greyed-out tile ("icon_disabled", "icon_disabled_night"); null: the normal tile */
+        byte[] iconDisabledDay, iconDisabledNight;
 
         LauncherEntry(String mod, String packageName, String className, String title, int index) {
             this.mod = mod;
@@ -315,6 +317,8 @@ final class Mods {
             LauncherEntry le = new LauncherEntry(id, pkg, cls, e.optString("title", null), launcher.size());
             le.iconDay = picture(dir, e.optString("icon", null));
             le.iconNight = picture(dir, e.optString("icon_night", null));
+            le.iconDisabledDay = picture(dir, e.optString("icon_disabled", null));
+            le.iconDisabledNight = picture(dir, e.optString("icon_disabled_night", null));
             launcher.add(le);
             info.launcher++;
         }

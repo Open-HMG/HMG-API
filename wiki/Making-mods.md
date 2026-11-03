@@ -11,6 +11,8 @@ off or removed. In the repository:
   page with readings, a test mod using buttons, projection and commands).
 - `docs/vehicle-commands.md`: the car commands and their limits.
 - `docs/micom-map.md`: mapping new car data.
+- `tools/mkicon.sh <picture> <folder>`: app-menu tile pictures that match the car's
+  own (the stock gradient, day and night, and the greyed-out look) from any shape.
 - `docs/api-plan.md`: what each community project uses and what's planned.
 
 Packaging: `tools/mkmodpkg.sh <mod folder> <your key>` (make a key once with

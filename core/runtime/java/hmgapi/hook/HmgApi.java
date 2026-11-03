@@ -375,7 +375,7 @@ final class HmgApi {
                 }
                 Mods.LauncherEntry m = entryForResource(id);
                 if (m == null) return;
-                Drawable d = icon(m);
+                Drawable d = icon(m, id == m.iconDisabled);
                 // never let a made-up id reach the real lookup: it would throw NotFoundException
                 param.setResult(d != null ? d
                         : Resources.getSystem().getDrawable(android.R.drawable.sym_def_app_icon));
@@ -402,14 +402,28 @@ final class HmgApi {
         });
     }
 
-    static Drawable icon(Mods.LauncherEntry m) {
+    static Drawable icon(Mods.LauncherEntry m, boolean disabled) {
         Context ctx = appContext;
         if (ctx == null) return null;
         // the mod's own pictures: the night one while the car's display is in night mode
         // (the launcher's own icons switch the same way, by drawable-night resources)
         boolean night = (ctx.getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
                 == android.content.res.Configuration.UI_MODE_NIGHT_YES;
-        byte[] pic = night && m.iconNight != null ? m.iconNight : m.iconDay;
+        byte[] pic = null;
+        if (disabled) {
+            pic = night && m.iconDisabledNight != null ? m.iconDisabledNight : m.iconDisabledDay;
+            if (pic == null && Mods.APP_PACKAGE.equals(m.packageName)) {
+                // HMG-API's own greyed-out tile is in its app (ic_hmgapi_disabled, day and night)
+                try {
+                    Resources r = ctx.getPackageManager().getResourcesForApplication(Mods.APP_PACKAGE);
+                    int rid = r.getIdentifier("ic_hmgapi_disabled", "drawable", Mods.APP_PACKAGE);
+                    if (rid != 0) return r.getDrawable(rid);
+                } catch (Exception e) {
+                    e("[" + m.mod + "] disabled entry icon", e);
+                }
+            }
+        }
+        if (pic == null) pic = night && m.iconNight != null ? m.iconNight : m.iconDay;
         if (pic != null) {
             android.graphics.Bitmap b = android.graphics.BitmapFactory.decodeByteArray(pic, 0, pic.length);
             if (b != null) return new android.graphics.drawable.BitmapDrawable(ctx.getResources(), b);

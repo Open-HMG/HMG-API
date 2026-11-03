@@ -39,7 +39,7 @@ Owners get to decide for their own units. Follow these by default. If the user a
 | `core/app` | `hmgapi.app`: status + mod list (from `HmgApiStatus.json`, set by the hooks). |
 | `install/` | `adb/`, `nemesis/`, `usb/`, `common/` (planned); `dev/`: the scripts used to bring up the core on a car. |
 | `mods/examples` | `hello`, `nemesis-shortcut`. |
-| `tools/` | `lpatch`, `mkrecipe.py`, `mkdelta.py`, `env.sh`, `push-dev.sh`, `test-all.sh`; `map-car.py` (partial maps), `test-hooks.py` (points × cars, `maps/coverage.json`), `probe-test.py` (on-car mapper vs map-car.py); cars in `tools/hook-trees.local` (private). |
+| `tools/` | `lpatch`, `mkrecipe.py`, `mkdelta.py`, `mkicon.sh` (stock-style tile pictures; `mkicon-hmgapi.sh` makes HMG-API's own from the logo), `env.sh`, `push-dev.sh`, `test-all.sh`; `map-car.py` (partial maps), `test-hooks.py` (points × cars, `maps/coverage.json`), `probe-test.py` (on-car mapper vs map-car.py); cars in `tools/hook-trees.local` (private). |
 
 ## Gotchas learned the hard way
 
