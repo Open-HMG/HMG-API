@@ -298,13 +298,17 @@ public final class Engine {
                 return 1;
             }
             if (args.length < 2) {
-                out.add("usage: engine install <zip|dir> [--uuid <uuid>] [--force] | remove <id>");
+                out.add("usage: engine install <zip|dir> [--uuid <uuid>] [--force] [--any-car] | remove <id>");
                 return 2;
             }
             if ("remove".equals(cmd)) return Packages.remove(this, args[1]);
             String uuid = null;
-            for (int i = 2; i + 1 < args.length; i++) if ("--uuid".equals(args[i])) uuid = args[i + 1];
-            return Packages.install(this, args[1], uuid, force);
+            boolean anyCar = false;
+            for (int i = 2; i < args.length; i++) {
+                if ("--uuid".equals(args[i]) && i + 1 < args.length) uuid = args[i + 1];
+                else if ("--any-car".equals(args[i])) anyCar = true;
+            }
+            return Packages.install(this, args[1], uuid, force, anyCar);
         }
         if ("recover".equals(cmd)) return recover();
         if ("keep".equals(cmd)) return keep();

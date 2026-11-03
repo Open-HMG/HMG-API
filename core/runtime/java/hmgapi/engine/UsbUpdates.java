@@ -79,7 +79,7 @@ final class UsbUpdates {
             Packages.unzip(zip, stage);
             File dir = Packages.root(stage);
             if (new File(dir, "mod.json").isFile()) {
-                Packages.Verdict v = Packages.check(e, dir, null, false);
+                Packages.Verdict v = Packages.check(e, dir, null, false, false);
                 p.put("kind", "mod");
                 p.put("id", v.id);
                 p.put("name", v.name);
@@ -91,6 +91,15 @@ final class UsbUpdates {
                 if (v.author != null) p.put("author", v.author);
                 if (v.reason != null) p.put("reason", v.reason);
                 p.put("notes", new ArrayList<Object>(v.notes));
+                if (v.otherCar != null && "refused".equals(v.status)) {
+                    // only the car is wrong: what "Install anyway" (--any-car) would do
+                    Packages.Verdict a = Packages.check(e, dir, null, false, true);
+                    if (a.code == 0) {
+                        p.put("any_car", a.status);
+                        if (a.author != null) p.put("author", a.author);
+                        if (a.installedVersion != null) p.put("installed", a.installedVersion);
+                    }
+                }
             } else if (new File(dir, "install.sh").isFile() && new File(dir, "VERSION").isFile()) {
                 Release r = release(e, dir);
                 p.put("kind", "hmgapi");

@@ -69,6 +69,7 @@ eng install $T/unsigned.zip; check "unsigned refused" 3 $rc
 mk 2.0.0 '{"platform": ["tcc897x"]}'; sig sign $T/m $T/author.key > /dev/null; pkg $T/m $T/kr.zip
 eng install $T/kr.zip; check "wrong head unit refused" 3 $rc
 has "with the reason" "isn't for this head unit: needs platform tcc897x" "$out"
+has "and how to install it anyway" "Install anyway" "$out"
 
 python3 - $T/evil.zip <<'PY'
 import sys, zipfile
@@ -82,4 +83,15 @@ check "nothing written outside" no "$([ -e $R/data/escape.txt ] || [ -e $R/escap
 eng remove demo; check "remove" 0 $rc
 check "removed" no "$([ -d $R/data/hmgapi/mods/demo ] && echo yes || echo no)"
 check "settings stay after remove" '{"x": 1}' "$(cat $R/data/hmgapi/settings/demo.json)"
+
+# "Install anyway": a mod for another head unit, at the owner's risk
+ign() { python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('overrides', {}).get('ignore_system'))" $R/data/hmgapi/settings/hmgapi.json 2>/dev/null; }
+eng install $T/kr.zip --any-car; check "install anyway" 0 $rc
+has "with a warning" "WARNING: demo isn't for this head unit (needs platform tcc897x (this unit: tcc803x)); installing it anyway" "$out"
+check "recorded for the loader and the engine" "['demo']" "$(ign)"
+eng plan; has "the engine goes on with it" "WARNING: demo: needs platform tcc897x (this unit: tcc803x); overrides.ignore_system is set" "$out"
+eng remove demo; check "remove it" 0 $rc
+check "the override goes with it" "[]" "$(ign)"
+eng install $T/demo.zip --any-car; check "--any-car on a mod for this unit: plain install" 0 $rc
+check "... nothing recorded" "[]" "$(ign)"
 exit $fail

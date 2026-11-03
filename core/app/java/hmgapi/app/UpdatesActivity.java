@@ -87,7 +87,7 @@ public class UpdatesActivity extends Activity {
                 : p.optString("name") + "  " + p.optString("version");
         Ui.text(rows, title, 22, true, "refused".equals(status) ? Color.GRAY : Color.WHITE);
         String what;
-        if ("refused".equals(status)) what = "Can't install: " + p.optString("reason");
+        if ("refused".equals(status)) what = "Can't install: " + p.optString("reason").replaceFirst("\\. To install it anyway.*$", "");
         else if ("new".equals(status)) what = "New mod";
         else if ("update".equals(status)) what = "Update from " + p.optString("installed");
         else if ("same".equals(status)) what = "Already installed (this version)";
@@ -98,6 +98,18 @@ public class UpdatesActivity extends Activity {
         for (int i = 0; notes != null && i < notes.length(); i++) {
             Ui.text(rows, notes.optString(i).replaceFirst("^note +", ""), 15, false, Ui.WARN);
         }
+        if ("refused".equals(status) && p.has("any_car")) {
+            Button b = new Button(this);
+            b.setText("Install anyway…");
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    confirmAnyCar(p);
+                }
+            });
+            rows.addView(b);
+            return;
+        }
         if ("refused".equals(status) || "older".equals(status)) return;
         String label = "hmgapi".equals(kind) ? ("same".equals(status) ? "Reinstall HMG-API" : "Update HMG-API")
                 : "same".equals(status) ? "Reinstall" : "update".equals(status) ? "Update" : "Install";
@@ -107,14 +119,32 @@ public class UpdatesActivity extends Activity {
             @Override
             public void onClick(View v) {
                 if ("hmgapi".equals(p.optString("kind"))) confirmHmgApi(p);
-                else if ("new".equals(p.optString("status")) && p.optString("author", "").isEmpty()) confirmAuthor(p);
-                else install(p, null);
+                else if ("new".equals(p.optString("status")) && p.optString("author", "").isEmpty()) confirmAuthor(p, false);
+                else install(p, null, false);
             }
         });
         rows.addView(b);
     }
 
-    private void confirmAuthor(final JSONObject p) {
+    /** Only the car is wrong (mod.json "system"): the owner may install it anyway. */
+    private void confirmAnyCar(final JSONObject p) {
+        new AlertDialog.Builder(this)
+                .setTitle("Install " + p.optString("name") + " anyway?")
+                .setMessage("Its author didn't list this head unit:\n\n" + p.optString("reason").replaceFirst("\\. To install it anyway.*$", "")
+                        + "\n\nIt may not work here, or may need something this unit doesn't have. HMG-API keeps a backup of "
+                        + "every file it changes, and removing the mod puts them back. Install it only if you know it suits "
+                        + "this car (for example, the author or a Car Report says so).")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Install anyway", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        if ("new".equals(p.optString("any_car")) && p.optString("author", "").isEmpty()) confirmAuthor(p, true);
+                        else install(p, null, true);
+                    }
+                }).show();
+    }
+
+    private void confirmAuthor(final JSONObject p, final boolean anyCar) {
         new AlertDialog.Builder(this)
                 .setTitle("Install " + p.optString("name") + "?")
                 .setMessage("This mod's author isn't on HMG-API's trusted author list (author key "
@@ -124,19 +154,20 @@ public class UpdatesActivity extends Activity {
                 .setPositiveButton("Install", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int which) {
-                        install(p, null);
+                        install(p, null, anyCar);
                     }
                 }).show();
     }
 
-    private void install(final JSONObject p, final String uuid) {
+    private void install(final JSONObject p, final String uuid, final boolean anyCar) {
         message.setText("Installing " + p.optString("name") + "…");
         new Ui.Job<Hmgapid.Result>() {
             @Override
             Hmgapid.Result work() throws Exception {
-                String f = p.optString("file");
-                return uuid == null ? Hmgapid.call(300000, "engine", "install", f)
-                        : Hmgapid.call(300000, "engine", "install", f, "--uuid", uuid);
+                java.util.List<String> c = new java.util.ArrayList<String>(java.util.Arrays.asList("engine", "install", p.optString("file")));
+                if (uuid != null) c.addAll(java.util.Arrays.asList("--uuid", uuid));
+                if (anyCar) c.add("--any-car");
+                return Hmgapid.call(300000, c.toArray(new String[0]));
             }
 
             @Override

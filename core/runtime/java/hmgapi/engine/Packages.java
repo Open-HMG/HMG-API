@@ -34,7 +34,7 @@ final class Packages {
     static final long MAX_BYTES = 64L << 20;
 
     @SuppressWarnings("unchecked")
-    static int install(Engine e, String path, String uuid, boolean force) throws Exception {
+    static int install(Engine e, String path, String uuid, boolean force, boolean anyCar) throws Exception {
         File src = new File(path);
         if (!src.exists()) {
             e.out.add("no package at " + path);
@@ -47,7 +47,7 @@ final class Packages {
             if (src.isDirectory()) copyTree(src, stage);
             else unzip(src, stage);
             File dir = root(stage);
-            Verdict v = check(e, dir, uuid, force);
+            Verdict v = check(e, dir, uuid, force, anyCar);
             e.out.addAll(v.notes);
             if (v.code != 0) {
                 e.out.add("refused: " + v.reason);
@@ -66,6 +66,7 @@ final class Packages {
             }
             if (wasOff) new File(installed, ".disabled").createNewFile();
             Engine.rm(prev);
+            if (anyCar && v.otherCar != null) ignoreSystem(e, v.id, true);
             e.chmodTree(installed);
             e.out.add("installed " + v.id + " " + v.version + (v.uuid != null ? " (author key " + v.uuid + ")" : " (unsigned)")
                     + (wasOff ? ", still turned off" : ""));
@@ -84,6 +85,7 @@ final class Packages {
         String id, version, name, description, uuid, installedVersion, reason;
         String author;   // a new mod's author on the trusted list (null: not listed)
         String status;   // new, update, same, older, refused
+        String otherCar;   // why it isn't for this head unit (the owner may install it anyway: --any-car)
         final java.util.List<String> notes = new java.util.ArrayList<String>();
     }
 
@@ -96,7 +98,7 @@ final class Packages {
 
     /** Every check install makes, without changing anything. */
     @SuppressWarnings("unchecked")
-    static Verdict check(Engine e, File dir, String uuid, boolean force) throws Exception {
+    static Verdict check(Engine e, File dir, String uuid, boolean force, boolean anyCar) throws Exception {
         Verdict v = new Verdict();
         File mj = new File(dir, "mod.json");
         if (!mj.isFile()) return refuse(v, "not a HMG-API mod package (no mod.json)");
@@ -145,8 +147,14 @@ final class Packages {
         }
         Map<String, Object> car = (Map<String, Object>) e.hmgapi.get("car");
         String sys = SystemCheck.check(mod.get("system"), new SystemCheck.Facts(e.root, car));
-        if (sys != null && !SystemCheck.ignored(e.hmgapi, v.id)) {
-            return refuse(v, v.id + " " + v.version + " isn't for this head unit: " + sys);
+        if (sys != null) {
+            v.otherCar = sys;
+            if (SystemCheck.ignored(e.hmgapi, v.id) || anyCar) {
+                v.notes.add("WARNING: " + v.id + " isn't for this head unit (" + sys + "); installing it anyway, at your own risk");
+            } else {
+                return refuse(v, v.id + " " + v.version + " isn't for this head unit: " + sys
+                        + ". To install it anyway, at your own risk: \"Install anyway\" in HMG-API's updates, or engine install --any-car");
+            }
         }
         for (Version.Dep d : Version.deps(mod.get("requires"))) {
             File dm = new File(e.data, "mods/" + d.id + "/mod.json");
@@ -202,9 +210,33 @@ final class Packages {
             return 1;
         }
         Engine.rm(installed);
+        ignoreSystem(e, id, false);
         LiveState.publish(e);
         e.out.add("removed " + id + " (its settings stay in /data/hmgapi/settings); run `engine apply` to put its files back to stock");
         return 0;
+    }
+
+    /**
+     * hmgapi.json overrides.ignore_system: add or drop one mod id (the owner's "Install anyway").
+     * true (every mod) is left as it is.
+     */
+    @SuppressWarnings("unchecked")
+    static void ignoreSystem(Engine e, String id, boolean on) throws IOException {
+        Object o = e.hmgapi.get("overrides");
+        Map<String, Object> ov = o instanceof Map ? (Map<String, Object>) o : new java.util.LinkedHashMap<String, Object>();
+        Object v = ov.get("ignore_system");
+        if (Boolean.TRUE.equals(v)) return;
+        java.util.List<Object> ids = v instanceof java.util.List ? (java.util.List<Object>) v : new java.util.ArrayList<Object>();
+        if (on == ids.contains(id)) return;
+        if (on) ids.add(id);
+        else ids.remove(id);
+        ov.put("ignore_system", ids);
+        e.hmgapi.put("overrides", ov);
+        File lj = new File(e.data, "settings/hmgapi.json");
+        lj.getParentFile().mkdirs();
+        Engine.write(lj, Json.write(e.hmgapi));
+        e.out.add(on ? "noted: " + id + " runs on this head unit at your own risk (hmgapi.json overrides.ignore_system)"
+                : "dropped " + id + " from hmgapi.json overrides.ignore_system");
     }
 
     /** The package's mod folder: the top, or its single subfolder. */

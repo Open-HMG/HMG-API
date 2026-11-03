@@ -14,7 +14,11 @@
 4. Go back to the main screen and tap **Apply changes** (see
    [Using the HMG-API app](Using-the-HMG-API-app)).
 
-A mod that doesn't support your car or software says so and isn't installed.
+A mod that doesn't list your car or software says so and isn't installed. If you know
+it suits your car anyway (its author or a Car Report says so), tap **Install anyway…**
+under it. It installs with a warning, at your own risk: HMG-API still backs up every
+file it changes, and removing the mod puts them back. Over adb, add `--any-car` to
+`engine install`.
 
 ### Over adb, from a computer
 
