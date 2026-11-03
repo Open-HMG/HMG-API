@@ -1,0 +1,69 @@
+{
+  "panel.home": {
+    "class": "com.mobis.splitscreen.right.SplitScreenHome"
+  },
+  "panel.home.build_views": {
+    "method": "b",
+    "params": [
+      "int",
+      "boolean",
+      "int"
+    ],
+    "ret": "void",
+    "static": false
+  },
+  "panel.home.page_for_id": {
+    "method": "aS",
+    "params": [
+      "int"
+    ],
+    "ret": "com.mobis.splitscreen.right.k",
+    "static": false
+  },
+  "panel.home.test_page": {
+    "field": "pq",
+    "static": false,
+    "type": "com.mobis.splitscreen.right.subviewExample.a"
+  },
+  "panel.page": {
+    "class": "com.mobis.splitscreen.right.k"
+  },
+  "panel.page.context": {
+    "field": "mContext",
+    "static": false,
+    "type": "android.content.Context"
+  },
+  "panel.page.handler": {
+    "field": "mHandler",
+    "static": false,
+    "type": "android.os.Handler"
+  },
+  "panel.page.view": {
+    "field": "mView",
+    "static": false,
+    "type": "android.view.View"
+  },
+  "panel.page.view_id": {
+    "field": "viewId",
+    "static": false,
+    "type": "int"
+  },
+  "panel.test_gate": {
+    "class": "com.mobis.splitscreen.right.n.v"
+  },
+  "panel.test_gate.on": {
+    "method": "py",
+    "params": [],
+    "ret": "boolean",
+    "static": true
+  },
+  "panel.test_page": {
+    "class": "com.mobis.splitscreen.right.subviewExample.a"
+  },
+  "panel.test_page.get_view": {
+    "method": "getView",
+    "params": [],
+    "ret": "android.view.View",
+    "static": false
+  }
+}
