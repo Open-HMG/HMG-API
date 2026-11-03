@@ -78,10 +78,12 @@ jobs:
           rm -rf out/packages
           grep -v '^#' tools/release-mods.txt | while read -r m; do [ -n "$m" ] && tools/mkmodpkg.sh "$m" "$MOD_KEY_FILE"; done
           tools/mkinstallers.sh
+          for z in out/packages/*.zip; do tools/mknemesismod.sh "$z" out/dist/mods; done
           mkdir -p out/assets
           cp out/dist/hmgapi-"$VERSION"-*.zip out/assets/
           cp out/releases/hmgapi-"$VERSION".zip out/assets/hmgapi-"$VERSION"-update.zip
           cp out/packages/*.zip out/assets/
+          cp out/dist/mods/*-nemesis*.zip out/assets/
           (cd out/assets && sha256sum *.zip > SHA256SUMS)
 
       - name: Draft release

@@ -20,6 +20,22 @@ under it. It installs with a warning, at your own risk: HMG-API still backs up e
 file it changes, and removing the mod puts them back. Over adb, add `--any-car` to
 `engine install`.
 
+### With NEMESIS
+
+Some mods also come as a NEMESIS package (`<mod>-<version>-nemesis.zip`; HMG-API's
+releases carry one for each of its mods). HMG-API must be installed first; NEMESIS
+Manager says so if it isn't.
+
+1. Unzip it onto the top level of a USB stick, plug it in, and confirm the install.
+2. Restart the head unit if it says so.
+
+HMG-API installs the mod and applies it, with the same checks as the app (signature,
+author key, car). A mod that doesn't list your car isn't installed; to install it
+anyway, at your own risk, add an empty file `HMGAPI/ANY-CAR` to the stick.
+Uninstalling the package in NEMESIS Manager removes the mod and puts its files back
+to stock. While a mod package is installed, NEMESIS won't uninstall HMG-API:
+uninstall the mod packages first.
+
 ### Over adb, from a computer
 
 With HMG-API installed and the head unit on adb, one command per step:

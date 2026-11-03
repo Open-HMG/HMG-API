@@ -13,7 +13,7 @@ REPO = os.path.dirname(HERE)
 
 ALL = 'ALL'
 RUNTIME = ['core/runtime/*-test.sh']
-INSTALL = ['install/common/test.sh', 'install/common/install-test.sh', 'install/usb/test.sh']
+INSTALL = ['install/common/test.sh', 'install/common/install-test.sh', 'install/usb/test.sh', 'install/nemesis/mod-test.sh']
 MODS = ['mods/*/test.sh', 'mods/*/tools/*/test.sh', 'tools/check-scripts.sh']
 HOOKS = ['core/hookpoints/test.sh']
 
@@ -35,7 +35,7 @@ RULES = [
     (['mods/*'], ['tools/check-scripts.sh']),   # plus the changed mod's own tests (select)
     (['install/*'], INSTALL + ['core/runtime/packages-test.sh']),
     (['tools/mkdelta.py', 'tools/mkrecipe.py', 'tools/mkmemrecipe.py'], ['core/runtime/engine-test.sh', 'core/runtime/safety-test.sh', 'tools/lpatch/test.sh']),
-    (['tools/mkinstallers.sh', 'tools/mkrelease.sh', 'tools/mkmodpkg.sh', 'tools/release-mods.txt'], INSTALL + ['core/runtime/signing-test.sh', 'core/runtime/usb-test.sh']),
+    (['tools/mkinstallers.sh', 'tools/mkrelease.sh', 'tools/mkmodpkg.sh', 'tools/mknemesismod.sh', 'tools/nemesis-version.py', 'tools/release-mods.txt'], INSTALL + ['core/runtime/signing-test.sh', 'core/runtime/usb-test.sh']),
     (['tools/mod-draft*'], ['tools/mod-draft-test.sh']),
     (['catalog/*', 'tools/catalog*', 'maps/authors.json', '.github/workflows/catalog.yml'], ['tools/catalog-test.sh']),
     (['tools/micom-*'], ['tools/micom-decode-test.sh']),

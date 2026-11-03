@@ -18,21 +18,8 @@ V=$(cat out/payload/VERSION)
 D=$PWD/out/dist
 mkdir -p "$D"
 rm -f "$D/hmgapi-$V-usb.zip" "$D/hmgapi-$V-nemesis.zip" "$D/hmgapi-$V-nemesis-package.zip" "$D/hmgapi-$V-adb.zip"
-# NEMESIS's package-version: dotted numbers only (04-Packages.md; meta.c refuses anything else). A beta
-# comes before its release: the version before it, then .99.<beta> (1.0.0-beta.4 is 0.99.4, below 1.0.0)
-PV=$(python3 - "$V" <<'PY'
-import re, sys
-v = sys.argv[1]
-if re.fullmatch(r"\d+(\.\d+)*", v):
-    print(v)
-    sys.exit()
-m = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)-beta\.(\d+)", v)
-if not m:
-    sys.exit("no NEMESIS package-version for %s: add a rule to tools/mkinstallers.sh" % v)
-x, y, z, n = map(int, m.groups())
-print("%d.%d.%d.99.%d" % (x, y, z - 1, n) if z else "%d.%d.99.%d" % (x, y - 1, n) if y else "%d.99.%d" % (x - 1, n))
-PY
-)
+# NEMESIS's package-version: dotted numbers only, a beta before its release
+PV=$(tools/nemesis-version.py "$V")
 W=$(mktemp -d); trap 'rm -rf "$W"' EXIT
 
 # zipdir <dir> <zip>: fixed order and times, so the same input gives the same zip

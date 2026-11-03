@@ -19,6 +19,33 @@ layouts against those rules.
 - Installed with Android down (a stick with `NEMESIS.emergency`; NEMESIS otherwise
   waits for Android), the HMG-API app goes in by itself once Android is up.
 
+## Mods as NEMESIS packages
+
+`tools/mknemesismod.sh <signed mod zip>` wraps a mod (tools/mkmodpkg.sh's zip, as it
+is, in `mod/package.zip`) in a NEMESIS package from the template in `mod/`:
+`<id>-<v>-nemesis.zip` (stick) and `<id>-<v>-nemesis-package.zip` (the package). The
+release builds one for each mod in `tools/release-mods.txt`. `mod-test.sh` runs it all
+off-car with the real engine.
+
+- id `hmgapi.<mod id>` (mod ids are at most 57 characters for this), `depends="hmgapi"`
+  (NEMESIS then also refuses to uninstall HMG-API while a mod package is installed),
+  `os` from the mod's `"system"` (a firmware range like `>=260206` becomes `*`),
+  `package-version` from the mod's version (`tools/nemesis-version.py`).
+- `preinstall`: refuses before NEMESIS copies anything if HMG-API isn't installed
+  (`/system/bin/hmgapid` and `/data/hmgapi/uninstall.sh`).
+- `postinstall`: `hmgapid engine install mod/package.zip` (plus `--any-car` with
+  `HMGAPI/ANY-CAR` on a stick), then `engine apply`. If the apply fails on a first
+  install, `engine remove` again; an update stays in HMG-API (the app shows the
+  problem). Either failure exits 1; NEMESIS keeps the package registered, so it's
+  uninstalled as usual.
+- `preuninstall`: skipped on a NEMESIS update (the same stage rule as HMG-API's own).
+  Otherwise `engine remove`, then `engine apply`. The mod already gone from HMG-API:
+  nothing to do. HMG-API gone (its uninstall already restored `/system`): drop
+  `/data/hmgapi/mods/<id>` so a reinstall doesn't bring it back. A failed remove keeps
+  the package (exit 1); a failed apply after it only warns (the mod is out of HMG-API
+  either way; Apply changes in the app finishes it).
+- Launch (`[app.0]`, `bin/open.sh`): opens the HMG-API app, as HMG-API's package does.
+
 **Descriptor (1.1, 04-Packages.md §2; 07-Submit-a-Package.md for the Package Store).**
 `version=1.1` is the descriptor format, not HMG-API's version. `package-version` is
 HMG-API's version as dotted numbers only (NEMESIS refuses anything else); a beta

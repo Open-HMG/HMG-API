@@ -19,6 +19,31 @@ Packaging: `tools/mkmodpkg.sh <mod folder> <your key>` (make a key once with
 `java -cp out/engine-host hmgapi.engine.Signing keygen <file>`). Keep the key safe:
 only packages signed with it update your mod.
 
+### As a NEMESIS package
+
+Owners with NEMESIS can install your mod from NEMESIS Manager, a USB stick or the
+Package Store. One command wraps your signed zip:
+
+```
+tools/mknemesismod.sh out/packages/my-mod-1.0.0.zip
+```
+
+It makes `out/dist/my-mod-1.0.0-nemesis.zip` (unzipped onto a stick, NEMESIS
+installs it) and `my-mod-1.0.0-nemesis-package.zip` (the package itself, for the
+Package Store or `nemesis install`). The package's id is `hmgapi.<your mod id>`, it
+needs HMG-API's package (`depends="hmgapi"`), and its `os` comes from your
+`mod.json` `"system"`. It carries your zip unchanged; its scripts (the template in
+`install/nemesis/mod/`) do only what the HMG-API app does, through `hmgapid`:
+
+- install and update: `engine install` (same signature, author key and car checks),
+  then `engine apply`. A first install whose apply fails comes out again.
+- uninstall: `engine remove`, then `engine apply`: everything the mod changed goes
+  back to stock, its settings stay. A NEMESIS update skips this, so the mod and its
+  settings stay while the new version goes in.
+
+Don't add your own install steps to these scripts: put every change in
+`patches.json`, so HMG-API backs it up and removing the mod puts it back.
+
 ## Listing your mod
 
 The [Community mods](Community-mods) page lists mods from their authors'

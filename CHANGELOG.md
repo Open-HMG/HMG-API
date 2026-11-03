@@ -19,6 +19,10 @@ map lacks, only those parts stay off and the app says why.
 
 - **Install** from a USB stick (with or without NEMESIS), as a NEMESIS package, or
   over adb. Uninstalling puts every file and setting back to the stock bytes.
+- **Mods as NEMESIS packages** (`<mod>-<version>-nemesis.zip`): install, update and
+  uninstall a mod from NEMESIS Manager or a stick. HMG-API's engine does the work, with
+  the same checks as the app; uninstalling puts the mod's files back to stock. Authors
+  make one with `tools/mknemesismod.sh`.
 - **The HMG-API app** (its own menu tile and ★ choice): a status bar (hooks on, changes
   not applied, restart needed) with *Apply changes* (a plan of what will change before
   anything does), *Check USB updates* and *Restart unit*; tabs for **Mods** (each mod's
