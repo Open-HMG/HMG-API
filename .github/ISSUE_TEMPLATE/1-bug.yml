@@ -12,7 +12,18 @@ body:
     id: car
     attributes:
       label: Car
-      description: Make, model, year and region, e.g. "Kia EV6 2023, US".
+      description: Make, model, year, trim and region.
+    validations:
+      required: true
+  - type: dropdown
+    id: supported
+    attributes:
+      label: Is your car supported?
+      description: See [Supported cars](https://github.com/VysseCodes/HMG-API/wiki/Supported-cars). Only each region's newest head unit software is supported; on older software, updating often fixes it.
+      options:
+        - Listed, with the software version shown there
+        - Listed, but my head unit has older software
+        - Not listed (or I don't know)
     validations:
       required: true
   - type: input
@@ -20,11 +31,19 @@ body:
     attributes:
       label: Head unit software
       description: From the Car Report, or Settings → General → Software info (e.g. 260507).
+  - type: dropdown
+    id: install
+    attributes:
+      label: How you installed HMG-API
+      options:
+        - USB stick (Engineering Mode → DSP → Update OTA)
+        - NEMESIS
+        - adb
   - type: input
     id: version
     attributes:
       label: HMG-API version and mods
-      description: Shown at the top of the HMG-API app, and the mods you have on.
+      description: Shown at the top of the HMG-API app, and the mods you have on (with their versions; say if you used "Install anyway" for one that doesn't list your car).
   - type: textarea
     id: what
     attributes:

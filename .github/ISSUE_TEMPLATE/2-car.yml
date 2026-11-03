@@ -26,10 +26,11 @@ body:
         - A car or region that isn't supported
         - A newer head unit software version
         - Something missing on a supported car (a mod doesn't load)
+        - My car's map says "waiting for a check on a car", and it works
     validations:
       required: true
   - type: textarea
     id: notes
     attributes:
       label: Anything else
-      description: Trim, navigation or not, HUD, what you'd like to use.
+      description: Trim, HUD, what you'd like to use; for a check, which mods you tried and that they worked.
