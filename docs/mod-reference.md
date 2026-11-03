@@ -323,7 +323,9 @@ or adb.
 
 HMG-API ships a trusted author list (`maps/authors.json`, by author key UUID). A
 mod from a key that isn't listed still installs, with a warning to the owner. To
-be listed, open an issue with your key's UUID (`tools/mkmodpkg.sh` prints it) and
-where your mods are published. Keep your key private and backed up: a lost key
+be listed, add your mod to the community catalogue (`catalog/`, `tools/catalog.py
+add`; see the wiki's Making mods page): the same pull request lists your key. An
+optional `"repo": "https://…"` in `mod.json` is the link the catalogue shows for
+your source. Keep your key private and backed up: a lost key
 means a new UUID, and owners would have to remove the old mod before installing
 yours again.

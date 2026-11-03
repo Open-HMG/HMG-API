@@ -1,0 +1,40 @@
+{
+  "id": "wireless-carplay-aa",
+  "name": "Wireless CarPlay + Android Auto",
+  "description": "Wireless CarPlay and Android Auto on the head unit's hotspot, with turn-by-turn on the cluster and HUD.",
+  "authors": [
+    "VysseCodes"
+  ],
+  "license": "AGPL-3.0",
+  "uuid": "7251ce71-a146-8a1e-958b-dbffc6af7359",
+  "version": "2.1.0",
+  "repo": "https://github.com/VysseCodes/HMG-API/tree/main/mods/wireless-carplay-aa",
+  "download": "https://github.com/VysseCodes/HMG-API/releases/download/v1.0.0-beta.6/wireless-carplay-aa-2.1.0.zip",
+  "sha256": "f4e17de5d3e9dc89c2f538cb237603a2ce91480959e4881e161d90fe2f2fa826",
+  "hmgapi": ">=1.0.0",
+  "system": [
+    {
+      "model": [
+        "CVEV",
+        "NEEV",
+        "NEEV23"
+      ],
+      "region": "USA",
+      "firmware": "260507",
+      "features": [
+        "hmgapi.wifi"
+      ]
+    },
+    {
+      "model": [
+        "CVEV",
+        "NEEV"
+      ],
+      "region": "CAN",
+      "firmware": "260206",
+      "features": [
+        "hmgapi.wifi"
+      ]
+    }
+  ]
+}

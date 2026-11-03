@@ -37,6 +37,7 @@ RULES = [
     (['tools/mkdelta.py', 'tools/mkrecipe.py', 'tools/mkmemrecipe.py'], ['core/runtime/engine-test.sh', 'core/runtime/safety-test.sh', 'tools/lpatch/test.sh']),
     (['tools/mkinstallers.sh', 'tools/mkrelease.sh', 'tools/mkmodpkg.sh', 'tools/release-mods.txt'], INSTALL + ['core/runtime/signing-test.sh', 'core/runtime/usb-test.sh']),
     (['tools/mod-draft*'], ['tools/mod-draft-test.sh']),
+    (['catalog/*', 'tools/catalog*', 'maps/authors.json', '.github/workflows/catalog.yml'], ['tools/catalog-test.sh']),
     (['tools/micom-*'], ['tools/micom-decode-test.sh']),
     (['tools/check-scripts.sh'], ['tools/check-scripts.sh']),
     (['tools/requirements.txt'], ALL),

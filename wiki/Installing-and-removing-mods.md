@@ -2,8 +2,8 @@
 
 ## Installing
 
-1. Put the mod's `.zip` (as its author released it) in `HMGAPI/updates/` on a USB
-   stick.
+1. Put the mod's `.zip` (as its author released it; [Community mods](Community-mods)
+   lists them) in `HMGAPI/updates/` on a USB stick.
 2. Plug the stick in, open the HMG-API app > **Check USB updates**.
 3. Each zip is listed with what it is. Tap the mod to install it.
    - **A mod whose author isn't on HMG-API's trusted author list** shows a warning

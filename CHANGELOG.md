@@ -135,6 +135,10 @@ side with it: `tools/mod-draft.py` drafts its `mod.json`.
 - **MICOM watch** (owners and developers): records the frames the head unit gets
   from the car's MICOM, for mapping new readings with the community CAN projects
   (`docs/micom-map.md`). Listening only; identity never reaches the log.
+- **Community mod catalogue:** one pull request (`tools/catalog.py add`) lists your mod
+  on the wiki's Community mods page, linking your repository and your own signed
+  release zip, and puts your author key on the trusted list. CI downloads the zip and
+  checks its SHA-256 and signature; an entry's author key can't change.
 
 ### Compared with Leafia 1.x
 

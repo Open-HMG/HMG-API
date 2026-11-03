@@ -1,0 +1,38 @@
+# The community mod catalogue (catalog/, maps/authors.json): every entry well-formed,
+# and each new or changed one's download fetched and checked (SHA-256, signature,
+# id, version) against the base branch's rules (tools/catalog.py check).
+name: Catalogue
+
+on:
+  push:
+    branches: [main]
+    paths: ["catalog/**", "maps/authors.json", "tools/catalog.py", ".github/workflows/catalog.yml"]
+  pull_request:
+    paths: ["catalog/**", "maps/authors.json", "tools/catalog.py", ".github/workflows/catalog.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Check the catalogue
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          case "$BASE" in
+            ""|0000000000000000000000000000000000000000) python3 tools/catalog.py check --download ;;
+            *) python3 tools/catalog.py check --download --base "$BASE" ;;
+          esac

@@ -1,6 +1,12 @@
 {
-  "about": "Mod authors HMG-API knows, by author key UUID. A mod from a key not listed here still installs, with a warning; updates to any installed mod must come from the key it was first installed with. To be listed, open an issue with your key's UUID and where your mods are published.",
+  "about": "Mod authors HMG-API knows, by author key UUID. A mod from a key not listed here still installs, with a warning; updates to any installed mod must come from the key it was first installed with. To be listed, add your mod to the catalogue (catalog/, tools/catalog.py add; see the wiki's Making mods page): that pull request lists your key here.",
   "authors": {
-    "7251ce71-a146-8a1e-958b-dbffc6af7359": { "name": "VysseCodes", "projects": "HMG-API, its example mods, wireless CarPlay + Android Auto" }
+    "7251ce71-a146-8a1e-958b-dbffc6af7359": {
+      "name": "VysseCodes",
+      "projects": "HMG-API, its example mods, wireless CarPlay + Android Auto",
+      "repos": [
+        "https://github.com/VysseCodes/HMG-API"
+      ]
+    }
   }
 }

@@ -19,6 +19,33 @@ Packaging: `tools/mkmodpkg.sh <mod folder> <your key>` (make a key once with
 `java -cp out/engine-host hmgapi.engine.Signing keygen <file>`). Keep the key safe:
 only packages signed with it update your mod.
 
+## Listing your mod
+
+The [Community mods](Community-mods) page lists mods from their authors'
+own repositories. One pull request to HMG-API adds yours and puts your author key
+on the trusted list, so owners install it without the unknown-author warning (once
+a HMG-API release carries the list).
+
+1. Publish your signed zip (`tools/mkmodpkg.sh`) where it stays put, such as a
+   GitHub release asset. Don't replace a published file: each version gets its own.
+2. In your fork of HMG-API, one command:
+
+   ```
+   tools/catalog.py add my-mod-1.0.0.zip --download https://github.com/you/my-mod/releases/download/v1.0.0/my-mod-1.0.0.zip --repo https://github.com/you/my-mod
+   ```
+
+   It checks the zip's signature and writes `catalog/<id>.json` (name, description,
+   cars and version from your `mod.json`, the zip's SHA-256, your author key) and
+   your entry in `maps/authors.json`. `--repo` can come from `"repo"` in `mod.json`.
+3. Open the pull request with both files. CI downloads the zip and checks that its
+   SHA-256, signature, id and version match the entry.
+
+A new version is the same steps with the new zip: the entry's author key can't
+change (only your key updates your mod), and its version can't go back. A pull
+request changes only its own author's entry in the trusted list. Listing means the
+package is whole and signed by you; the maintainer reviews each new author before
+merging.
+
 ## Scripts on the head unit
 
 The head unit's shell is mksh with a small toolbox: no `sed`, `tr`, `awk`, `head`,

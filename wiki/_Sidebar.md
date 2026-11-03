@@ -8,6 +8,7 @@
 - [Car Report](Car-Report)
 - [Getting help](Getting-help)
 - [Troubleshooting](Troubleshooting)
+- [Community mods](Community-mods)
 - [What mods can add](What-mods-can-add)
 - [When two mods want the same thing](When-two-mods-want-the-same-thing)
 - [What HMG-API never does](What-HMG-API-never-does)
