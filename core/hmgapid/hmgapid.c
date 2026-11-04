@@ -3,7 +3,7 @@
  *
  *   hmgapid daemon          start the daemon (needs full root)
  *   hmgapid boot            the boot hook: returns at once; detached, starts the daemon
- *                           and, if this call started it, runs ROOTDIR/boot.sh
+ *                           if none runs, and the first call each boot runs ROOTDIR/boot.sh
  *   hmgapid <op> [args...]  ask the daemon; prints its output, exits with its code
  *
  * Started from the boot hook (init's flash_recovery / qb_runtime), so it has
@@ -66,6 +66,9 @@ typedef long sl;
 #endif
 #ifndef GETPROP
 #define GETPROP "/system/bin/getprop"
+#endif
+#ifndef BOOTMARK
+#define BOOTMARK "/dev/.hmgapi-boot"   /* tmpfs: empty again at every boot */
 #endif
 #ifndef USBROOT
 #define USBROOT ""
@@ -165,6 +168,7 @@ static long clock_sec(int clk)
 #define O_WRONLY 1
 #define O_RDWR 2
 #define O_CREAT 0100
+#define O_EXCL 0200
 #define O_TRUNC 01000
 #define O_APPEND 02000
 #define O_DIRECTORY 040000
@@ -555,7 +559,7 @@ static int run_env(int fd, char *const argv[], char *const extra[], int finish)
     }
     envp[ne] = 0;
     sl pid, n;
-    int st = 0;
+    int st = 0, exited = 0;
     char buf[4096];
     if (x_pipe(pfd) < 0) { say(fd, "pipe failed\n"); return 1; }
     pid = x_fork();
@@ -566,17 +570,28 @@ static int run_env(int fd, char *const argv[], char *const extra[], int finish)
         x_dup2(pfd[1], 1);
         x_dup2(pfd[1], 2);
         /* only 0-2 go to the command: the pipe's own fd, the client's socket and the
-         * services' pipes stay here. A command's background job (the boot hook's
-         * "(sleep 120; ...) &") kept the pipe open otherwise, the read loop below waited
-         * for its EOF, and so did the boot script: NEMESIS started two minutes late */
+         * services' pipes stay here */
         for (i = 3; i < 1024; i++) x_close(i);
         x_execve(argv[0], argv, envp);
         x_exit(127);
     }
     x_close(pfd[1]);
-    while ((n = x_read(pfd[0], buf, sizeof buf)) != 0) {
+    /* Done when the command exits, not when the pipe closes: a background job it started
+     * can still hold the pipe. The unit's shell (mksh) keeps copies of fds 1 and 2 above
+     * 9 while it applies a job's ">file 2>&1", and the job inherits them, so the boot
+     * hook's "(sleep 120; ...) >log 2>&1 &" held hmgapid sh, and the boot script with it
+     * (NEMESIS two minutes late, 1.0.0 and 1.0.1). What's left in the pipe once the command
+     * has exited is still sent. */
+    for (;;) {
+        struct { int fd; short ev, rev; } p = { (int)pfd[0], POLLIN, 0 };
+        sl pr;
+        if (!exited && x_wait4(pid, &st, WNOHANG) == pid) exited = 1;
+        pr = x_poll(&p, 1, exited ? 0 : 200);
+        if (pr == -EINTR) continue;
+        if (pr <= 0) { if (exited) break; continue; }
+        n = x_read(pfd[0], buf, sizeof buf);
         if (n == -EINTR) continue;
-        if (n < 0) break;
+        if (n <= 0) break;
         if (fd < 0) continue;   /* client gone, finishing: drop the output */
         if (frame(fd, 'O', buf, (u32)n)) {   /* client gone */
             if (!finish) { x_kill(pid, SIGKILL); break; }
@@ -584,7 +599,7 @@ static int run_env(int fd, char *const argv[], char *const extra[], int finish)
         }
     }
     x_close(pfd[0]);
-    while (x_wait4(pid, &st, 0) == -EINTR) ;
+    if (!exited) while (x_wait4(pid, &st, 0) == -EINTR) ;
     if ((st & 0x7f) == 0) return (st >> 8) & 0xff;
     return 128 + (st & 0x7f);
 }
@@ -1758,8 +1773,6 @@ static int full_root(void)
 
 struct ksigaction { void *handler; ul flags; void *restorer; u32 mask[2]; };
 
-static int g_already;   /* daemon_main found one running */
-
 static int daemon_main(void)
 {
     struct sun a;
@@ -1785,7 +1798,7 @@ static int daemon_main(void)
     s = x_socket(1, 1 | 02000000 /* SOCK_STREAM | SOCK_CLOEXEC */, 0);
     if (s < 0) return 1;
     r = x_bind(s, &a, alen);
-    if (r == -EADDRINUSE) { g_already = 1; out(1, "hmgapid: already running\n"); return 0; }
+    if (r == -EADDRINUSE) { out(1, "hmgapid: already running\n"); return 0; }
     if (r < 0 || x_listen(s, 16) < 0) { out(2, "hmgapid: can't listen\n"); return 1; }
 
     /* detach: the boot hook's process may be killed when it returns */
@@ -1847,9 +1860,9 @@ static int daemon_main(void)
  * service. It returns at once, so the boot script goes straight on to NEMESIS's start:
  * waiting on HMG-API's boot steps held it (two minutes in 1.0.0). A detached child (own
  * session, none of the caller's fds: init's oneshot cleanup can't take it down, and it
- * holds none of the script's pipes) starts the daemon, then runs boot.sh only if it was
- * this call that started it: the daemon's socket is the once-per-boot lock, so the
- * other triggers stop there. */
+ * holds none of the script's pipes) starts the daemon if none runs (the zygote wrapper
+ * usually started it already), then runs boot.sh if it's the first this boot: BOOTMARK,
+ * made with O_EXCL on tmpfs, is the once-per-boot lock, so the other triggers stop there. */
 static int boot_main(void)
 {
     static char *a[] = { SH, ROOTDIR "/boot.sh", 0 };
@@ -1872,7 +1885,10 @@ static int boot_main(void)
     f = x_open("/dev/null", O_RDWR, 0);
     if (f >= 0) { x_dup2(f, 0); x_dup2(f, 1); x_dup2(f, 2); }
     for (i = 3; i < 1024; i++) x_close(i);
-    if (daemon_main() != 0 || g_already) x_exit(0);
+    if (daemon_main() != 0) x_exit(0);
+    f = x_open(BOOTMARK, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+    if (f < 0) x_exit(0);   /* another trigger ran boot.sh this boot */
+    x_close(f);
     f = x_open(ROOTDIR "/boot.log", O_WRONLY | O_CREAT | O_TRUNC, 0600);
     if (f >= 0) { x_dup2(f, 1); x_dup2(f, 2); if (f > 2) x_close(f); }
     logline("boot: running boot.sh", 0, -1, 0);

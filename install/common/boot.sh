@@ -11,13 +11,19 @@
 # was cut off (or a trial is waiting), roll it back, and restart once if anything was
 # rolled back (apps may already have loaded the files).
 umask 077
+# what hmgapid gives its commands (the caller's environment is init's or NEMESIS's)
+export PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
+export LD_LIBRARY_PATH=/vendor/lib:/system/lib
+unset LD_PRELOAD
 D=/data/hmgapi
 H=/system/bin/hmgapid
 echo "$(date) boot"
+# Already detached (own session, output to boot.log), so the background jobs start from
+# here: through `hmgapid sh` they'd hold its output pipe (mksh's saved fds), and this with it.
 if [ -s $D/state/binds.txt ]; then $H binds > $D/binds.log 2>&1 & fi
-if [ -f $D/public/HmgApi.apk ]; then $H sh "sh $D/app-pending.sh </dev/null >/dev/null 2>&1 &" >/dev/null 2>&1; fi
-if [ -f $D/hook-check.sh ]; then $H sh "sh $D/hook-check.sh </dev/null >/dev/null 2>&1 &" >/dev/null 2>&1; fi
-if [ -x /system/xbin/nemesis ]; then $H sh "(sleep 120; $H engine nemesis-sync) </dev/null >$D/nemesis-sync.log 2>&1 &" >/dev/null 2>&1; fi
+if [ -f $D/public/HmgApi.apk ]; then sh $D/app-pending.sh </dev/null >/dev/null 2>&1 & fi
+if [ -f $D/hook-check.sh ]; then sh $D/hook-check.sh </dev/null >/dev/null 2>&1 & fi
+if [ -x /system/xbin/nemesis ]; then (sleep 120; $H engine nemesis-sync) </dev/null >$D/nemesis-sync.log 2>&1 & fi
 if [ -f $D/state/journal.json ]; then
     $H engine recover > $D/recover.log 2>&1
     if grep -q "rolled back" $D/recover.log || grep -q "trial undone" $D/recover.log; then
