@@ -27,7 +27,7 @@ calls() { cat $T/calls.log 2>/dev/null || true; : > $T/calls.log; }
 run() { set +e; out=$(cd $T && env PATH="$T/bin:$PATH" ROOT=$R CAPCHECK=0 $SH "$@" 2>&1); rc=$?; set -e; }
 tree() { (cd $R/system && find . -type f | sort | while read f; do echo "$(md5sum < "$f" | cut -c1-32) $f"; done) }
 
-mkdir -p $R/system/bin $R/system/lib $R/system/framework $R/system/etc $R/data/dalvik-cache
+mkdir -p $R/system/bin $R/system/lib $R/system/framework $R/system/etc $R/data/dalvik-cache $R/dev
 STOCK=$HOME/hmg-private/stock/ev6-sysimg/bin/app_process
 if [ -f "$STOCK" ]; then cp $STOCK $R/system/bin/app_process; else head -c 9000 /dev/urandom > $R/system/bin/app_process; fi
 chmod 755 $R/system/bin/app_process
@@ -87,6 +87,7 @@ check "boot hook in qb_runtime.sh" 1 "$(grep -c 'HMGAPI_HOOK begin' $R/system/et
 check "boot hook: only hmgapid boot, which returns at once (NEMESIS's start comes after it)" "if [ -x /system/bin/hmgapid ]; then /system/bin/hmgapid boot; fi" "$(sed -n 3p $R/system/etc/install-recovery.sh)"
 check "... and NEMESIS's own lines still follow it" "# NEMESIS|nemesis watchdog" "$(sed -n 5p $R/system/etc/install-recovery.sh)|$(sed -n 6p $R/system/etc/install-recovery.sh)"
 check "boot.sh (the boot steps hmgapid boot runs) kept, root only" "-rwx------" "$(ls -l $R/data/hmgapi/boot.sh | cut -c1-10)"
+check "this boot marked done, so a boot service NEMESIS starts after the install runs no boot steps (no engine recover mid-install)" yes "$([ -f $R/dev/.hmgapi-boot ] && echo yes)"
 check "hooks on at the next start" "yes" "$([ -f $R/data/hmgapi/hook/enable ] && echo yes)"
 check "updates off by default" '{"updates": false}' "$(cat $R/data/hmgapi/settings/hmgapi.json)"
 check "/data/hmgapi: traverse only for apps" "drwx--x--x" "$(ls -ld $R/data/hmgapi | cut -c1-10)"

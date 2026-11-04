@@ -112,6 +112,12 @@ else
     fail "app_process md5 $HAVE isn't a known stock build, so nothing was changed. Please send this line to the HMG-API maintainers. To install anyway, at your own risk: an empty file HMGAPI/FORCE on the USB stick, or HMGAPI_FORCE=1 over adb."
 fi
 
+# this boot's boot steps are done: an install does what they would (the app, the NEMESIS
+# sync). NEMESIS starts HMG-API's boot service after an install, and after each listing
+# the sync makes; on a unit that started with an older hmgapid there's no marker yet, and
+# boot.sh's engine recover would then undo a waiting trial in the middle of this install
+echo > "$ROOT/dev/.hmgapi-boot" 2>/dev/null || true   # not ":": a failed redirect on a special builtin ends the script
+
 # /data/hmgapi: root only (NEMESIS runs commands with umask 0)
 for d in "" /stock /state /mods /settings /hook /inbox /dalvik-cache /public; do
     mkdir -p "$D$d" && chmod 700 "$D$d" || fail "make $D$d"
