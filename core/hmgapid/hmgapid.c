@@ -1,7 +1,9 @@
 /*
  * hmgapid: HMG-API's root daemon, and its client (same binary).
  *
- *   hmgapid daemon          start the daemon (boot hook; needs full root)
+ *   hmgapid daemon          start the daemon (needs full root)
+ *   hmgapid boot            the boot hook: returns at once; detached, starts the daemon
+ *                           and, if this call started it, runs ROOTDIR/boot.sh
  *   hmgapid <op> [args...]  ask the daemon; prints its output, exits with its code
  *
  * Started from the boot hook (init's flash_recovery / qb_runtime), so it has
@@ -1756,6 +1758,8 @@ static int full_root(void)
 
 struct ksigaction { void *handler; ul flags; void *restorer; u32 mask[2]; };
 
+static int g_already;   /* daemon_main found one running */
+
 static int daemon_main(void)
 {
     struct sun a;
@@ -1781,7 +1785,7 @@ static int daemon_main(void)
     s = x_socket(1, 1 | 02000000 /* SOCK_STREAM | SOCK_CLOEXEC */, 0);
     if (s < 0) return 1;
     r = x_bind(s, &a, alen);
-    if (r == -EADDRINUSE) { out(1, "hmgapid: already running\n"); return 0; }
+    if (r == -EADDRINUSE) { g_already = 1; out(1, "hmgapid: already running\n"); return 0; }
     if (r < 0 || x_listen(s, 16) < 0) { out(2, "hmgapid: can't listen\n"); return 1; }
 
     /* detach: the boot hook's process may be killed when it returns */
@@ -1839,6 +1843,44 @@ static int daemon_main(void)
     }
 }
 
+/* The boot hook's one line (install-recovery.sh, qb_runtime.sh) and HMG-API's NEMESIS
+ * service. It returns at once, so the boot script goes straight on to NEMESIS's start:
+ * waiting on HMG-API's boot steps held it (two minutes in 1.0.0). A detached child (own
+ * session, none of the caller's fds: init's oneshot cleanup can't take it down, and it
+ * holds none of the script's pipes) starts the daemon, then runs boot.sh only if it was
+ * this call that started it: the daemon's socket is the once-per-boot lock, so the
+ * other triggers stop there. */
+static int boot_main(void)
+{
+    static char *a[] = { SH, ROOTDIR "/boot.sh", 0 };
+    sl r, f;
+    int i;
+#ifndef NOCAPCHECK
+    if (!full_root()) {
+        out(2, "hmgapid: not full root (started from adb?); start it from the boot hook\n");
+        return 1;
+    }
+#endif
+    r = x_fork();
+    if (r < 0) return 1;
+    if (r > 0) {   /* the middle child exits at once; the grandchild is init's */
+        while (x_wait4(r, 0, 0) == -EINTR) ;
+        return 0;
+    }
+    x_setsid();
+    if (x_fork() != 0) x_exit(0);
+    f = x_open("/dev/null", O_RDWR, 0);
+    if (f >= 0) { x_dup2(f, 0); x_dup2(f, 1); x_dup2(f, 2); }
+    for (i = 3; i < 1024; i++) x_close(i);
+    if (daemon_main() != 0 || g_already) x_exit(0);
+    f = x_open(ROOTDIR "/boot.log", O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (f >= 0) { x_dup2(f, 1); x_dup2(f, 2); if (f > 2) x_close(f); }
+    logline("boot: running boot.sh", 0, -1, 0);
+    x_execve(a[0], a, g_env);
+    logline("boot: can't run boot.sh", 0, -1, 0);
+    x_exit(127);
+}
+
 /* ---------------- client ---------------- */
 static int client(int argc, char **argv)
 {
@@ -1881,7 +1923,7 @@ int main(int argc, char **argv, char **envp)
 {
     g_env = envp;
     if (argc < 2) {
-        out(2, "usage: hmgapid daemon | hmgapid <op> [args...]\n"
+        out(2, "usage: hmgapid daemon | hmgapid boot | hmgapid <op> [args...]\n"
                "ops: ping, version, mods, enable <id>, disable <id>, setting-get <id>,\n"
                "     setting-set <id> <json>, mod-file <id> mod.json|settings.json, log, reboot, engine <plan|apply|keep|restore|status|recover>,\n"
                "     services [mod], service-restart|service-stop|service-start <mod> <name>, service-log <mod> <name>,\n"
@@ -1891,6 +1933,7 @@ int main(int argc, char **argv, char **envp)
         return 2;
     }
     if (seq(argv[1], "daemon")) return daemon_main();
+    if (seq(argv[1], "boot") && argc == 2) return boot_main();
     return client(argc - 1, argv + 1);
 }
 

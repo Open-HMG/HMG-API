@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- **HMG-API never holds up NEMESIS's start.** HMG-API's boot hook is now one line,
+  `hmgapid boot`, which returns at once: it starts HMG-API and runs its boot steps
+  (`/data/hmgapi/boot.sh`) detached, alongside NEMESIS instead of before it. 1.0.1
+  fixed the two-minute wait, but any slow boot step (an `engine recover` after a cut-off
+  apply, say) still made NEMESIS wait.
+- **HMG-API starts with NEMESIS too.** HMG-API's NEMESIS package has a boot service
+  that runs the same `hmgapid boot`, so HMG-API starts even when a NEMESIS install or
+  update has rewritten `install-recovery.sh` without HMG-API's block. Whichever comes
+  first starts HMG-API; the other does nothing. Cars without NEMESIS start from the boot hook alone, as before.
+
 ## 1.0.1 (2026-11-03)
 
 ### Fixes

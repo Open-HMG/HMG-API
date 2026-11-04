@@ -279,4 +279,29 @@ s.settimeout(5)
 assert s.recv(10) == b""
 PY
 check "still answers after bad clients" "ok" "$(run root ping)"
+
+# --- boot: the boot hook's line returns at once (NEMESIS's start comes after it); detached, it
+# starts the daemon and runs boot.sh, once: a second trigger (NEMESIS's service) finds it running
+build boot "$ME" ""
+B=$T/boot
+printf 'echo ran >> "%s/ran"
+echo "boot output"
+%s 3
+echo done >> "%s/ran"
+' "$B" "$SLEEP" "$B" > "$B/root/boot.sh"
+t0=$(date +%s)
+out=$("$B/hmgapid" boot 2>&1)   # $(...) waits for every holder of its pipe: the detached child may hold none
+check "boot returns at once, saying nothing" "yes|" "$([ $(( $(date +%s) - t0 )) -lt 2 ] && echo yes || echo no)|$out"
+waitfor '[ "$(run boot ping)" = ok ]' || true
+check "... it started the daemon" "ok" "$(run boot ping)"
+waitfor '[ -f "$B/ran" ]' || true
+check "... and ran boot.sh" "ran" "$(cat "$B/ran" 2>/dev/null)"
+check "... its output in boot.log" "boot output" "$(cat "$B/root/boot.log" 2>/dev/null)"
+t0=$(date +%s)
+out=$("$B/hmgapid" boot 2>&1)
+check "a second boot returns at once too" "yes|" "$([ $(( $(date +%s) - t0 )) -lt 2 ] && echo yes || echo no)|$out"
+waitfor 'grep -q done "$B/ran"' || true
+check "... and doesn't run boot.sh again" "ran done" "$(cat "$B/ran" | tr '\n' ' ' | sed 's/ $//')"
+has "... boot.sh logged in hmgapid.log" "boot: running boot.sh" "$(cat "$B/root/hmgapid.log")"
+check "boot takes no arguments" "2" "$(code boot boot extra)"
 exit $fail
