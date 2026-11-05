@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- **The head unit no longer restarts at car start when a car sends Digital Key data.** The
+  vehicle service answered the car's `out` array callbacks without the array, which crashed
+  system_server. This could happen with any mod that reads the car (US Niro EV 260507).
+
 ## 1.0.2 (2026-11-04)
 
 ### Fixes
