@@ -1,0 +1,120 @@
+{
+  "make": "kia",
+  "model": "ev6",
+  "name": "Kia EV6",
+  "region": "can",
+  "firmware": "260206",
+  "products": [
+    "CVEV.CAN."
+  ],
+  "status": "mapped",
+  "verified": null,
+  "files": {
+    "/system/app/HKMC_BtSettings.odex": "9096dec592a9959291dffa00b23e1a52",
+    "/system/app/ButtonSettings.odex": "64f400e7baf8afa44d5ba49e65657b91",
+    "/system/app/HKMC_DiPO.odex": "a565e180fdb0b73d6520f28c91cdba63",
+    "/system/framework/com.tcc.iap2.odex": "40d1b9c379d1e7ec0fbe44e9b84a79ba",
+    "/system/framework/com.broadcom.bt.jar": "dbf374aa8bde80fad95746a67719ce51",
+    "/system/framework/framework.odex": "eb36b75336eeeb62bd705aca355d4f20",
+    "/system/framework/core.odex": "5c87034ee064af113929de08ffa6b6aa",
+    "/system/framework/framework2.odex": "8eb769e7667eee9b959d4007bd9c41cf",
+    "/system/framework/automotive.odex": "a0de8ed6a423c24af19565b184fd112e",
+    "/system/framework/com.hkmc.ext.hcan.odex": "e3928a78928b75949a639af6b8ee0c0d",
+    "/system/framework/automotive-service.odex": "1da6ac148850cba9ec5ebcc5ac55690c",
+    "/system/app/HKMC_GPM.odex": "96cd7c27a9db19acb3900f21f57ea9f0",
+    "/system/app/HKMC_HomeSetting_WP.odex": "905bee45b573b32918a973cfc1a1fe01",
+    "/system/app/Iap2ServerApp.odex": "03950e4b691f846e5478a5a69818c65e",
+    "/system/app/Launcher_WP3.odex": "12c9a96cae35fce9c11fab3918cd912a",
+    "/system/app/RightScreenHome.odex": "8c06f56597970d09ab369cfd8cc8c28d",
+    "/system/app/Settings_W.odex": "362c3fc19c69581b3966c207c08daa8d",
+    "/system/app/ThemeSettings.odex": "c30f040fd0648b5c8be457f287705ada"
+  },
+  "apps": [
+    "btsettings",
+    "buttonsettings",
+    "dipo",
+    "framework",
+    "gpm",
+    "homesetting",
+    "iap2",
+    "launcher",
+    "panel",
+    "settings",
+    "themesettings"
+  ],
+  "app_files": {
+    "btsettings": {
+      "package": "com.android.btsettings",
+      "files": [
+        "/system/app/HKMC_BtSettings.odex"
+      ]
+    },
+    "buttonsettings": {
+      "package": "com.android.buttonsettings",
+      "files": [
+        "/system/app/ButtonSettings.odex"
+      ]
+    },
+    "dipo": {
+      "package": "com.daudio.app.dipo",
+      "files": [
+        "/system/app/HKMC_DiPO.odex",
+        "/system/framework/com.tcc.iap2.odex",
+        "/system/framework/com.broadcom.bt.jar"
+      ]
+    },
+    "framework": {
+      "package": null,
+      "files": [
+        "/system/framework/framework.odex",
+        "/system/framework/core.odex",
+        "/system/framework/framework2.odex",
+        "/system/framework/automotive.odex",
+        "/system/framework/com.hkmc.ext.hcan.odex",
+        "/system/framework/automotive-service.odex"
+      ]
+    },
+    "gpm": {
+      "package": "com.google.android.projection.sink",
+      "files": [
+        "/system/app/HKMC_GPM.odex"
+      ]
+    },
+    "homesetting": {
+      "package": "com.hkmc.system.app.homesetting",
+      "files": [
+        "/system/app/HKMC_HomeSetting_WP.odex"
+      ]
+    },
+    "iap2": {
+      "package": "com.tcc.iap2server",
+      "files": [
+        "/system/app/Iap2ServerApp.odex"
+      ]
+    },
+    "launcher": {
+      "package": "com.android.launcher3",
+      "files": [
+        "/system/app/Launcher_WP3.odex"
+      ]
+    },
+    "panel": {
+      "package": "com.mobis.splitscreen.right",
+      "files": [
+        "/system/app/RightScreenHome.odex"
+      ]
+    },
+    "settings": {
+      "package": "com.android.settings",
+      "files": [
+        "/system/app/Settings_W.odex"
+      ]
+    },
+    "themesettings": {
+      "package": "com.android.themesettings",
+      "files": [
+        "/system/app/ThemeSettings.odex"
+      ]
+    }
+  }
+}

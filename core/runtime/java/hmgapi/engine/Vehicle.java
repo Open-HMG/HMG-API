@@ -47,6 +47,10 @@ public final class Vehicle {
         add(m, "hv.health", "raw", 60000, "high-voltage battery health index");
         add(m, "hv.ready", "raw", 1000, "EV ready");
         add(m, "hv.conditioning", "raw", 5000, "the owner's Battery Conditioning setting (EV settings): 1 off, 2 on; not whether it's running");
+        add(m, "hv.conditioning_active", "0/1", 2000, "the car's battery conditioning indicator: conditioning now (body control)");
+        add(m, "hv.battery_temp_min", "C", 5000, "high-voltage battery's minimum cell temperature, whole degrees (cluster battery info)");
+        add(m, "hv.conditioning_failure", "raw", 5000, "battery conditioning failure popup flag (BMS), as the car sends it; meaning of values not known yet");
+        add(m, "conditioning.state", "text", 1000, "HMG-API's conditioning request: off, requested, waiting, active, stopping, ended (by the car), timed_out");
         add(m, "charging", "raw", 5000, "charging status");
         add(m, "odometer", "km", 60000, "odometer");
         for (String seat : new String[] { "driver", "passenger", "rear_left", "rear_right" }) {
@@ -81,7 +85,7 @@ public final class Vehicle {
         cmd(m, "seat_heat", "driver|passenger|rear_left|rear_right off|low|medium|high", "the seat's climate setting, as the climate app sets it");
         cmd(m, "seat_vent", "driver|passenger off|low|medium|high", "the seat's ventilation through the same seat setting the climate app uses (owner's request, 2026-10-31)");
         cmd(m, "wheel_heat", "on|off", "on or off only");
-        cmd(m, "conditioning", "start|auto-start|stop", "one state for the unit; a manual stop blocks automatic starts until the next manual start; stopped when the mod that started it is turned off");
+        cmd(m, "conditioning", "start|auto-start [<km> <minutes>] [warm]|route <km> <minutes>|stop|status", "refused unless READY with Battery Conditioning on in the EV settings and the car not conditioning on its own; a warm pack refused unless \"warm\" is added; stopped if the indicator isn't on in time (EV6 5 min, others 2 min) or when the car ends it, and automatic starts wait for a manual one after a timeout; one state for the unit; route values as the car's navigation sends them (0-2046 km, 0-1022 min; default 9 km, 18 min), changed only by the mod conditioning; a manual stop blocks automatic starts until the next manual start (the mod whose automatic request it is ending it doesn't); stopped when the mod that started it is turned off");
         cmd(m, "ambient_light", "color <rrggbb>|brightness <0-10>|release|owner_change release|keep", "one mod at a time (the first to ask holds it until it releases or is turned off); the owner's light is put back on release, including a change made in the car's menu meanwhile (owner_change release: such a change ends the hold instead); the owner's switch block_ambient_light keeps every mod off it; 10 changes a second at most");
         cmd(m, "guide_lines", "on|off|restore", "the state before the first change comes back when the mod restores, releases or is turned off");
         cmd(m, "rear_camera", "take|release", "one mod at a time (coordination: the car's reverse view always comes first); free again when the mod is turned off");

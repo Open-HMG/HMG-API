@@ -31,7 +31,8 @@
   },
   "vehicle": {
     "read": ["gear.park", "parking_brake", "speed", "moving", "driving.restricted", "steering.angle", "pedal.accel",
-             "brake.pressure", "battery12v.soc", "hv.soc", "hv.health", "hv.ready", "hv.conditioning", "charging",
+             "brake.pressure", "battery12v.soc", "hv.soc", "hv.health", "hv.ready", "hv.conditioning", "hv.conditioning_active",
+             "hv.battery_temp_min", "hv.conditioning_failure", "conditioning.state", "charging",
              "odometer", "seat_heat.driver", "seat_heat.passenger", "seat_heat.rear_left", "seat_heat.rear_right",
              "seat_vent.driver", "seat_vent.passenger", "wheel_heat", "defogger",
              "seat_state.driver", "seat_state.passenger", "outside_temp", "outside_temp_f", "guide_lines"],

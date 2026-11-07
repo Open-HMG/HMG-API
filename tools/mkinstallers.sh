@@ -2,12 +2,15 @@
 # Make HMG-API's install downloads in out/dist/:
 #   hmgapi-<v>-usb.zip      a USB stick: DSP OTA (nothing installed yet), NEMESIS
 #                           (NEMESIS.data type=install) and the app (HMGAPI/updates)
-#   hmgapi-<v>-nemesis.zip  for NEMESIS, laid out like NEMESIS's own downloads: unzipped
-#                           onto a stick, its NEMESIS.data (type=install) installs
-#                           packages/hmgapi.zip, the package itself (NEMESIS.data [nemesis])
+#   hmgapi-<v>-nemesis.zip  for NEMESIS 1.16 or newer: unzipped onto a stick, its
+#                           NEMESIS.data (type=list) opens NEMESIS's Package Store on
+#                           packages/hmgapi.zip (the package itself, NEMESIS.data
+#                           [nemesis]) and each mod's NEMESIS package, packages/hmgapi.<id>.zip
 #   hmgapi-<v>-nemesis-package.zip  the package itself, for NEMESIS's Package Store (the
 #                           portal) and nemesis install
 #   hmgapi-<v>-adb.zip      hmgapi-adb.sh and the payload
+#   mods/<id>-<v>-nemesis*.zip  each signed mod in out/packages as a NEMESIS package
+#                           (tools/mknemesismod.sh)
 # Every one carries the same payload (out/payload) and ends in install/common/install.sh.
 # HMGAPI/updates gets the signed release (tools/mkrelease.sh, if the release key is
 # here) and every signed mod package in out/packages (tools/mkmodpkg.sh).
@@ -18,21 +21,8 @@ V=$(cat out/payload/VERSION)
 D=$PWD/out/dist
 mkdir -p "$D"
 rm -f "$D/hmgapi-$V-usb.zip" "$D/hmgapi-$V-nemesis.zip" "$D/hmgapi-$V-nemesis-package.zip" "$D/hmgapi-$V-adb.zip"
-# NEMESIS's package-version: dotted numbers only (04-Packages.md; meta.c refuses anything else). A beta
-# comes before its release: the version before it, then .99.<beta> (1.0.0-beta.4 is 0.99.4, below 1.0.0)
-PV=$(python3 - "$V" <<'PY'
-import re, sys
-v = sys.argv[1]
-if re.fullmatch(r"\d+(\.\d+)*", v):
-    print(v)
-    sys.exit()
-m = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)-beta\.(\d+)", v)
-if not m:
-    sys.exit("no NEMESIS package-version for %s: add a rule to tools/mkinstallers.sh" % v)
-x, y, z, n = map(int, m.groups())
-print("%d.%d.%d.99.%d" % (x, y, z - 1, n) if z else "%d.%d.99.%d" % (x, y - 1, n) if y else "%d.99.%d" % (x - 1, n))
-PY
-)
+# NEMESIS's package-version: dotted numbers only, a beta before its release
+PV=$(tools/nemesis-version.py "$V")
 W=$(mktemp -d); trap 'rm -rf "$W"' EXIT
 
 # zipdir <dir> <zip>: fixed order and times, so the same input gives the same zip
@@ -43,17 +33,39 @@ readme() { sed "s/@VERSION@/$V/" "$1" > "$2"; }
 # only reads a NEMESIS.data at the stick's root, with type= and a relative path= (native/usb.c)
 N=$W/nemesis
 mkdir -p "$N"
-sed "s/@VERSION@/$V/; s/@PACKAGE_VERSION@/$PV/" install/nemesis/NEMESIS.data.in > "$N/NEMESIS.data"
+# os="any": HMG-API runs on every Gen5W navigation unit (without a car's hook map only the hook
+# parts stay off); depends=: the NEMESIS packages HMG-API can't live with (install/nemesis/conflicts.txt)
+DEP=$(tools/nemesis-meta.py depends hmgapi)
+sed "s/@VERSION@/$V/; s/@PACKAGE_VERSION@/$PV/; s/@DEPENDS@/$DEP/" install/nemesis/NEMESIS.data.in > "$N/NEMESIS.data"
 cp -r install/nemesis/scripts "$N/scripts"
 cp -r install/nemesis/bin "$N/bin"
 cp -r out/payload "$N/payload"
 chmod 755 "$N"/scripts/*.sh "$N"/bin/*.sh
 zipdir "$N" "$W/hmgapi.zip"
 cp "$W/hmgapi.zip" "$D/hmgapi-$V-nemesis-package.zip"
+# each signed mod as a NEMESIS package, and the stick: a Package Store list (type=list,
+# NEMESIS 1.16) of HMG-API and those mods. The mods depend on hmgapi, so NEMESIS Manager
+# installs HMG-API from the stick first when a mod is picked on its own.
+rm -rf "$D/mods"
+for z in out/packages/*.zip; do [ -f "$z" ] && tools/mknemesismod.sh "$z" "$D/mods" >/dev/null; done
 NB=$W/nemesis-stick
 mkdir -p "$NB/packages"
 cp "$W/hmgapi.zip" "$NB/packages/hmgapi.zip"
-printf '[nemesis]\nversion=1.0\ntype=install\npath=packages/hmgapi.zip\n' > "$NB/NEMESIS.data"
+PUB=$(git log -1 --format=%cs 2>/dev/null || date -u +%F)
+ini() { unzip -p "$1" NEMESIS.data | grep "^$2=" | head -1 | cut -d= -f2- | sed 's/^"\(.*\)"$/\1/'; }
+row() { printf '\n[package.%s]\npath=packages/%s\nname=%s\nshort-desc=%s\npublished=%s\n' "$1" "$2" "$(ini "$NB/packages/$2" name)" "$(ini "$NB/packages/$2" short-desc)" "$PUB"; }
+{
+    printf '[nemesis]\nversion=1.1\ntype=list\n'
+    row 0 hmgapi.zip
+    i=1
+    for p in "$D"/mods/*-nemesis-package.zip; do
+        [ -f "$p" ] || continue
+        id=$(ini "$p" id)
+        cp "$p" "$NB/packages/$id.zip"
+        row $i "$id.zip"
+        i=$((i + 1))
+    done
+} > "$NB/NEMESIS.data"
 readme install/nemesis/README.txt "$NB/README.txt"
 zipdir "$NB" "$D/hmgapi-$V-nemesis.zip"
 

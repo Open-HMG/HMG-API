@@ -38,12 +38,14 @@ public final class Hub {
     static final String ALLOW = "/data/hmgapi/settings/allow/";
 
     static ClassLoader hcan;
+    static SystemCheck.Facts facts;
     static final Map<String, Object> services = new HashMap<String, Object>();
     static final Map<String, String> values = new HashMap<String, String>();
     static final Map<String, Long> readAt = new HashMap<String, Long>();
 
     public static void main(String[] args) throws Exception {
-        Points.use(CarMap.load("", new SystemCheck.Facts("", null), null));
+        facts = new SystemCheck.Facts("", null);
+        Points.use(CarMap.load("", facts, null));
         if (!Points.ready()) {
             System.out.println("vehicle: no good hook map for this car; every reading answers -");
         }
@@ -166,6 +168,14 @@ public final class Hub {
         }
         if ("hv.ready".equals(name)) return hevRaw("framework.hev_flag.ev_ready");
         if ("hv.conditioning".equals(name)) return hevRaw("framework.hev_flag.battery_conditioning");
+        if ("hv.conditioning_active".equals(name)) return valid(num(call(bcm(), "framework.bcm_service.batt_cond_indicator")), 0, 1);
+        if ("hv.conditioning_failure".equals(name)) return String.valueOf(num(call(hev(), "framework.hev_service.hev_status",
+                Points.get(null, "framework.hev_flag.batt_cond_failure", null))));
+        if ("hv.battery_temp_min".equals(name)) {
+            int t = callbacks.packTempMin(500);
+            return t == Integer.MIN_VALUE ? null : String.valueOf(t);
+        }
+        if ("conditioning.state".equals(name)) return commands == null ? null : commands.conditioningState;
         if (name.startsWith("seat_heat.") || name.startsWith("seat_vent.") || name.startsWith("seat_state.")) {
             String seat = name.substring(name.indexOf('.') + 1);
             String id = seatId(seat);
@@ -237,6 +247,10 @@ public final class Hub {
 
     static Object hev() throws Exception {
         return service("framework.car_services.hev", "framework.hev_service_stub.as_interface", null);
+    }
+
+    static Object cluster() throws Exception {
+        return service("framework.car_services.cluster", "framework.cluster_service_stub.as_interface", null);
     }
 
     static Object datc() throws Exception {
@@ -331,6 +345,38 @@ public final class Hub {
 
         public void conditioningStation(int a, int b) { run(get("hev"), "framework.hev_service.batt_cond_station", a, b); }
 
+        public int ready() {
+            try {
+                return hev("framework.hev_flag.ev_ready");
+            } catch (Exception e) {
+                return -1;
+            }
+        }
+
+        public int conditioningSetting() {
+            try {
+                return hev("framework.hev_flag.battery_conditioning");
+            } catch (Exception e) {
+                return -1;
+            }
+        }
+
+        public int conditioningIndicator() {
+            try {
+                int v = num(call(get("bcm"), "framework.bcm_service.batt_cond_indicator"));
+                return v == 0 || v == 1 ? v : -1;
+            } catch (RuntimeException e) {
+                return -1;
+            }
+        }
+
+        public int packTempMin() { return callbacks.packTempMin(1000); }
+
+        public String model() {
+            String m = facts == null ? null : facts.get("model");
+            return m == null ? "" : m;
+        }
+
         public void lightBrightness(int level) { run(get("system"), "framework.system_service.sml_configuration", 5, level); }
 
         public void lightColor(int r, int g, int b) {
@@ -370,13 +416,28 @@ public final class Hub {
             return new java.io.File(ALLOW + "cmd." + mod + "." + cmd).isFile() ? "yes" : null;
         }
 
-        public void ask(String mod, String cmd) {
-            try {
-                new ProcessBuilder("/system/bin/am", "start", "--user", "0", "-n", "hmgapi.app/.AskActivity",
-                        "--es", "mod", mod, "--es", "command", cmd).redirectErrorStream(true).start();
-            } catch (Exception e) {
-                System.out.println("vehicle: can't ask the owner: " + e);
-            }
+        public void ask(final String mod, final String cmd) {
+            // in the background (am takes a moment); what am says goes to the log when the question
+            // didn't go on screen (an app without AskActivity, Android not up), so it isn't lost
+            new Thread() {
+                @Override
+                public void run() {
+                    try {
+                        Process p = new ProcessBuilder("/system/bin/am", "start", "--user", "0", "-n", "hmgapi.app/.AskActivity",
+                                "--es", "mod", mod, "--es", "command", cmd).redirectErrorStream(true).start();
+                        java.io.InputStream in = p.getInputStream();
+                        java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
+                        byte[] b = new byte[1024];
+                        int n;
+                        while ((n = in.read(b)) > 0) o.write(b, 0, n);
+                        int rc = p.waitFor();
+                        String out = o.toString("UTF-8").trim();
+                        if (rc != 0 || out.contains("Error")) System.out.println("vehicle: the question for " + mod + " " + cmd + " didn't go on screen: " + out.replace('\n', ' '));
+                    } catch (Exception e) {
+                        System.out.println("vehicle: can't ask the owner: " + e);
+                    }
+                }
+            }.start();
         }
 
         public long now() { return android.os.SystemClock.elapsedRealtime(); }

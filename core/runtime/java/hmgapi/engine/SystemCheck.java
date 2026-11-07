@@ -35,7 +35,8 @@ import java.util.TreeSet;
  * (>=, >, <=, <, =, ^, ~) is a version range. "features" lists what the unit
  * must have (or, with "!", must not); features are the <feature name> entries
  * in /system/etc/permissions plus HMG-API's own: hmgapi.wifi (a Wi-Fi chip
- * answered on SDIO; the wifi.module feature file is there even without one).
+ * answered on SDIO, or its driver and firmware are in /system/wifi on a car with
+ * the stock hotspot; the wifi.module feature file is there even without one).
  *
  * "system" may also be a list of such objects: any one of them is enough, for
  * a mod that supports e.g. the US EV6 on 260507 and the Canadian Ioniq 5 on 260206.
@@ -147,10 +148,22 @@ public final class SystemCheck {
                         // not root: the engine records it
                     }
                 }
-            } else if (seen.exists()) {
+            } else if (seen.exists() || wifiDriver()) {
                 features.add("hmgapi.wifi");
             }
             return features;
+        }
+
+        /**
+         * The chip is only powered once Wi-Fi or the hotspot is turned on (the Wi-Fi HAL loads
+         * its driver then), so a unit that never had Wi-Fi on shows nothing on SDIO. Its
+         * Broadcom driver and firmware in /system/wifi, on a car whose stock software has the
+         * hotspot, stand for it.
+         */
+        boolean wifiDriver() {
+            return features.contains("com.hkmc.software.wifihotspot")
+                    && new File(root + "/system/wifi/bcmdhd.ko").isFile()
+                    && new File(root + "/system/wifi/fw_bcmdhd.bin").isFile();
         }
 
         /** One line for logs and the app: what HMG-API thinks this unit is. */
@@ -282,7 +295,7 @@ public final class SystemCheck {
             String name = not ? e.substring(1).trim() : e;
             boolean has = facts.features().contains(name);
             if (not && has) return "not for units with " + name;
-            if (!not && !has) return "needs " + name + (name.equals("hmgapi.wifi") ? " (no Wi-Fi chip found on this unit)" : "");
+            if (!not && !has) return "needs " + name + (name.equals("hmgapi.wifi") ? " (no Wi-Fi chip or driver found on this unit)" : "");
         }
         return null;
     }
@@ -307,7 +320,10 @@ public final class SystemCheck {
         return s.toString();
     }
 
-    /** hmgapi.json overrides.ignore_system: true, or a list of mod ids. At the owner's own risk. */
+    /**
+     * hmgapi.json overrides.ignore_system: true, or a list of mod ids. At the owner's own risk.
+     * The app's "Install anyway" (engine install --any-car) adds the mod's id to the list.
+     */
     @SuppressWarnings("unchecked")
     public static boolean ignored(Map<String, Object> hmgapi, String id) {
         Object o = hmgapi.get("overrides");

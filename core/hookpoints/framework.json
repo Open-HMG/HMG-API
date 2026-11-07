@@ -1097,6 +1097,50 @@
       }
     },
     {
+      "id": "framework.hscan_service.battery_12v_sensor_state",
+      "kind": "method",
+      "of": "framework.hscan_service",
+      "find": {
+        "name": "getBATSNSRState",
+        "params": [],
+        "ret": "byte"
+      },
+      "about": "12V battery sensor's state (raw)"
+    },
+    {
+      "id": "framework.hscan_service.battery_12v_sensor_invalid",
+      "kind": "method",
+      "of": "framework.hscan_service",
+      "find": {
+        "name": "getBATSNSRInvalid",
+        "params": [],
+        "ret": "byte"
+      },
+      "about": "12V battery sensor's invalid flag (raw)"
+    },
+    {
+      "id": "framework.hscan_service.battery_12v_sensor_error",
+      "kind": "method",
+      "of": "framework.hscan_service",
+      "find": {
+        "name": "getBATSNSRError",
+        "params": [],
+        "ret": "byte"
+      },
+      "about": "12V battery sensor's error flag (raw)"
+    },
+    {
+      "id": "framework.hscan_service.battery_12v_saver",
+      "kind": "method",
+      "of": "framework.hscan_service",
+      "find": {
+        "name": "get_BAT_AuxBattOpt",
+        "params": [],
+        "ret": "byte"
+      },
+      "about": "the Auxiliary Battery Saver option (raw)"
+    },
+    {
       "id": "framework.car_services",
       "kind": "class",
       "find": {
@@ -2084,6 +2128,128 @@
         "params": [],
         "ret": "int"
       }
+    },
+    {
+      "id": "framework.bcm_service.batt_cond_indicator",
+      "kind": "method",
+      "of": "framework.bcm_service",
+      "find": {
+        "name": "getBattCondIndSta",
+        "params": [],
+        "ret": "int"
+      },
+      "about": "battery conditioning indicator: 1 conditioning, 0 not (as Launchpad reads it)"
+    },
+    {
+      "id": "framework.hev_flag.batt_cond_failure",
+      "kind": "field",
+      "of": "framework.hev_flag",
+      "find": {
+        "name": "BMS_BATTCONDFAILPOPUP",
+        "type": "int",
+        "static": true
+      },
+      "about": "battery conditioning failure popup (raw; -1 seen when nothing's wrong)"
+    },
+    {
+      "id": "framework.car_services.cluster",
+      "kind": "field",
+      "of": "framework.car_services",
+      "find": {
+        "name": "CLUSTER_SERVICE",
+        "type": "java.lang.String",
+        "static": true
+      }
+    },
+    {
+      "id": "framework.cluster_service",
+      "kind": "class",
+      "find": {
+        "name": "com.hkmc.cluster.IClusterService"
+      }
+    },
+    {
+      "id": "framework.cluster_service_stub",
+      "kind": "class",
+      "find": {
+        "name": "com.hkmc.cluster.IClusterService$Stub"
+      }
+    },
+    {
+      "id": "framework.cluster_service_stub.as_interface",
+      "kind": "method",
+      "of": "framework.cluster_service_stub",
+      "find": {
+        "name": "asInterface",
+        "params": [
+          "android.os.IBinder"
+        ],
+        "ret": "@framework.cluster_service",
+        "static": true
+      }
+    },
+    {
+      "id": "framework.cluster_listener",
+      "kind": "class",
+      "find": {
+        "name": "com.hkmc.cluster.INavigationClusterListener"
+      }
+    },
+    {
+      "id": "framework.cluster_listener_stub",
+      "kind": "class",
+      "find": {
+        "name": "com.hkmc.cluster.INavigationClusterListener$Stub"
+      },
+      "about": "HMG-API answers its callbacks with a plain binder (only the ones it reads)"
+    },
+    {
+      "id": "framework.cluster_listener_stub.as_interface",
+      "kind": "method",
+      "of": "framework.cluster_listener_stub",
+      "find": {
+        "name": "asInterface",
+        "params": [
+          "android.os.IBinder"
+        ],
+        "ret": "@framework.cluster_listener",
+        "static": true
+      }
+    },
+    {
+      "id": "framework.cluster_listener_stub.battery_info",
+      "kind": "field",
+      "of": "framework.cluster_listener_stub",
+      "find": {
+        "name": "TRANSACTION_onHandleBatteryInfoResp",
+        "type": "int",
+        "static": true
+      },
+      "about": "onHandleBatteryInfoResp(int[8]): [1] minimum pack temperature (whole C), [5] conditioning indicator; the answer to requestBatteryInfoReq, sent to every listener"
+    },
+    {
+      "id": "framework.cluster_service.add_listener",
+      "kind": "method",
+      "of": "framework.cluster_service",
+      "find": {
+        "name": "addNavigationClusterListener",
+        "params": [
+          "@framework.cluster_listener"
+        ],
+        "ret": "void"
+      },
+      "about": "the service keeps a list and calls every listener: the navigation's own stays registered"
+    },
+    {
+      "id": "framework.cluster_service.battery_info",
+      "kind": "method",
+      "of": "framework.cluster_service",
+      "find": {
+        "name": "requestBatteryInfoReq",
+        "params": [],
+        "ret": "void"
+      },
+      "about": "asks the cluster for the battery info; answered through onHandleBatteryInfoResp"
     }
   ]
 }

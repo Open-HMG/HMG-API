@@ -7,8 +7,14 @@
   "products": [
     "CVEV.USA."
   ],
-  "status": "mapped",
-  "verified": null,
+  "status": "verified",
+  "verified": {
+    "by": "VysseCodes",
+    "date": "2026-11-03",
+    "product": "CVEV.USA.0000.V015.012.260507",
+    "points": 331,
+    "report": "hmgapid engine verify-map passed on the car (CVEV.USA.0000.V015.012.260507, Tue Nov 03 15:56:06 GMT-05:00 2026)"
+  },
   "files": {
     "/system/app/HKMC_BtSettings.odex": "9096dec592a9959291dffa00b23e1a52",
     "/system/app/ButtonSettings.odex": "64f400e7baf8afa44d5ba49e65657b91",

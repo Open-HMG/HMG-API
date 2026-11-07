@@ -24,6 +24,13 @@ public final class CommandsTest {
         public void conditioningRoute(int km) { calls.add("route " + km); }
         public void conditioningTime(int minutes) { calls.add("time " + minutes); }
         public void conditioningStation(int a, int b) { calls.add("station " + a + "," + b); }
+        int ready = 1, setting = 2, indicator = 0, packC = Integer.MIN_VALUE;
+        String model = "CVEV";
+        public int ready() { return ready; }
+        public int conditioningSetting() { return setting; }
+        public int conditioningIndicator() { return indicator; }
+        public int packTempMin() { return packC; }
+        public String model() { return model; }
         public void lightBrightness(int level) { calls.add("bright " + level); }
         public void lightColor(int r, int g, int b) { calls.add("rgb " + r + "," + g + "," + b); }
         public void lightStatus() { calls.add("light status"); }
@@ -106,7 +113,7 @@ public final class CommandsTest {
         check("a second start doesn't start again", "ok already conditioning (pad)", c.handle("egmp", "conditioning", new String[] { "auto-start" }));
         car.now += 5000;
         c.tick(declared("pad conditioning"));
-        check("kept up every 5 s, the station too (the car's navigation may clear it)", "route 9 | time 18 | station 2,3", calls(car));
+        check("kept up every 5 s: the route data only, the station event (the start) isn't repeated", "route 9 | time 18", calls(car));
         check("stop", "ok conditioning stopped", c.handle("pad", "conditioning", new String[] { "stop" }));
         check("... cleared as Launchpad does", "route 2047 | time 1023 | station 0,0", calls(car));
         check("an automatic start after a stop waits", "refused: stopped by hand; automatic starts wait for a manual start", c.handle("egmp", "conditioning", new String[] { "auto-start" }));
@@ -115,6 +122,103 @@ public final class CommandsTest {
         check("... and automatic starts are allowed again", "ok already conditioning (pad)", c.handle("egmp", "conditioning", new String[] { "auto-start" }));
         c.tick(declared("egmp conditioning"));
         check("the mod that started it is turned off: stopped", "route 2047 | time 1023 | station 0,0", calls(car));
+
+        // route values: an automatic request to a real charger (EV routing)
+        Commands r = new Commands(car);
+        check("auto-start with route values", "ok conditioning started", r.handle("egmp", "conditioning", new String[] { "auto-start", "37", "25" }));
+        check("... sent as the route", "route 37 | time 25 | station 2,3", calls(car));
+        check("the holder updates them", "ok conditioning route 30 km 20 min", r.handle("egmp", "conditioning", new String[] { "route", "30", "20" }));
+        check("... at once", "route 30 | time 20", calls(car));
+        car.now += 5000;
+        r.tick(declared("egmp conditioning"));
+        check("kept up with the current values (the route data only)", "route 30 | time 20", calls(car));
+        check("another mod can't change them", "refused: only the mod conditioning changes its route (egmp)", r.handle("pad", "conditioning", new String[] { "route", "1", "1" }));
+        check("values past what the navigation sends", "refused: route values are <km 0-2046> <minutes 0-1022>", r.handle("egmp", "conditioning", new String[] { "route", "2047", "20" }));
+        check("not numbers", true, r.handle("egmp", "conditioning", new String[] { "route", "ten", "20" }).startsWith("refused: route values"));
+        check("route needs both values", true, r.handle("egmp", "conditioning", new String[] { "route" }).startsWith("refused"));
+        check("an unknown subcommand is named as one, values or not", "refused: conditioning start|auto-start|stop|route|status", r.handle("egmp", "conditioning", new String[] { "foo", "1" }));
+        calls(car);
+        check("the holder ends its own automatic request (arrived)", "ok conditioning stopped", r.handle("egmp", "conditioning", new String[] { "stop" }));
+        calls(car);
+        check("... which isn't a manual stop: the next automatic start goes", "ok conditioning started", r.handle("egmp", "conditioning", new String[] { "auto-start", "12", "9" }));
+        check("... with its own values", "route 12 | time 9 | station 2,3", calls(car));
+        check("the owner stops it", "ok conditioning stopped", r.handle("-", "conditioning", new String[] { "stop" }));
+        calls(car);
+        check("... a manual stop: automatic starts wait", "refused: stopped by hand; automatic starts wait for a manual start", r.handle("egmp", "conditioning", new String[] { "auto-start", "12", "9" }));
+        check("route without conditioning", "refused: only the mod conditioning changes its route (not conditioning)", r.handle("egmp", "conditioning", new String[] { "route", "1", "1" }));
+        check("a manual start without values: the defaults", "ok conditioning started", r.handle("pad", "conditioning", new String[] { "start" }));
+        check("... 9 km, 18 min", "route 9 | time 18 | station 2,3", calls(car));
+        check("a manual start's own stop still counts as manual", "ok conditioning stopped", r.handle("pad", "conditioning", new String[] { "stop" }));
+        calls(car);
+        check("... automatic starts wait", "refused: stopped by hand; automatic starts wait for a manual start", r.handle("egmp", "conditioning", new String[] { "auto-start" }));
+
+        // what the car makes of it (Launchpad's checks, activation timeout and state)
+        FakeCar k = new FakeCar();
+        Commands b = new Commands(k);
+        k.ready = 0;
+        check("not READY: refused", "refused: the car isn't READY", b.handle("pad", "conditioning", new String[] { "start" }));
+        k.ready = 1;
+        k.setting = 1;
+        check("the EV setting off: refused", "refused: Battery Conditioning is off in the car's EV settings", b.handle("pad", "conditioning", new String[] { "start" }));
+        k.setting = 2;
+        k.indicator = 1;
+        check("the car already conditioning: refused", "refused: the car is already conditioning (controlled by the car)", b.handle("pad", "conditioning", new String[] { "start" }));
+        check("... nothing reached the car", "", calls(k));
+        k.indicator = 0;
+        k.packC = 22;
+        check("a warm pack (EV6, 20 C): refused, with the way past it",
+                "refused: the pack is warm (22 °C / 72 °F; this car usually won't heat at 20 °C / 68 °F or warmer); add \"warm\" to send it anyway",
+                b.handle("pad", "conditioning", new String[] { "start" }));
+        k.model = "NEEV";
+        k.packC = 20;
+        check("Ioniq 5's limit is 21 C: 20 C goes", "ok conditioning started", b.handle("pad", "conditioning", new String[] { "start" }));
+        b.handle("pad", "conditioning", new String[] { "stop" });
+        calls(k);
+        k.model = "CVEV";
+        check("... the EV6's is 20 C: the owner's override", "ok conditioning started", b.handle("-", "conditioning", new String[] { "start", "37", "25", "warm" }));
+        check("... with its route values", "route 37 | time 25 | station 2,3", calls(k));
+        check("waiting for the indicator", "ok waiting (-)", b.handle("pad", "conditioning", new String[] { "status" }));
+        k.now += 4 * 60000;
+        b.tick(declared());
+        check("EV6: still waiting after 4 min (5 min deadline)", "waiting", b.conditioningState);
+        k.indicator = 1;
+        b.tick(declared());
+        check("indicator on: active", "active", b.conditioningState);
+        k.now += 30 * 60000;
+        calls(k);
+        b.tick(declared());
+        check("active: no deadline", "active", b.conditioningState);
+        k.indicator = 0;
+        calls(k);
+        b.tick(declared());
+        check("the car ended it: stopped, reported", "ended", b.conditioningState);
+        check("... the stop went to the car", "route 2047 | time 1023 | station 0,0", calls(k));
+        check("... nobody holds it", "ok ended", b.handle("pad", "conditioning", new String[] { "status" }));
+        k.packC = Integer.MIN_VALUE;
+        k.model = "NEEV";
+        check("an unknown temperature doesn't block", "ok conditioning started", b.handle("egmp", "conditioning", new String[] { "auto-start" }));
+        calls(k);
+        k.now += 2 * 60000;
+        b.tick(declared("egmp conditioning"));
+        check("Ioniq 5: no indicator in 2 min: timed out", "timed_out", b.conditioningState);
+        check("... stopped", true, calls(k).endsWith("route 2047 | time 1023 | station 0,0"));
+        check("... automatic starts wait for a manual one", "refused: the car didn't start conditioning last time; automatic starts wait for a manual start", b.handle("egmp", "conditioning", new String[] { "auto-start" }));
+        check("a manual start goes", "ok conditioning started", b.handle("pad", "conditioning", new String[] { "start" }));
+        k.indicator = 1;
+        b.tick(declared("pad conditioning"));
+        calls(k);
+        check("a stop while the indicator is on: stopping", "ok conditioning stopped", b.handle("pad", "conditioning", new String[] { "stop" }));
+        check("... stopping until it's off", "stopping", b.conditioningState);
+        k.indicator = 0;
+        b.tick(declared());
+        check("... then off", "off", b.conditioningState);
+        check("... a manual stop: automatic starts wait", true, b.handle("egmp", "conditioning", new String[] { "auto-start" }).startsWith("refused: stopped by hand"));
+        k.indicator = -1;
+        check("an indicator that can't be read doesn't block", "ok conditioning started", b.handle("pad", "conditioning", new String[] { "start" }));
+        check("... requested (can't confirm)", "requested", b.conditioningState);
+        k.now += 60 * 60000;
+        b.tick(declared("pad conditioning"));
+        check("... and no deadline", "requested", b.conditioningState);
 
         check("ambient light: first mod holds it; sent as the car's nearest colour", "ok color ff6930 (the car's nearest to ff8000)", c.handle("amb", "ambient_light", new String[] { "color", "ff8000" }));
         check("... the car asked for its light first (not heard yet), then {0,r},{0,g},{0,b}", "light status | rgb 255,105,48", calls(car));
@@ -234,6 +338,9 @@ public final class CommandsTest {
         o.answers.put("heat seat_heat", "no");
         check("not allowed: refused, says where to change it", "refused: the owner didn't allow seat_heat for heat (HMG-API app: Settings, Vehicle)",
                 oc.handle("heat", "seat_heat", new String[] { "driver", "low" }));
+        calls(o);
+        check("the owner's own command (\"-\": adb, the app): no question, it runs", "ok wheel heat on", oc.handle("-", "wheel_heat", new String[] { "on" }));
+        check("... nothing asked on screen", false, calls(o).contains("ask "));
         o.askFirst = false;
         check("asking off (trust_commands): runs", true, oc.handle("other", "wheel_heat", new String[] { "on" }).startsWith("ok"));
         System.exit(fail);

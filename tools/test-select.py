@@ -13,7 +13,7 @@ REPO = os.path.dirname(HERE)
 
 ALL = 'ALL'
 RUNTIME = ['core/runtime/*-test.sh']
-INSTALL = ['install/common/test.sh', 'install/common/install-test.sh', 'install/usb/test.sh']
+INSTALL = ['install/common/test.sh', 'install/common/install-test.sh', 'install/usb/test.sh', 'install/nemesis/mod-test.sh', 'install/nemesis/sync-test.sh']
 MODS = ['mods/*/test.sh', 'mods/*/tools/*/test.sh', 'tools/check-scripts.sh']
 HOOKS = ['core/hookpoints/test.sh']
 
@@ -29,14 +29,15 @@ RULES = [
     (['tools/lpatch/*'], ['tools/lpatch/test.sh', 'core/runtime/native-test.sh', 'core/runtime/engine-test.sh'] + INSTALL),
     (['core/runtime/unit-commands.txt'], ['tools/check-scripts.sh']),
     (['core/runtime/*'], RUNTIME + HOOKS + MODS + INSTALL),
-    (['core/hookpoints/*', 'maps/*', 'tools/map-car.py', 'tools/check-maps.py', 'tools/test-hooks.py', 'tools/probe-test.py'], HOOKS),
+    (['core/hookpoints/*', 'maps/*', 'tools/map-car.py', 'tools/check-maps.py', 'tools/mkhookdoc.py', 'docs/hook-points.md', 'tools/test-hooks.py', 'tools/probe-test.py'], HOOKS),
     (['core/app/*'], ['core/app/qr-test.sh']),
     (['mods/examples/*'], ['core/runtime/signing-test.sh']),
     (['mods/*'], ['tools/check-scripts.sh']),   # plus the changed mod's own tests (select)
     (['install/*'], INSTALL + ['core/runtime/packages-test.sh']),
     (['tools/mkdelta.py', 'tools/mkrecipe.py', 'tools/mkmemrecipe.py'], ['core/runtime/engine-test.sh', 'core/runtime/safety-test.sh', 'tools/lpatch/test.sh']),
-    (['tools/mkinstallers.sh', 'tools/mkrelease.sh', 'tools/mkmodpkg.sh', 'tools/release-mods.txt'], INSTALL + ['core/runtime/signing-test.sh', 'core/runtime/usb-test.sh']),
+    (['tools/mkinstallers.sh', 'tools/mkrelease.sh', 'tools/mkmodpkg.sh', 'tools/mknemesismod.sh', 'tools/nemesis-version.py', 'tools/release-mods.txt'], INSTALL + ['core/runtime/signing-test.sh', 'core/runtime/usb-test.sh']),
     (['tools/mod-draft*'], ['tools/mod-draft-test.sh']),
+    (['catalog/*', 'tools/catalog*', 'maps/authors.json', '.github/workflows/catalog.yml'], ['tools/catalog-test.sh']),
     (['tools/micom-*'], ['tools/micom-decode-test.sh']),
     (['tools/check-scripts.sh'], ['tools/check-scripts.sh']),
     (['tools/requirements.txt'], ALL),

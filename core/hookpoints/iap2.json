@@ -150,6 +150,70 @@
       "find": {
         "type": "@iap2.service"
       }
+    },
+    {
+      "id": "iap2.service.on_destroy",
+      "kind": "method",
+      "of": "iap2.service",
+      "find": {
+        "name": "onDestroy",
+        "params": [],
+        "ret": "void",
+        "static": false
+      }
+    },
+    {
+      "id": "iap2.service.on_bind",
+      "kind": "method",
+      "of": "iap2.service",
+      "find": {
+        "name": "onBind",
+        "params": [
+          "android.content.Intent"
+        ],
+        "ret": "android.os.IBinder",
+        "static": false
+      }
+    },
+    {
+      "id": "iap2.service.native_handle",
+      "kind": "field",
+      "of": "iap2.service",
+      "find": {
+        "name": "mHandleIap2",
+        "type": "long",
+        "static": true
+      }
+    },
+    {
+      "id": "iap2.service.native_lock",
+      "kind": "field",
+      "of": "iap2.service",
+      "find": {
+        "name": "mLock",
+        "type": "java.lang.Object",
+        "static": true
+      }
+    },
+    {
+      "id": "iap2.init_info.use_vehicle_information",
+      "kind": "field",
+      "of": "iap2.init_info",
+      "find": {
+        "name": "iAP2UsedVehicelInformation",
+        "type": "int",
+        "static": true
+      }
+    },
+    {
+      "id": "iap2.init_info.use_vehicle_status",
+      "kind": "field",
+      "of": "iap2.init_info",
+      "find": {
+        "name": "iAP2UsedVehicleStatus",
+        "type": "int",
+        "static": true
+      }
     }
   ]
 }

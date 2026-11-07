@@ -69,4 +69,12 @@ has "installer output passed on" "fake installer ran" "$out"
 check "installer ran" yes "$([ -e $R/installed-9.9.9 ] && echo yes)"
 printf 'version 9.9.9\n' > $R/data/hmgapi/installed.txt
 eng usb-scan; check "after the update: same version" same "$(st hmgapi-9.9.9.zip)"
+
+# a mod for another head unit: refused, and the app may offer "Install anyway"
+rm -rf $T/m; mkdir -p $T/m/other
+printf '{"id": "other", "name": "Other", "version": "1.0.0", "hmgapi": ">=1.0.0", "system": {"platform": ["tcc897x"]}}\n' > $T/m/other/mod.json
+sig sign $T/m/other $T/author.key > /dev/null; (cd $T/m && zip -q -r -X $U/HMGAPI/updates/other-1.0.0.zip other)
+eng usb-scan; check "another head unit's mod refused" refused "$(st other-1.0.0.zip)"
+check "... with what installing it anyway would do" new "$(printf '%s' "$out" | python3 -c "import json,sys; d=json.load(sys.stdin); print([p.get('any_car') for p in d['packages'] if p['file'].endswith('/other-1.0.0.zip')][0])")"
+check "a refusal that isn't about the car: no Install anyway" None "$(printf '%s' "$out" | python3 -c "import json,sys; d=json.load(sys.stdin); print([p.get('any_car') for p in d['packages'] if p['file'].endswith('/gamma-1.0.0.zip') or p['file'].endswith('/hmgapi-fake.zip')][-1])")"
 exit $fail

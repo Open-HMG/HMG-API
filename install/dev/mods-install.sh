@@ -12,7 +12,7 @@ for d in "$HERE"/out/mods/*; do
     [ -n "$id" ] || continue
     rm -r "$MODS/$id" 2>/dev/null
     mkdir "$MODS/$id" || { echo "FAIL: mkdir $MODS/$id"; exit 1; }
-    for f in "$d"/*; do cp "$f" "$MODS/$id/" || { echo "FAIL: copy $f"; exit 1; }; done
+    for f in "$d"/*; do cp -r "$f" "$MODS/$id/" || { echo "FAIL: copy $f"; exit 1; }; done   # -r: a mod with an app has app/
     echo "installed mod $id"
 done
 echo "restart the head unit to load them"

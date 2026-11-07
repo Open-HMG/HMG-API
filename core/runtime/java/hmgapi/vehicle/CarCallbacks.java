@@ -13,7 +13,9 @@ import hmgapi.hook.Points;
  * change; the system service's own ambient callbacks send 0 on the EV6), and the
  * ambient light (the system service's SML_STATUS_CHANGED broadcast, passed on by
  * hmgapi.hook.LightRelay in system_server: a binder registered here as a receiver was
- * accepted but never got a broadcast on the EV6).
+ * accepted but never got a broadcast on the EV6), and the battery info the cluster
+ * service answers requestBatteryInfoReq with (onHandleBatteryInfoResp, to every
+ * listener: the navigation's own stays registered).
  *
  * A listener interface has dozens of callbacks; implementing it would mean a class
  * built against each car's exact interface. Instead this is a plain binder handed
@@ -27,11 +29,15 @@ final class CarCallbacks {
     /** body control's heating status: steering wheel heat, rear defogger (raw); MIN_VALUE: not heard yet */
     volatile int wheelHeat = Integer.MIN_VALUE, defogger = Integer.MIN_VALUE;
 
+    /** the cluster's last battery info (8 ints: [1] minimum pack temperature °C, [5] conditioning indicator), and when; null until heard */
+    volatile int[] battery;
+    volatile long batteryAt;
+
     /** the ambient light's last status: r, g, b (2 bytes each), brightness, dimmed while driving, drive mode; null until heard */
     volatile byte[] sml;
 
-    private Listener system, bcm;
-    private String lastFailure, lastBcmFailure;   // logged once, not every tick
+    private Listener system, bcm, cluster;
+    private String lastFailure, lastBcmFailure, lastClusterFailure;   // logged once, not every tick
     private boolean lightAsked;
 
     /** a binder answering some transactions of one interface */
@@ -103,6 +109,37 @@ final class CarCallbacks {
                 Hub.services.remove("framework.car_services.bcm");
             }
         }
+        if (cluster != null && !alive("framework.car_services.cluster")) {
+            Hub.services.remove("framework.car_services.cluster");
+            cluster = null;
+        }
+        if (cluster == null) {
+            try {
+                Object svc = Hub.cluster();
+                if (svc != null) {
+                    int code = (Integer) Points.get(null, "framework.cluster_listener_stub.battery_info", null);
+                    Listener l = new Listener(Points.cls(null, "framework.cluster_listener").getName(), code) {
+                        @Override
+                        void got(int c, Parcel d) {
+                            int[] v = d.createIntArray();
+                            if (battery == null) System.out.println("vehicle: battery info, first values: " + java.util.Arrays.toString(v));
+                            battery = v;
+                            batteryAt = android.os.SystemClock.elapsedRealtime();
+                        }
+                    };
+                    Object proxy = Points.call(null, "framework.cluster_listener_stub.as_interface", null, l);
+                    Points.call(svc.getClass().getClassLoader(), "framework.cluster_service.add_listener", svc, proxy);
+                    cluster = l;
+                    lastClusterFailure = null;
+                    System.out.println("vehicle: listening to the cluster service (battery info)");
+                }
+            } catch (Throwable t) {
+                String why = String.valueOf(t.getCause() != null ? t.getCause() : t);
+                if (!why.equals(lastClusterFailure)) System.out.println("vehicle: cluster listener: " + why + " (trying again every few seconds)");
+                lastClusterFailure = why;
+                Hub.services.remove("framework.car_services.cluster");
+            }
+        }
         if (system != null && !alive("framework.car_services.datc")) {
             Hub.services.remove("framework.car_services.datc");
             system = null;
@@ -140,6 +177,33 @@ final class CarCallbacks {
                 Hub.services.remove("framework.car_services.datc");
             }
         }
+    }
+
+    /**
+     * The pack's minimum temperature (whole °C): asks the cluster, waits up to waitMs for
+     * the answer. Integer.MIN_VALUE when there's none, or it isn't 8 values with a
+     * temperature of -40..60 °C (Launchpad's ClusterBatteryTemperatureReader).
+     */
+    int packTempMin(long waitMs) {
+        long asked = android.os.SystemClock.elapsedRealtime();
+        try {
+            Object svc = Hub.cluster();
+            if (svc == null || cluster == null) return Integer.MIN_VALUE;
+            Points.call(svc.getClass().getClassLoader(), "framework.cluster_service.battery_info", svc);
+        } catch (Throwable t) {
+            Hub.services.remove("framework.car_services.cluster");
+            return Integer.MIN_VALUE;
+        }
+        while (batteryAt < asked && android.os.SystemClock.elapsedRealtime() - asked < waitMs) {
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException e) {
+                break;
+            }
+        }
+        int[] b = battery;
+        if (batteryAt < asked || b == null || b.length != 8 || b[1] < -40 || b[1] > 60) return Integer.MIN_VALUE;
+        return b[1];
     }
 
     /** the light's status from LightRelay: hex of r, g, b (2 bytes each), brightness, dimmed, drive mode */

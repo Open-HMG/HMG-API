@@ -1,0 +1,17 @@
+# NEMESIS packages each HMG-API package can't be installed with: they change files
+# or settings HMG-API (or that mod) changes too. Written into the package's depends=
+# as "!<id>" (04-Packages.md §2): NEMESIS then refuses to install either while the
+# other is installed (exit 23), and the owner uninstalls one first.
+# <package id>  <conflicting package ids, comma-separated>
+#
+# HMG Leafia Plus 1.x: replaces app_process (HMG-API's zygote wrapper), the projection
+# apps HMG-API's hooks are mapped on, featurexml and the Wi-Fi permissions.
+# carplay.session and voicehandler.vr-gates (NEMESIS Package Store) change files on the
+# head unit too; which ones isn't known here, so they're assumed to clash until checked.
+hmgapi                      wireless.carplay.aa,carplay.session,voicehandler.vr-gates
+# NEMESIS's wireless.projection (featurexml in /system/onebin, the wireless CarPlay/AA
+# and Wi-Fi permissions) and projection.tbt (replaces DiPO, GPM, iAP2 and navigation,
+# whose stock files the mod's hooks are mapped on, and libautoreceiver_infobank.so)
+hmgapi.wireless-carplay-aa  wireless.projection,projection.tbt
+# NEMESIS's adb.tcp turns persist.service.adb.tcp.enable on; the adb mod holds it at 0
+hmgapi.adb                  adb.tcp

@@ -8,9 +8,10 @@ the parts that change the car's own apps stay off, and the app says which.
 | Car | Region | Head unit software | Hook map |
 |---|---|---|---|
 | Kia EV6 | USA | 260507 | ✅ checked on a car (325 of 325 hook points) |
-| Kia EV6 | Canada | 260206 | 259 hook points found in the stock files we have; waiting for a Car Report |
-| Hyundai Ioniq 5 | Canada | 260206 | 259 hook points found in the stock files we have; waiting for a Car Report |
-| Hyundai Ioniq 5 | USA | 260507 | found in stock files, waiting for a Car Report |
+| Kia EV6 | Canada | 260206 | 325 of 325 hook points found in stock files; waiting for a check on a car |
+| Hyundai Ioniq 5 | Canada | 260206 | 325 of 325 hook points found in stock files; waiting for a check on a car |
+| Hyundai Ioniq 5 (all trims, incl. SE) | USA | 260507 | 325 of 325 hook points found in stock files, same files as 3 Car Reports; waiting for a check on a car |
+| Hyundai Ioniq 5 (2023 on) | USA | 260903 | made on 4 cars by HMG-API's own mapper (325 of 325 hook points); waiting for a check on a car |
 
 **Your car isn't listed, or says "waiting"?** Install HMG-API and make a
 [Car Report](Car-Report): HMG-API maps your car from its own software on the spot,

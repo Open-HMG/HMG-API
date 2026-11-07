@@ -24,7 +24,7 @@ import java.util.Set;
  * and which apps hear projection events (Projection.settle).
  *
  * A mod is "enabled" only if it's turned on and every mod it requires is too. Mods'
- * mod.json and hooks.jar are made readable (their folders traversable), so an app can
+ * mod.json and declared hook JARs are made readable (their folders traversable), so an app can
  * load a "live" mod that wasn't loaded when it started; settings files are not.
  */
 final class LiveState {
@@ -86,7 +86,7 @@ final class LiveState {
             if (!d.notWhileDriving.isEmpty()) s.put("not_while_driving", new java.util.ArrayList<Object>(d.notWhileDriving));
             if (!d.panel.isEmpty()) s.put("panel", new java.util.ArrayList<Object>(d.panel));
             mods.put(m.getKey(), s);
-            readable(e, new File(modsDir, m.getKey()));
+            readable(e, new File(modsDir, m.getKey()), m.getValue());
             nativeReadable(new File(modsDir, m.getKey()), m.getValue());
         }
         ModRuntime.publish(e, json, on);   // apps, services, USB folders: hmgapid acts on them
@@ -153,10 +153,20 @@ final class LiveState {
         return out;
     }
 
-    /** Only mod.json and hooks.jar readable; the folder traversable, not listable. */
-    static void readable(Engine e, File dir) {
+    /** Only metadata and the declared code JAR readable; other files stay private. */
+    @SuppressWarnings("unchecked")
+    static void readable(Engine e, File dir, Map<String, Object> mod) throws Exception {
         traversable(dir);
-        for (String f : new String[] { "mod.json", "hooks.jar" }) new File(dir, f).setReadable(true, false);
+        new File(dir, "mod.json").setReadable(true, false);
+        Object hooks = mod.get("hooks");
+        Object declared = hooks instanceof Map ? ((Map<String, Object>) hooks).get("jar") : null;
+        String name = declared == null ? "hooks.jar" : String.valueOf(declared);
+        File jar = new File(dir, name);
+        // A manifest (or a symlink in it) must not expose another mod's/private file.
+        if (new File(name).isAbsolute() || !jar.getCanonicalPath().startsWith(dir.getCanonicalPath() + File.separator)) return;
+        if (!jar.isFile()) return;
+        for (File d = jar.getParentFile(); d != null && !d.equals(dir); d = d.getParentFile()) traversable(d);
+        jar.setReadable(true, false);
     }
 
     /** a mod's native patch recipes (hooks.native) too: the apps that load the libraries read them */

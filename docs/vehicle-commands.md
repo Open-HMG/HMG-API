@@ -21,7 +21,7 @@ charge_door open` or `api.command("charge_door", "open")`.
 | `seat_heat` | `driver` / `passenger` / `rear_left` / `rear_right`, `off` / `low` / `medium` / `high` (a two-level seat, the EV6's rear: `off` / `low` / `high`, from the seat's own option) |
 | `seat_vent` | `driver` / `passenger` (no rear ventilation), `off` / `low` / `medium` / `high` (added at the owner's request, 2026-10-31) |
 | `wheel_heat` | `on` / `off` |
-| `conditioning` | `start` / `auto-start` / `stop` |
+| `conditioning` | `start` / `auto-start` (both optionally `<km> <minutes>`, then optionally `warm`) / `route <km> <minutes>` / `stop` / `status` |
 | `ambient_light` | `color <rrggbb>` / `brightness <0-10>` / `release` / `owner_change release\|keep` |
 | `guide_lines` | `on` / `off` / `restore` (cars with a plain rear camera; a 360-view car draws its own and refuses, EV6 2026-10-31) |
 | `startup_notice` | `dismiss` (only after the owner turns on "Startup notice" in the HMG-API app, or `hmgapid allow startup_notice on`) |
@@ -88,8 +88,42 @@ P (`ISystemService.getGearPStatus`, 36), HEV status flags (`IHEVService.getHEVSt
 - **Guard:** one conditioning state for the unit, requests logged with the mod;
   a manual stop wins over an automatic start; values limited to what the car's
   navigation sends; stopped (values cleared) when the mod that started it is
-  turned off. Open question: whether the car's own navigation overrides these
-  when it has a route; to check on a car.
+  turned off.
+- **Route values (EV routing):** the BMS times the heating from the distance and
+  time it's given, so a mod routing to a real charger (EGMP AA EV: Google Maps'
+  charging stop) starts with `auto-start <km> <minutes>` and keeps them current with
+  `route <km> <minutes>` (only the mod conditioning may); without values it's 9 km,
+  18 min (Launchpad's). 0-2046 km and 0-1022 min, as the navigation sends them
+  (2047 / 1023 mean "no route"). The mod whose automatic request it is ending it
+  (it arrived, or the route ended) isn't a manual stop: its next automatic start
+  isn't blocked. A stop by the owner or another mod still is. Open question:
+  whether the car's own navigation overrides these when it has a route; to check
+  on a car.
+- **The station event is the start, sent once:** distance, time, then station
+  `2,3`. HEVService puts the station back to Invalid about 120 ms after any set,
+  so it's never held. The 5 s keep-alive resends the distance and time only, as
+  Launchpad's does; resending the station too repeated the start, and on a US EV6
+  (260507) the car's conditioning indicator (`IBCMService` 109) then stayed off.
+  The EV6 can take up to 5 minutes to switch on (Launchpad's field notes; about a
+  minute on the Ioniq 5), and may not heat a pack at 20 °C / 68 °F or warmer.
+- **Checks before a start** (as Launchpad's `PreconditioningController`): refused
+  when the car isn't READY (HEV `EV_RDY`, 44), Battery Conditioning is off in the EV
+  settings (HEV `EV_BATTERYCONDITIONING`, 94: 2 on), or the indicator (`IBCMService`
+  `getBattCondIndSta`, 109) already shows the car conditioning on its own. A warm pack
+  is refused with a way past it: a last word `warm` sends it anyway (a warning and an
+  override, never a silent block). The limit is the pack's minimum temperature
+  (`IClusterService.requestBatteryInfoReq`, answered by
+  `INavigationClusterListener.onHandleBatteryInfoResp(int[8])`, `[1]`): EV6 and Ioniq 6
+  20 °C / 68 °F, Ioniq 5 21 °C / 70 °F (Launchpad's `PreconditioningProfile`, from a Kia
+  bulletin and owners' reports, not BMS calibration). A value that can't be read
+  (no map point, no answer, a temperature outside -40..60 °C) doesn't block.
+- **Activation:** after a start the indicator is read every tick (2 s). Not on within
+  5 minutes on the EV6 (Launchpad, field-tested) or 2 minutes on other cars (the
+  Ioniq 5 takes about 60-70 s): stopped, reported as `timed_out`, and automatic starts
+  wait for a manual one (no retry loop). Once on, no deadline; off again while
+  requested is the car ending it: stopped, `ended`. A stop is done once the indicator
+  is off (`stopping` until then). Without an indicator reading there's no deadline
+  (`requested`). Mods read it as `conditioning.state` or `conditioning status`.
 
 ## 5. Ambient light
 

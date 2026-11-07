@@ -2,7 +2,7 @@
 # HMG-API: open the HMG-API app, installing it first if it isn't there (an install
 # that failed, or the app removed). Installed as /data/hmgapi/open.sh; run as root by
 # NEMESIS Manager's Launch (the package's [app.0], bin/open.sh) or over adb:
-#   adb shell hmgapid sh 'sh /data/hmgapi/open.sh'
+#   adb shell "hmgapid sh 'sh /data/hmgapi/open.sh'"
 # Needs no hooks, so it opens the app on a car without a hook map too (there the
 # launcher tile and the star key choice, which the hooks add, aren't there).
 # The app's copy: /data/hmgapi/HmgApi.apk (kept by install.sh). pm takes HMG-API's

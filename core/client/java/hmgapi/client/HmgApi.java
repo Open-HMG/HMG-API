@@ -157,7 +157,8 @@ public final class HmgApi {
     /**
      * A vehicle command the mod declared ("vehicle": {"commands": [...]}):
      * command("charge_door", "open"), command("seat_heat", "driver", "low"),
-     * command("conditioning", "start"), command("ambient_light", "color", "ff8000"),
+     * command("conditioning", "start"), command("conditioning", "auto-start", "37", "25"),
+     * command("conditioning", "route", "30", "20"), command("ambient_light", "color", "ff8000"),
      * command("guide_lines", "off"). Each has the guard its review gave it (park only,
      * one holder ...); a refusal throws HmgApiException with the reason. Returns the
      * car's "ok ..." line.

@@ -134,7 +134,22 @@ if [ -z "$ROOT" ]; then
     done
     [ -s "$D/state/apps.installed" ] && : > "$D/state/apps.alloff"   # a reinstall turns them on again
 fi
-rm -f "$D/installed.txt" "$D/hook/enable" "$D/public/HmgApi.apk" "$D/HmgApi.apk" "$D/open.sh"
+rm -f "$D/installed.txt" "$D/hook/enable" "$D/public/HmgApi.apk" "$D/HmgApi.apk" "$D/open.sh" "$D/hook-check.sh" "$D/boot.sh"
+
+# 6. NEMESIS's package list: HMG-API and its mods off it too, the mods first (they depend on
+# HMG-API's package). HMGAPI_NEMESIS_SYNC=1: their scripts only unlist (refreshed first: an
+# older package's copies would uninstall again). Not when NEMESIS runs this: it's unlisting it already.
+N=$ROOT/system/xbin/nemesis
+if [ "$HMGAPI_FROM_NEMESIS" != 1 ] && [ -x "$N" ] && [ -d "$ROOT/data/nemesis/apps" ]; then
+    for a in "$ROOT"/data/nemesis/apps/hmgapi.* "$ROOT/data/nemesis/apps/hmgapi"; do
+        [ -f "$a/NEMESIS.data" ] || continue
+        id=${a##*/}
+        t=$D/nemesis/scripts; [ "$id" = hmgapi ] || t=$D/nemesis/mod/scripts
+        [ -d "$t" ] && [ -d "$a/scripts" ] && cp "$t"/*.sh "$a/scripts/" 2>/dev/null
+        if r=$(HMGAPI_NEMESIS_SYNC=1 "$N" uninstall "$id" 2>&1); then log "NEMESIS: $id unlisted"
+        else log "NEMESIS: couldn't unlist $id ($r): uninstall it in NEMESIS Manager"; fi
+    done
+fi
 if [ "$1" = --purge ]; then
     rm -r "$D"
     echo "removed /data/hmgapi (mods, settings, backups)"

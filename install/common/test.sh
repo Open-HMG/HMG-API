@@ -35,4 +35,38 @@ L hook_add /system/etc/install-recovery.sh top
 check "created when missing" "yes" "$([ -x "$T/system/etc/install-recovery.sh" ] && grep -q HMGAPI_CREATED "$T/system/etc/install-recovery.sh" && echo yes)"
 L hook_remove /system/etc/install-recovery.sh
 check "created file removed again" "no" "$([ -e "$T/system/etc/install-recovery.sh" ] && echo yes || echo no)"
+
+# hook-check.sh at boot: a NEMESIS install or update rewrites install-recovery.sh as a whole
+D=$T/data/hmgapi
+mkdir -p "$D"; cp lib.sh "$D/"; echo "version 1.0.0" > "$D/installed.txt"
+HC() { env ROOT="$T" $SH "$PWD/hook-check.sh" 2>&1; }
+printf '#!/system/bin/sh\n# NEMESIS\nnemesis watchdog\nexit 0\n' > "$T/system/etc/install-recovery.sh"; chmod 755 "$T/system/etc/install-recovery.sh"
+L hook_add /system/etc/install-recovery.sh top
+L hook_add /system/etc/qb_runtime.sh end
+IRH=$(md5sum < "$T/system/etc/install-recovery.sh"); QBH=$(md5sum < "$T/system/etc/qb_runtime.sh")
+o=$(HC)
+check "hook-check: both hooks there: nothing changed, nothing said" "|$IRH|$QBH" "$o|$(md5sum < "$T/system/etc/install-recovery.sh")|$(md5sum < "$T/system/etc/qb_runtime.sh")"
+printf '#!/system/bin/sh\n# NEMESIS\nnemesis watchdog\nexit 0\n' > "$T/system/etc/install-recovery.sh"   # what a NEMESIS update writes
+o=$(HC)
+check "hook-check: install-recovery.sh rewritten: the block put back after the first line" "# HMGAPI_HOOK begin (HMG-API: starts hmgapid. HMG-API's uninstall removes this block.)" "$(sed -n 2p "$T/system/etc/install-recovery.sh")"
+check "... as HMG-API's install puts it (same bytes)" "$IRH" "$(md5sum < "$T/system/etc/install-recovery.sh")"
+check "... qb_runtime.sh left alone" "$QBH" "$(md5sum < "$T/system/etc/qb_runtime.sh")"
+check "... said in install.log" "1" "$(grep -c 'boot hook put back in /system/etc/install-recovery.sh' "$D/install.log")"
+check "... no lock left" "no" "$([ -e "$D/state/hook-check.pid" ] && echo yes || echo no)"
+L hook_remove /system/etc/qb_runtime.sh
+HC > /dev/null
+check "hook-check: qb_runtime.sh lost it: put back at the end" "$QBH" "$(md5sum < "$T/system/etc/qb_runtime.sh")"
+printf '#!/system/bin/sh\n# NEMESIS\nnemesis watchdog\nexit 0\n' > "$T/system/etc/install-recovery.sh"
+rm "$D/installed.txt"
+HC > /dev/null
+check "hook-check: HMG-API not installed: nothing put back" "0" "$(grep -c HMGAPI_HOOK "$T/system/etc/install-recovery.sh")"
+echo "version 1.0.0" > "$D/installed.txt"
+cp "$(command -v sleep)" "$T/hook-check"; "$T/hook-check" 30 & sp=$!   # stands in for one already running
+echo $sp > "$D/state/hook-check.pid"
+HC > /dev/null
+check "hook-check: another one running: this one does nothing" "0" "$(grep -c HMGAPI_HOOK "$T/system/etc/install-recovery.sh")"
+kill $sp 2>/dev/null; wait $sp 2>/dev/null || true
+echo 999999 > "$D/state/hook-check.pid"
+HC > /dev/null
+check "hook-check: a stale lock (after a restart) doesn't stop it" "1" "$(grep -c 'HMGAPI_HOOK begin' "$T/system/etc/install-recovery.sh")"
 exit $fail

@@ -48,7 +48,15 @@ mod a '{"colour": "red"}'; no a "unknown key refused" 'unknown system requiremen
 printf '{"car": {"year": 2023}}\n' > $R/data/hmgapi/settings/hmgapi.json
 mod a '{"year": ">=2022 <2025", "name": "EV6"}'; ok a "owner's year and the model table's name"
 rmdir $R/sys/bus/sdio/devices/mmc1:0001:1
-mod a '{"features": ["hmgapi.wifi"]}'; no a "no Wi-Fi chip" "no Wi-Fi chip found on this unit"
+mod a '{"features": ["hmgapi.wifi"]}'; no a "no Wi-Fi chip" "no Wi-Fi chip or driver found on this unit"
+# a chip nobody has powered yet (Wi-Fi never on): its driver and firmware stand for it on a car with the hotspot
+mkdir -p $R/system/wifi; : > $R/system/wifi/bcmdhd.ko; : > $R/system/wifi/fw_bcmdhd.bin
+mod a '{"features": ["hmgapi.wifi"]}'; no a "driver without the stock hotspot: no" "no Wi-Fi chip or driver found on this unit"
+printf '<permissions><feature name="com.hkmc.software.wifihotspot"/></permissions>\n' > $R/system/etc/permissions/hotspot.xml
+mod a '{"features": ["hmgapi.wifi"]}'; ok a "driver, firmware and the stock hotspot: Wi-Fi chip"
+rm $R/system/wifi/fw_bcmdhd.bin
+mod a '{"features": ["hmgapi.wifi"]}'; no a "driver without its firmware: no" "no Wi-Fi chip or driver found on this unit"
+rm -r $R/system/wifi $R/system/etc/permissions/hotspot.xml
 
 # the engine: refuses the mod, leaves out a part, override at the owner's risk
 mod b '{"region": "KOR"}'

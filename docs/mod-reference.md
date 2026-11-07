@@ -26,7 +26,8 @@ setting). It never edits your code.
 | You want | In mod.json |
 |---|---|
 | your own APK | `"apps": [{"apk": "…", "package": "…"}]`: installed with the signature workaround, data kept on update, turned off with the mod, removed with it |
-| a tile in the app menu | `"provides": {"launcher": [{"package": "pkg", "class": ".Main"}]}`, with optional day/night pictures (`icon`, `icon_night`) |
+| a tile in the app menu | `"provides": {"launcher": [{"package": "pkg", "class": ".Main"}]}`, with optional day/night pictures (`icon`, `icon_night`) and greyed-out ones (`icon_disabled`, `icon_disabled_night`); `tools/mkicon.sh <picture> <dir>` makes all four in the stock style from any shape (PNG or SVG; add a size and the shape's colour for a logo on its own background, e.g. `66 '#41ae45'`) |
+| to change how the car's own apps behave | `"hooks": {"jar": "hooks.jar", "entry": "my.Entry"}`: your code runs in their processes and hooks them by stable hook point names, mapped per car; the list, and which cars have each: [hook-points.md](hook-points.md) (example: `mods/examples/hello`) |
 | a background process | `"services": [{"name": "…", "script": "…", "user": "root\|system\|app"}]`, or `{"jar": "x.jar", "class": "my.Main", "args": […]}` (`BOOTCLASSPATH` already set); `"restart": true` (default) or `false`; `"start": "android"` (default), `"boot"`, or `"manual"` (only when your app or `hmgapid service-start` asks) |
 | files and settings on the unit | `patches.json` changes (`add`, `lines`, `props`, `setting`, `codecs`, …): merged with other mods, put back on removal |
 | a folder on a USB stick | `"usb": ["MyFolder"]`: your apps get `hmgapi.intent.action.USB_FOLDER`; services ask `hmgapid usb` |
@@ -87,6 +88,10 @@ the HMG-API app, and hooks see new values at once.
 | `battery12v.soc` | % | telematics CAN service (`getBatSoc`) |
 | `hv.soc` | %, 0.5 steps | HEV service, `DISPLAY_SOC` |
 | `hv.health`, `hv.ready`, `hv.conditioning`, `charging` | raw | telematics CAN / HEV service |
+| `hv.conditioning_active` | 0/1 | the car's battery conditioning indicator (body control `getBattCondIndSta`): conditioning now |
+| `hv.battery_temp_min` | °C, whole | the pack's minimum temperature (cluster battery info, asked for on each read; `-` outside -40..60 °C) |
+| `hv.conditioning_failure` | raw | the BMS's conditioning failure popup flag (HEV `BMS_BATTCONDFAILPOPUP`); meaning of the values not known yet |
+| `conditioning.state` | text | HMG-API's conditioning request: `off`, `requested` (the indicator can't be read), `waiting`, `active`, `stopping`, `ended` (by the car), `timed_out` |
 | `odometer` | km | HEV service, `ODOMETER` |
 | `seat_heat.<seat>` (driver, passenger, rear_left, rear_right), `seat_vent.<seat>` (driver, passenger: the rear seats have none) | level 0-3 | body control's seat climate step (one value per seat: off, ventilation 1-3 or heat 1-3) |
 | `wheel_heat`, `defogger` | raw | body control's heating status: steering wheel heat (0 off), rear defogger (1 on, 0 off); pushed by the car, `-` until it has said |
@@ -323,7 +328,9 @@ or adb.
 
 HMG-API ships a trusted author list (`maps/authors.json`, by author key UUID). A
 mod from a key that isn't listed still installs, with a warning to the owner. To
-be listed, open an issue with your key's UUID (`tools/mkmodpkg.sh` prints it) and
-where your mods are published. Keep your key private and backed up: a lost key
+be listed, add your mod to the community catalogue (`catalog/`, `tools/catalog.py
+add`; see the wiki's Making mods page): the same pull request lists your key. An
+optional `"repo": "https://…"` in `mod.json` is the link the catalogue shows for
+your source. Keep your key private and backed up: a lost key
 means a new UUID, and owners would have to remove the old mod before installing
 yours again.

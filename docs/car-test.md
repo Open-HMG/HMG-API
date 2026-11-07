@@ -144,10 +144,15 @@ Run each as the owner (`adb shell hmgapid vehicle-do ...`). Each answers `ok ...
    8, 2. Same for `passenger`.
 3. Wheel heat: `vehicle-do wheel_heat on`, then `off`. **Expect:** the wheel heat
    light follows.
-4. Conditioning: `vehicle-do conditioning start`. **Expect:** the car's battery
-   conditioning indicator comes on within a minute; `vehicle hv.conditioning`
-   reads 2 only if the owner's Battery Conditioning setting is on (it's the setting). Leave it 2 minutes (HMG-API keeps it going every 5 s), then
-   `vehicle-do conditioning stop`: indicator off. **Note** how long each took.
+4. Conditioning: car in READY, Battery Conditioning on in the EV settings
+   (`vehicle hv.conditioning` reads 2). `vehicle hv.battery_temp_min
+   hv.conditioning_active` (**note** the temperature). `vehicle-do conditioning start`
+   (a warm pack is refused: add `warm` to send it anyway). **Expect:** within 5 minutes
+   on the EV6 (about a minute on the Ioniq 5) `vehicle hv.conditioning_active` reads 1
+   and `vehicle conditioning.state` reads `active`; if not, the state goes to
+   `timed_out` and the stop is sent (the log says so). Then `vehicle-do conditioning
+   stop`: `conditioning.state` `stopping`, then `off` once the indicator is. **Note**
+   how long each took, and the temperature.
    Then `vehicle-do conditioning auto-start`: **expect** refused (a manual stop
    blocks automatic starts).
 5. Ambient light: select *Custom colour* in the car's light settings (a theme such as

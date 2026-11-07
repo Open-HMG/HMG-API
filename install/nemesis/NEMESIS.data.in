@@ -6,9 +6,9 @@ type=application
 package-version=@PACKAGE_VERSION@
 short-desc="Mod manager for Gen5W head units: hooks, mods, Car Report."
 detailed-desc="HMG-API @VERSION@: a root daemon, a hook runtime and the HMG-API app. Mods (wireless CarPlay and Android Auto, and more) are added from the app. Uninstalling puts every file back to stock."
-os="CVEV.USA.*.260507"
+os="any"
 models="any"
-depends=""
+depends="@DEPENDS@"
 postinstall=scripts/postinstall.sh
 preuninstall=scripts/preuninstall.sh
 
@@ -16,3 +16,10 @@ preuninstall=scripts/preuninstall.sh
 kind=sh
 path=bin/open.sh
 uid=root
+
+[service.0]
+name=boot
+kind=sh
+path=bin/start.sh
+uid=root
+mode=background

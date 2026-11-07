@@ -32,6 +32,21 @@ final class Commands {
 
         void conditioningStation(int a, int b);
 
+        /** EV ready (HEV status EV_RDY): 1 ready; -1 unknown */
+        int ready();
+
+        /** the owner's Battery Conditioning setting (EV settings): 1 off, 2 on; -1 unknown */
+        int conditioningSetting();
+
+        /** the car's conditioning indicator (body control getBattCondIndSta): 1 conditioning, 0 not; -1 unknown */
+        int conditioningIndicator();
+
+        /** the pack's minimum temperature, whole °C (cluster battery info); Integer.MIN_VALUE unknown */
+        int packTempMin();
+
+        /** model code, the first field of ro.build.product (CVEV, NEEV, ...); "" unknown */
+        String model();
+
         /** the car's raw value: 1 off, 2-11 levels 1-10 */
         void lightBrightness(int raw);
 
@@ -79,6 +94,26 @@ final class Commands {
     static final int LINES_OFF = 1, LINES_ON = 2;
     static final long DOOR_GAP_MS = 5000, LIGHT_GAP_MS = 100, KEEP_MS = 5000;
     /**
+     * Conditioning's route values when a mod gives none (Launchpad's), and the most the
+     * car's navigation sends (2047 km and 1023 min mean "no route"): the BMS times the
+     * heating from them, so a mod routing to a real charger sends the real ones.
+     */
+    static final int ROUTE_KM = 9, ROUTE_MIN = 18, KM_MAX = 2046, MIN_MAX = 1022;
+    static final int READY = 1, SETTING_ON = 2;
+    /**
+     * Per model (Launchpad's PreconditioningProfile): the minimum pack temperature at or
+     * above which the car usually won't heat (°C; a Kia bulletin and owners' reports, not
+     * BMS calibration), and how long the indicator may take to come on (the EV6 up to
+     * 5 minutes, field-tested; the Ioniq 5 about 60-70 s, so 2 minutes for the others).
+     */
+    static int warmC(String model) {
+        return model.startsWith("NEEV") ? 21 : 20;   // Ioniq 5 21 °C / 70 °F; EV6, Ioniq 6 (CEEV) 20 °C / 68 °F
+    }
+
+    static long activationMs(String model) {
+        return "CVEV".equals(model) ? 5 * 60000 : 2 * 60000;
+    }
+    /**
      * The ambient light's custom colours (the vehicle settings app's 64-colour picker,
      * EV6 260507): the car ignores any other colour, so a colour is sent as the nearest one
      */
@@ -97,6 +132,18 @@ final class Commands {
     long doorAt = -DOOR_GAP_MS, lightAt = -LIGHT_GAP_MS, keptAt;
     String conditioningBy, lightBy, linesBy, cameraBy;
     boolean manualStop, noticeDone;
+    /** the conditioning request in force: an automatic one (auto-start), and its route values */
+    boolean conditioningAuto;
+    int conditioningKm = ROUTE_KM, conditioningMin = ROUTE_MIN;
+    /**
+     * What the car made of it (the indicator, read every tick): off; requested (sent, the
+     * indicator can't be read); waiting (sent, not on yet); active; stopping (stopped, the
+     * indicator still on); ended (the car turned it off while requested); timed_out (it
+     * never came on in time: stopped). ended and timed_out stay until the next start.
+     */
+    String conditioningState = "off";
+    long conditioningAt;
+    boolean timedOut;   // automatic starts wait for a manual one after a timeout (no retry loop)
     int linesBefore;
     int[] lightSaved;   // the owner's light, taken when a mod first changes it
     /** mods that let go of the light when the owner changes it in the menu (default: they keep it) */
@@ -120,7 +167,8 @@ final class Commands {
      * (release, stop, restore, off) never waits: a mod can always give back what it took.
      */
     String owner(String mod, String cmd, String a0) {
-        if (!car.askFirst() || mod == null || mod.isEmpty() || "hmgapi".equals(mod)) return null;
+        // "-" is the owner (root over adb, HMG-API's app): their own request needs no OK from themselves
+        if (!car.askFirst() || mod == null || mod.isEmpty() || "hmgapi".equals(mod) || "-".equals(mod)) return null;
         if ("release".equals(a0) || "stop".equals(a0) || "restore".equals(a0) || "off".equals(a0)) return null;
         String a = car.answer(mod, cmd);
         if ("yes".equals(a)) return null;
@@ -135,15 +183,15 @@ final class Commands {
     }
 
     synchronized String handle(String mod, String cmd, String[] args) {
-        String a0 = args.length > 0 ? args[0] : "", a1 = args.length > 1 ? args[1] : "";
+        String a0 = args.length > 0 ? args[0] : "", a1 = args.length > 1 ? args[1] : "", a2 = args.length > 2 ? args[2] : "";
         String r;
         try {
             r = owner(mod, cmd, a0);
-            if (r == null) r = run(mod, cmd, a0, a1);
+            if (r == null) r = "conditioning".equals(cmd) ? conditioning(mod, args) : run(mod, cmd, a0, a1);
         } catch (RuntimeException e) {
             r = "refused: the car's service failed (" + e + ")";
         }
-        car.log(mod + " " + cmd + " " + a0 + (a1.isEmpty() ? "" : " " + a1) + " -> " + r);
+        car.log(mod + " " + cmd + " " + a0 + (a1.isEmpty() ? "" : " " + a1) + (a2.isEmpty() ? "" : " " + a2) + " -> " + r);
         return r;
     }
 
@@ -172,22 +220,6 @@ final class Commands {
             if (!"on".equals(a0) && !"off".equals(a0)) return "refused: wheel_heat on|off";
             car.wheelHeat("on".equals(a0) ? 1 : 0);
             return "ok wheel heat " + a0;
-        }
-        if ("conditioning".equals(cmd)) {
-            if ("stop".equals(a0)) {
-                if (conditioningBy == null) return "ok not conditioning";
-                stopConditioning();
-                manualStop = true;   // a stop is the driver's (or a mod's) call: automatic starts wait for a manual one
-                return "ok conditioning stopped";
-            }
-            boolean auto = "auto-start".equals(a0);
-            if (!auto && !"start".equals(a0)) return "refused: conditioning start|auto-start|stop";
-            if (auto && manualStop) return "refused: stopped by hand; automatic starts wait for a manual start";
-            if (conditioningBy != null) return "ok already conditioning (" + conditioningBy + ")";
-            if (!auto) manualStop = false;
-            conditioningBy = mod;
-            startConditioning();
-            return "ok conditioning started";
         }
         if ("ambient_light".equals(cmd)) {
             if (car.lightBlocked() && !"release".equals(a0)) return "refused: the owner turned off mod light control (HMG-API app)";
@@ -274,10 +306,95 @@ final class Commands {
         return "refused: unknown command " + cmd;
     }
 
+    /**
+     * Battery conditioning: start, auto-start (a mod's own decision, e.g. routing to a
+     * charger), both with optional route values "<km> <minutes>"; route (the mod
+     * conditioning keeps its values current); stop. A stop blocks automatic starts until
+     * the next manual start, except the stop of the mod whose automatic request it is
+     * (that's the request ending, e.g. at the charger, not the driver saying no).
+     *
+     * A start is refused, as Launchpad's PreconditioningController does, when the car
+     * isn't READY, Battery Conditioning is off in the EV settings, or the car is already
+     * conditioning on its own; a warm pack is refused with a way past it (a last word
+     * "warm"). A value that can't be read doesn't block. status: the state (see
+     * conditioningState) and who holds it.
+     */
+    private String conditioning(String mod, String[] args) {
+        java.util.List<String> w = new java.util.ArrayList<String>(java.util.Arrays.asList(args));
+        boolean warm = !w.isEmpty() && "warm".equals(w.get(w.size() - 1));
+        if (warm) w.remove(w.size() - 1);
+        String a0 = w.size() > 0 ? w.get(0) : "", a1 = w.size() > 1 ? w.get(1) : "", a2 = w.size() > 2 ? w.get(2) : "";
+        if ("status".equals(a0)) return "ok " + conditioningState + (conditioningBy == null ? "" : " (" + conditioningBy + ")");
+        if ("stop".equals(a0)) {
+            if (conditioningBy == null) return "ok not conditioning";
+            boolean ownAuto = conditioningAuto && conditioningBy.equals(mod);
+            stopConditioning();
+            if (!ownAuto) manualStop = true;   // a stop is the driver's (or another mod's) call: automatic starts wait for a manual one
+            return "ok conditioning stopped";
+        }
+        boolean auto = "auto-start".equals(a0);
+        if (!auto && !"start".equals(a0) && !"route".equals(a0)) return "refused: conditioning start|auto-start|stop|route|status";
+        if ("route".equals(a0) && a1.isEmpty()) return "refused: conditioning route <km> <minutes>";
+        int[] route = a1.isEmpty() && a2.isEmpty() ? new int[] { ROUTE_KM, ROUTE_MIN } : route(a1, a2);
+        if (route == null) return "refused: route values are <km 0-" + KM_MAX + "> <minutes 0-" + MIN_MAX + ">";
+        if ("route".equals(a0)) {
+            if (conditioningBy == null || !conditioningBy.equals(mod)) {
+                return "refused: only the mod conditioning changes its route (" + (conditioningBy == null ? "not conditioning" : conditioningBy) + ")";
+            }
+            conditioningKm = route[0];
+            conditioningMin = route[1];
+            car.conditioningRoute(conditioningKm);
+            car.conditioningTime(conditioningMin);
+            keptAt = car.now();
+            return "ok conditioning route " + conditioningKm + " km " + conditioningMin + " min";
+        }
+        if (auto && manualStop) return "refused: stopped by hand; automatic starts wait for a manual start";
+        if (auto && timedOut) return "refused: the car didn't start conditioning last time; automatic starts wait for a manual start";
+        if (conditioningBy != null) return "ok already conditioning (" + conditioningBy + ")";
+        String why = startRefusal(warm);
+        if (why != null) return "refused: " + why;
+        if (!auto) {
+            manualStop = false;
+            timedOut = false;
+        }
+        conditioningBy = mod;
+        conditioningAuto = auto;
+        conditioningKm = route[0];
+        conditioningMin = route[1];
+        startConditioning();
+        conditioningAt = car.now();
+        conditioningState = car.conditioningIndicator() < 0 ? "requested" : "waiting";
+        return "ok conditioning started";
+    }
+
+    /** why the car won't take a start now, or null */
+    String startRefusal(boolean warm) {
+        int ready = car.ready(), setting = car.conditioningSetting(), ind = car.conditioningIndicator();
+        if (ready >= 0 && ready != READY) return "the car isn't READY";
+        if (setting >= 0 && setting != SETTING_ON) return "Battery Conditioning is off in the car's EV settings";
+        if (ind == 1) return "the car is already conditioning (controlled by the car)";
+        int t = car.packTempMin(), limit = warmC(car.model());
+        if (!warm && t != Integer.MIN_VALUE && t >= limit) {
+            return "the pack is warm (" + t + " °C / " + Math.round(t * 9 / 5f + 32) + " °F; this car usually won't heat at "
+                    + limit + " °C / " + Math.round(limit * 9 / 5f + 32) + " °F or warmer); add \"warm\" to send it anyway";
+        }
+        return null;
+    }
+
+    /** "<km> <minutes>" within what the car's navigation sends, or null */
+    static int[] route(String km, String min) {
+        try {
+            int k = Integer.parseInt(km), m = Integer.parseInt(min);
+            return k < 0 || k > KM_MAX || m < 0 || m > MIN_MAX ? null : new int[] { k, m };
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     /** as the car's navigation does: route metadata, then "routed to a station" (Launchpad's order and timing) */
     void startConditioning() {
-        car.conditioningRoute(9);
-        car.conditioningTime(18);
+        car.conditioningRoute(conditioningKm);
+        car.conditioningTime(conditioningMin);
         car.pause(10);
         car.conditioningStation(2, 3);
         car.pause(130);
@@ -286,10 +403,14 @@ final class Commands {
 
     void stopConditioning() {
         conditioningBy = null;
+        conditioningAuto = false;
+        conditioningKm = ROUTE_KM;
+        conditioningMin = ROUTE_MIN;
         car.conditioningRoute(2047);
         car.conditioningTime(1023);
         car.conditioningStation(0, 0);
         car.pause(130);
+        conditioningState = car.conditioningIndicator() == 1 ? "stopping" : "off";   // stopped once the indicator is off
     }
 
     /** the palette colour closest to rgb */
@@ -395,13 +516,15 @@ final class Commands {
             car.log("conditioning: " + conditioningBy + " is off; stopping");
             stopConditioning();
         } else if (conditioningBy != null && car.now() - keptAt >= KEEP_MS) {
-            // the station too: the car's navigation sends "no station" when it has no route of
-            // its own (seen when the owner turned Battery Conditioning on), which undid ours
-            car.conditioningRoute(9);
-            car.conditioningTime(18);
-            car.conditioningStation(2, 3);
+            // the route data only, never the station event again: that event is the start
+            // (HEVService puts the station back to Invalid about 120 ms after any set, so it's
+            // never held), and repeating it every 5 s kept the BMS from switching on (US EV6
+            // 260507: indicator BCM 109 stayed 0). Launchpad's maintain does the same.
+            car.conditioningRoute(conditioningKm);
+            car.conditioningTime(conditioningMin);
             keptAt = car.now();
         }
+        watchConditioning();
         if (lightBy != null && !has(declared, lightBy, "ambient_light")) {
             car.log("ambient light: " + lightBy + " is off; released");
             releaseLight();
@@ -416,6 +539,34 @@ final class Commands {
         if (cameraBy != null && !has(declared, cameraBy, "rear_camera")) {
             car.log("rear camera: " + cameraBy + " is off; free again");
             cameraBy = null;
+        }
+    }
+
+    /**
+     * The car's indicator after a start or stop (Launchpad's activation check): on in time,
+     * or stopped and reported as timed out; once on, no deadline, and going off while
+     * requested is the car ending it (stopped, reported). A stop is done once it's off.
+     */
+    void watchConditioning() {
+        if ("stopping".equals(conditioningState)) {
+            if (car.conditioningIndicator() != 1) conditioningState = "off";
+            return;
+        }
+        if (conditioningBy == null) return;
+        int ind = car.conditioningIndicator();
+        if (ind < 0) return;   // can't tell: no deadline
+        if (ind == 1 && !"active".equals(conditioningState)) {
+            car.log("conditioning: the car's indicator is on, " + (car.now() - conditioningAt) / 1000 + " s after the start (" + conditioningBy + ")");
+            conditioningState = "active";
+        } else if (ind == 0 && "active".equals(conditioningState)) {
+            car.log("conditioning: the car ended it (indicator off); stopping (" + conditioningBy + ")");
+            stopConditioning();
+            conditioningState = "ended";
+        } else if (ind == 0 && car.now() - conditioningAt >= activationMs(car.model())) {
+            car.log("conditioning: the car's indicator didn't come on within " + activationMs(car.model()) / 60000 + " min; stopping (" + conditioningBy + ")");
+            stopConditioning();
+            conditioningState = "timed_out";
+            timedOut = true;
         }
     }
 

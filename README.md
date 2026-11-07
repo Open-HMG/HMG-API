@@ -2,6 +2,11 @@
 
 # HMG-API
 
+[![Sponsor on GitHub](https://img.shields.io/badge/Sponsor_on_GitHub-%E2%9D%A4-bf3989?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/VysseCodes)
+[![Buy me a coffee on Ko-fi](https://img.shields.io/badge/Buy_me_a_coffee-Ko--fi-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white)](https://ko-fi.com/vyssecodes)
+
+> **HMG-API is free.** If it saved you a dealer visit or made your drives nicer, please consider chipping in through [GitHub Sponsors](https://github.com/sponsors/VysseCodes) or [Ko-fi](https://ko-fi.com/vyssecodes). It keeps the testing and new-car ports going.
+
 A mod manager for Hyundai, Kia and Genesis **Gen5W** navigation head units.
 
 Mods add features to the head unit (wireless CarPlay and Android Auto with
@@ -18,13 +23,13 @@ changed when it's removed.
 
 ## Install
 
-Download the zip for your route from [Releases](https://github.com/VysseCodes/HMG-API/releases):
+Download the zip for your route from [Releases](https://github.com/Open-HMG/HMG-API/releases):
 a **USB stick** (no computer), **NEMESIS**, or **adb**. Step by step:
-[Installing HMG-API](https://github.com/VysseCodes/HMG-API/wiki/Installing-HMG-API).
+[Installing HMG-API](https://github.com/Open-HMG/HMG-API/wiki/Installing-HMG-API).
 
 HMG-API runs on any Gen5W navigation head unit. Cars with a hook map get everything;
 on others, mods still install and run, and the app's **Car Report** sends what's
-needed to add your car ([Supported cars](https://github.com/VysseCodes/HMG-API/wiki/Supported-cars)).
+needed to add your car ([Supported cars](https://github.com/Open-HMG/HMG-API/wiki/Supported-cars)).
 
 | Car | Region | Software | Hook map |
 |---|---|---|---|
@@ -34,11 +39,11 @@ needed to add your car ([Supported cars](https://github.com/VysseCodes/HMG-API/w
 
 ## Help and requests
 
-[Open an issue](https://github.com/VysseCodes/HMG-API/issues/new/choose): something
+[Open an issue](https://github.com/Open-HMG/HMG-API/issues/new/choose): something
 doesn't work, car or firmware support (the Car Report's QR code fills it in), a new
-hook point, or an idea. Guides are in the [wiki](https://github.com/VysseCodes/HMG-API/wiki).
+hook point, or an idea. Guides are in the [wiki](https://github.com/Open-HMG/HMG-API/wiki).
 
-> **Status: 1.0.0 beta 5.** Tested on a US Kia EV6 (260507): the hook runtime,
+> **Status: 1.0.2.** Tested on a US Kia EV6 (260507): the hook runtime,
 > mods, the app, buttons, the side panel, Android Auto turn-by-turn and projection
 > events, the Car Report. CarPlay on HMG-API, the installers on a car without adb, and
 > other cars aren't tested yet. Leafia 1.x (HMG Leafia Plus) is the previous project.
@@ -58,7 +63,7 @@ hook point, or an idea. Guides are in the [wiki](https://github.com/VysseCodes/H
 | `core/app` | the HMG-API app (`hmgapi.app`) |
 | `core/client` | `hmgapi-client.jar`: for mods' own apps and services (settings, services, USB folders, notices) |
 | `install/` | installers: `adb/`, `nemesis/`, `usb/` (DSP OTA), shared `common/`; `dev/` has the scripts used while building the core |
-| `core/hookpoints`, `maps/` | the hook point catalogue (stable names) and each car's map (`maps/coverage.json`: which points every car has) |
+| `core/hookpoints`, `maps/` | the hook point catalogue (stable names; every point and the cars that have it: [docs/hook-points.md](docs/hook-points.md)) and each car's map (`maps/coverage.json`: which points every car has) |
 | `mods/` | `wireless-carplay-aa`, `adb`, `adbd`; `examples/`: `hello`, `hello-service`, `side-panel`, `car-check`, `nemesis-shortcut` and more |
 | `docs/` | `mod-reference.md` (the `mod.json` reference; `tools/mod-draft.py` drafts one from an existing package), `api-plan.md` (what each community project uses), `vehicle-commands.md`, `micom-map.md`, `car-test.md` (the on-car test session) |
 | `wiki/` | the owners' wiki (GitHub wiki pages: installing, mods, the app, troubleshooting) |

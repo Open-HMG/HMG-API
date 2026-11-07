@@ -38,4 +38,5 @@ plain classes.dex (`/system/framework/com.broadcom.bt.jar`). Library points are
 reached with the app's class loader.
 
 Adding a hook point means mapping it for **every** car in `maps/`: the tests fail
-otherwise.
+otherwise. Then run `tools/mkhookdoc.py`: it remakes [docs/hook-points.md](../../docs/hook-points.md),
+the list of every point and the cars that have it (the tests fail if it's out of date).

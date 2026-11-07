@@ -4,7 +4,7 @@
 
 - **No tile, no ★ choice:** those come from HMG-API's hooks, which need your car's hook
   map. Open the app from **NEMESIS Manager → My Packages → HMG-API → Launch**, or over
-  adb: `adb shell hmgapid sh 'sh /data/hmgapi/open.sh'`.
+  adb: `adb shell "hmgapid sh 'sh /data/hmgapi/open.sh'"`.
 - **The app didn't install** (a message says so; `/data/hmgapi/install.log` has the
   reason): restart the head unit and HMG-API tries again, or use **Launch** above,
   which installs it first and then opens it.
@@ -34,7 +34,7 @@ head unit starts normally, and the app says the hooks aren't running. Turn off o
 remove the mod you added last, then reset the counter and restart:
 
 ```
-adb shell hmgapid sh 'echo 0 > /data/hmgapi/hook/starts'
+adb shell "hmgapid sh 'echo 0 > /data/hmgapi/hook/starts'"
 ```
 
 ## A mod isn't doing anything
@@ -48,6 +48,18 @@ adb shell hmgapid sh 'echo 0 > /data/hmgapi/hook/starts'
 A stick in the port can make the head unit start wired Android Auto and refuse
 wireless until it times out. Take the stick out; if it stays stuck, restart the head
 unit.
+
+## NEMESIS Manager shows hmgapi/boot as "stopped"
+
+That's normal. `hmgapi/boot` (Services) starts HMG-API when NEMESIS starts, then
+exits; HMG-API keeps running in its own daemon. Start and Stop there change
+nothing: HMG-API starts once per restart, from whichever comes first, this or its
+own boot hook.
+
+## NEMESIS says "daemon not running" for a minute or two after a restart
+
+That was HMG-API 1.0.0 and 1.0.1 holding up NEMESIS's start. Update HMG-API to
+1.0.2 or newer.
 
 ## Sending a report
 

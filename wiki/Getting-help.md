@@ -1,11 +1,11 @@
 # Getting help and asking for things
 
-Open an [issue](https://github.com/VysseCodes/HMG-API/issues/new/choose) and pick a form:
+Open an [issue](https://github.com/Open-HMG/HMG-API/issues/new/choose) and pick a form:
 
 | Form | For |
 |---|---|
 | **Something doesn't work** | a bug in HMG-API or a mod |
-| **Car or firmware support (Car Report)** | a car, region or head unit software version that isn't supported yet, or a mod that doesn't load on your car. The [Car Report](Car-Report) QR code opens this one filled in |
+| **Car or firmware support (Car Report)** | a car, region or head unit software version that isn't supported yet, a mod that doesn't load on your car, or to confirm a map that's waiting for a check on a car. The [Car Report](Car-Report) QR code opens this one filled in |
 | **New hook point** | a mod you're writing needs a place in the car's software HMG-API doesn't offer yet |
 | **Feature idea** | something HMG-API or a mod could do |
 
@@ -17,4 +17,4 @@ Before you post:
   needs them.
 
 Security problems: please report them privately (see the
-[security policy](https://github.com/VysseCodes/HMG-API/security/policy)), not as an issue.
+[security policy](https://github.com/Open-HMG/HMG-API/security/policy)), not as an issue.

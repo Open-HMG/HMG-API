@@ -7,7 +7,11 @@
 # Only an HMG-API package in the stage counts, and never when the nemesis command
 # that runs this is an uninstall: a stage left by an interrupted install mustn't
 # turn an uninstall into nothing. A failure here keeps NEMESIS's package (exit 5).
+# HMG-API's NEMESIS sync (HMGAPI_NEMESIS_SYNC=1) unlists or re-lists only: HMG-API did (or
+# keeps) the real work. Otherwise this uninstalls HMG-API, if it's installed
+# (installed.txt: uninstall.sh stays in /data/hmgapi after an uninstall).
 umask 077
+if [ "$HMGAPI_NEMESIS_SYNC" = 1 ]; then echo "HMG-API's NEMESIS sync: list only, nothing uninstalled"; exit 0; fi
 STAGE=${ROOT:-}/data/local/tmp/nemesis/stage/hmgapi
 caller=$(cat /proc/$PPID/cmdline 2>/dev/null)
 case $caller in
@@ -18,5 +22,6 @@ case $caller in
             exit 0
         fi ;;
 esac
-[ -f "${ROOT:-}/data/hmgapi/uninstall.sh" ] || { echo "HMG-API isn't installed"; exit 0; }
+[ -f "${ROOT:-}/data/hmgapi/installed.txt" ] && [ -f "${ROOT:-}/data/hmgapi/uninstall.sh" ] || { echo "HMG-API isn't installed"; exit 0; }
+export HMGAPI_FROM_NEMESIS=1   # uninstall.sh: NEMESIS is unlisting it already, no NEMESIS sync
 exec sh "${ROOT:-}/data/hmgapi/uninstall.sh"
