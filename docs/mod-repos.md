@@ -2,35 +2,34 @@
 
 The mods HMG-API ships (`tools/release-mods.txt`: `wireless-carplay-aa`, `adb`,
 `examples/nemesis-shortcut`), and `mods/adbd`, move to their own repositories in the
-Open-HMG org. `mods/examples` (except `nemesis-shortcut`, see 1) stay in core as API
-examples and test fixtures. Hook points and maps stay in core.
+Open-HMG org, one repo per mod. The other `mods/examples` stay in core as API examples
+and test fixtures. Hook points and maps stay in core.
 
-## Decisions for the maintainer
+## Decided (2026-11-07)
 
-| # | Question | Recommended | Other choice |
-|---|---|---|---|
-| A | `nemesis-shortcut`: move or stay? | Move to `hmgapi-adb` (with `adb`, `adbd`) | Stay in `mods/examples`; core keeps a mod key and builds one shipped mod in-tree |
-| B | Signing key for the moved mods | Same author key as now (`7251ce71-…`), as `MOD_KEY` in each mod repo's `release` environment | A new Open-HMG key: every installed car must remove and reinstall the mods |
-| C | Who updates `catalog/` on a mod release | A maintainer, by PR (`tools/catalog.py add`, the command printed by the mod's release run) | Mod release workflow opens the PR (needs a token that can write to HMG-API) |
-| D | Korean cars in the wireless mod (#22, #108) | Decided in the mod repo once a car is confirmed working; core takes the map either way | Wait until the core Korea fact is updated (job 7) |
+| # | Question | Decision |
+|---|---|---|
+| A | `nemesis-shortcut`, and repos shared by mods | Every mod gets its own repo, `nemesis-shortcut` included; `adb` and `adbd` don't share. Core then signs no mod and holds no mod key. |
+| B | Signing key for the moved mods | Same author key as now (`7251ce71-…`), as `MOD_KEY` in each mod repo's `release` environment. A new key would strand every installed car (5). |
+| C | Who updates `catalog/` on a mod release | A maintainer, by PR (`tools/catalog.py add`, the command printed by the mod's release run). |
+| D | Korean cars (#22, #108) | Not confirmed for now: no Korean car in the wireless mod's `system` list. #22's and #108's car entries wait (10). |
 
 ## 1. Which mods move, to which repos
 
-| Mod | Repo | Why |
+| Mod | Repo | Notes |
 |---|---|---|
-| `wireless-carplay-aa` | `Open-HMG/hmgapi-wireless-carplay-aa` | Most of the mod PRs; own release pace, own testers |
-| `adb` | `Open-HMG/hmgapi-adb` | adb access, same audience as `adbd` |
-| `adbd` | `Open-HMG/hmgapi-adb` (shared) | Same feature as `adb` (who can reach adb); its build needs `third_party/` (AOSP 4.4.4 adbd, used only here), which moves with it. Still not released or listed. |
-| `nemesis-shortcut` | `Open-HMG/hmgapi-adb` (decision A) | Owner tinkering tools, same audience; core then signs no mod and holds no mod key |
+| `wireless-carplay-aa` | `Open-HMG/hmgapi-wireless-carplay-aa` | most of the mod PRs |
+| `adb` | `Open-HMG/hmgapi-adb` | |
+| `adbd` | `Open-HMG/hmgapi-adbd` | its build needs `third_party/` (AOSP 4.4.4 adbd, Apache-2.0, used only here), which moves with it. Still not released or listed. |
+| `nemesis-shortcut` | `Open-HMG/hmgapi-nemesis-shortcut` | `mod.json` only, no code |
 | `mods/examples/*` (others) | stay | API examples, test fixtures (`hello` is used by signing, catalogue and NEMESIS tests) |
 
-Layout in every mod repo: each mod in its own folder (`wireless-carplay-aa/`, `adb/`,
-`adbd/`, `nemesis-shortcut/`), with `README.md`, `LICENSE`, `.github/` and `docs/` at the
-root. `mkmodpkg.sh` packages everything in a mod folder except `build.sh`, `test.sh`,
-`src`, `tools`, `native`, so a mod at the repo root would ship the README and workflows.
+Layout in every mod repo: the mod in a folder named by its id (`wireless-carplay-aa/`…),
+with `README.md`, `LICENSE`, `.github/` and `docs/` at the root. `mkmodpkg.sh` packages
+everything in a mod folder except `build.sh`, `test.sh`, `src`, `tools`, `native`, so a
+mod at the repo root would ship the README and workflows.
 
-Tags: `v<version>` in a one-mod repo; `<id>-v<version>` (e.g. `adb-v1.0.0`) in `hmgapi-adb`.
-The release workflow refuses a tag that isn't the mod's `mod.json` version.
+Tags: `v<version>`; the release workflow refuses a tag that isn't the mod's `mod.json` version.
 
 ## 2. History (git filter-repo)
 
@@ -42,7 +41,9 @@ that PR's rebase; the path is listed so a later import still catches it.
 | Repo | filter-repo arguments (scratch clone only) |
 |---|---|
 | `hmgapi-wireless-carplay-aa` | `--path mods/wireless-carplay-aa/ --path docs/cluster-turns.md --path-rename mods/wireless-carplay-aa/:wireless-carplay-aa/` |
-| `hmgapi-adb` | `--path mods/adb/ --path mods/adbd/ --path mods/examples/nemesis-shortcut/ --path third_party/ --path-rename mods/adb/:adb/ --path-rename mods/adbd/:adbd/ --path-rename mods/examples/nemesis-shortcut/:nemesis-shortcut/` |
+| `hmgapi-adb` | `--path mods/adb/ --path-rename mods/adb/:adb/` |
+| `hmgapi-adbd` | `--path mods/adbd/ --path third_party/ --path-rename mods/adbd/:adbd/` (`adbd/build.sh` then finds `third_party/` one level up, not two) |
+| `hmgapi-nemesis-shortcut` | `--path mods/examples/nemesis-shortcut/ --path-rename mods/examples/nemesis-shortcut/:nemesis-shortcut/` |
 
 Stays in core: `catalog/*.json` (the index), `wiki/` pages about the mods (owner docs),
 `docs/api-plan.md`, `docs/car-test.md` (it installs mods from their releases after job 5).
@@ -96,15 +97,15 @@ fetches that SDK too). A mod that raises its floor says so in its release notes.
 | | Now | After |
 |---|---|---|
 | Mod key | `HMGAPI_MOD_KEY`/`_PUB` in core's `release` environment | `MOD_KEY`/`MOD_KEY_PUB` in each mod repo's `release` environment (`v*` tags only), same key |
-| Core's mod key | signs three mods | deleted from core (with decision A) |
+| Core's mod key | signs three mods | deleted from core (decision A) |
 | Examples in core | throwaway keys in tests | unchanged |
 
 Why the same key (decision B): the engine refuses an update signed by a key other than
 the one the mod was installed with, and `tools/catalog.py check --base` refuses an entry
 whose author key changed. A new key strands every installed car. Cost: the key lives in
-two repo environments; both are `v*`-tag-only with Admin bypass.
+four repo environments; each is `v*`-tag-only with Admin bypass.
 
-`maps/authors.json`: the key's `repos` gets both new repo URLs (the catalogue checks
+`maps/authors.json`: the key's `repos` gets the new repo URLs (the catalogue checks
 an entry's `repo` against them).
 
 ## 6. Core release bundling
@@ -128,11 +129,11 @@ ignores the new field.)
 
 | Field | After |
 |---|---|
-| `repo` | `https://github.com/Open-HMG/hmgapi-wireless-carplay-aa`, `https://github.com/Open-HMG/hmgapi-adb` (with `/tree/main/<id>` in the shared repo) |
+| `repo` | `https://github.com/Open-HMG/hmgapi-<id>` (`wireless-carplay-aa`, `adb`, `nemesis-shortcut`; `adbd` gets an entry only when it's released) |
 | `download` | the mod repo's release asset; the current v1.0.2 links stay until each mod's next release |
 | `sha256`, `version` | from `tools/catalog.py add`, as now |
 
-On a mod release (decision C): the mod's release run prints the
+On a mod release (decision C), the mod's release run prints the
 `tools/catalog.py add <zip> --download <url> --repo <url>` command; a maintainer opens the
 HMG-API PR; `catalog.yml` downloads and checks it. The wiki's Community mods page updates
 on merge.
@@ -167,10 +168,10 @@ still own their `release.yml` caller and secrets.
 |---|---|---|
 | #15 CarPlay turns, left-hand traffic | wireless | merge in core before the freeze |
 | #111 Bluetooth kept up | wireless | merge in core: drop its catalogue/map edits (in #120), raise `"hmgapi"` |
-| #22 Niro Hybrid KOR | map + wireless car entry | map in core; car entry in the mod repo (decision D) |
+| #22 Niro Hybrid KOR | map + wireless car entry | car entry parked (decision D); later re-opened in the mod repo. Whether the map lands in core without a Supported-cars row is decided at its review |
 | #100 CarPlay picture freeze (draft) | wireless | re-open in the mod repo; its points are in core (#120) |
 | #75 AA lanes, car-format turns | wireless + `docs/cluster-turns.md` | rebase onto the mod repo (the author is a maintainer) |
-| #108 Korean K5 (draft) | core + wireless | split: core PR (Wi-Fi probe, install, `SystemCheck`); mod PR in the mod repo; its by-name hook becomes a hook point |
+| #108 Korean K5 (draft) | core + wireless | split: core PR (Wi-Fi probe, install, `SystemCheck`); its by-name hook becomes a hook point; the K5 car entry waits (decision D) |
 | #104 USB Wi-Fi adapter (draft) | new mod + wireless entry | if accepted: its own repo by its author, catalogue entry; small wireless `mod.json` change in the mod repo |
 
 Freeze: once the wireless extraction starts, nothing more merges into
@@ -187,5 +188,5 @@ core PR.
 | SDK + reusable CI | `feat/mod-sdk`, HMG-API | `./build.sh sdk` makes the zip listed in 3; `mod.yml` runs green on `mods/examples/hello` in core CI; the tests in 8 off the wireless fixture with the same checks; `"nemesis_conflicts"` read by `mknemesismod.sh`, ignored by the engine; `tools/test-all.sh` passes |
 | Release the SDK | tag in HMG-API | `hmgapi-mod-sdk-<v>.zip` on the release, in `SHA256SUMS` |
 | Extract wireless | `import`, `hmgapi-wireless-carplay-aa` | filter-repo history as in 2; CI green on the pinned SDK; a tag drafts a release whose signed zip installs over v1.0.2's `wireless-carplay-aa-2.1.0` on the mock tester (same key, no warning); stock-tree tests pass locally |
-| Extract adb, adbd, nemesis-shortcut | `import`, `hmgapi-adb` | same; `adbd` builds from `third_party/` with the NDK |
+| Extract adb, adbd, nemesis-shortcut (one job, three repos) | `import` in `hmgapi-adb`, `hmgapi-adbd`, `hmgapi-nemesis-shortcut` | same, per repo; `adbd` builds from `third_party/` with the NDK |
 | Remove from core | `chore/remove-bundled-mods`, HMG-API | moved folders and `third_party/` gone; `release-mods.txt` is ids; local dry run of the release steps gives the same zip listings as v1.0.2 (differences explained); catalogue points at mod releases, `tools/catalog.py check --download` passes; no hit for the moved ids/paths outside `catalog/`, `wiki/`, `CHANGELOG.md`, release notes; core's `HMGAPI_MOD_KEY` deleted |
