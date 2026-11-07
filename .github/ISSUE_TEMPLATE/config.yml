@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Install guide and help
-    url: https://github.com/VysseCodes/HMG-API/wiki
+    url: https://github.com/Open-HMG/HMG-API/wiki
     about: Installing, removing, and fixing common problems.
   - name: Security problem
-    url: https://github.com/VysseCodes/HMG-API/security/policy
+    url: https://github.com/Open-HMG/HMG-API/security/policy
     about: Please report security problems privately, not as an issue.
