@@ -1,4 +1,5 @@
 # A HMG-API release from a version tag (v1.0.0, v1.0.0-beta.1): built and tested,
+# with the mod SDK (hmgapi-mod-sdk-<version>.zip, in SHA256SUMS: what mod repos pin),
 # signed with HMG-API's keys (repository secrets), then attached to a *draft* GitHub
 # release (a pre-release when the tag has a "-"). Publishing it stays a person's call.
 #
@@ -71,6 +72,7 @@ jobs:
       - name: Build and test
         run: |
           ./build.sh
+          ./build.sh sdk   # the mod SDK, for mod repos (docs/mod-repos.md section 3)
           tools/test-all.sh
 
       - name: Mods, release and downloads
@@ -80,6 +82,7 @@ jobs:
           tools/mkinstallers.sh   # also each mod as a NEMESIS package, in out/dist/mods
           mkdir -p out/assets
           cp out/dist/hmgapi-"$VERSION"-*.zip out/assets/
+          cp out/dist/hmgapi-mod-sdk-"$VERSION".zip out/assets/
           cp out/releases/hmgapi-"$VERSION".zip out/assets/hmgapi-"$VERSION"-update.zip
           cp out/packages/*.zip out/assets/
           cp out/dist/mods/*-nemesis*.zip out/assets/

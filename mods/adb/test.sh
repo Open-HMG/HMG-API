@@ -11,6 +11,8 @@ check() { if [ "$2" = "$3" ]; then echo "ok    $1"; else echo "FAIL  $1: wanted 
 has() { case "$3" in *"$2"*) echo "ok    $1" ;; *) echo "FAIL  $1: wanted [$2] in [$3]"; fail=1 ;; esac; }
 eng() { set +e; out=$(HMGAPI_ROOT=$R HMGAPI_HOST=1 HMGAPI_TEST_ANY_CAR=1 java -cp "$CP" hmgapi.engine.Engine "$@" 2>&1); rc=$?; set -e; }
 prop() { grep "^prop/$1=" $R/settings.txt | cut -d= -f2-; }
+check "NEMESIS package refuses adb.tcp (mod.json nemesis_conflicts)" "hmgapi@>=1.0,!adb.tcp" \
+    "$(HMGAPI_NEMESIS_CONFLICTS=/dev/null tools/nemesis-meta.py depends hmgapi.adb 'hmgapi@>=1.0' --mod mods/adb/mod.json)"
 mkdir -p $R/data/hmgapi/mods $R/data/hmgapi/settings
 printf 'ro.board.platform=tcc803x\n' > $R/props.txt
 printf 'prop/persist.service.adb.tcp.enable=1\nprop/persist.sys.usb.config=adb\nprop/persist.adb.tcp.port=5555\n' > $R/settings.txt
