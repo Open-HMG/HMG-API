@@ -47,8 +47,7 @@ mods() {
     [ -d "$OUT/classes" ] || runtime
     [ -f "$OUT/hmgapi-client.jar" ] || client
     rm -rf "$OUT/mods" "$OUT/mod-build" && mkdir -p "$OUT/mods"
-    for m in mods/examples/*/ mods/*/; do
-        [ "$m" = mods/examples/ ] && continue
+    for m in mods/examples/*/; do   # the mods HMG-API ships live in their own repos (docs/mod-repos.md)
         id=$(basename "$m")
         # mods built before this one are on the classpath: a mod compiles against the API of mods it requires
         deps=$(find "$OUT/mod-build" -mindepth 2 -maxdepth 2 -type d -name classes 2>/dev/null | tr '\n' ':')

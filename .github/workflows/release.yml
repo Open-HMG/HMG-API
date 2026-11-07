@@ -5,8 +5,8 @@
 #
 # Secrets (in the "release" environment, which only v* tags can use): HMGAPI_APP_P12 (base64) and HMGAPI_APP_PASS, the app's signing key;
 # HMGAPI_RELEASE_KEY and HMGAPI_RELEASE_KEY_PUB (base64), the release key the app
-# checks updates against; HMGAPI_MOD_KEY and HMGAPI_MOD_KEY_PUB (base64), the author
-# key the bundled mods are signed with (signing reads <key>.pub beside each key).
+# checks updates against. The bundled mods come signed from their own repos' releases
+# (tools/release-mods.txt, pinned by their catalogue entries); core signs no mod.
 name: Release
 
 on:
@@ -52,8 +52,6 @@ jobs:
           APP_PASS: ${{ secrets.HMGAPI_APP_PASS }}
           RELEASE_KEY: ${{ secrets.HMGAPI_RELEASE_KEY }}
           RELEASE_KEY_PUB: ${{ secrets.HMGAPI_RELEASE_KEY_PUB }}
-          MOD_KEY: ${{ secrets.HMGAPI_MOD_KEY }}
-          MOD_KEY_PUB: ${{ secrets.HMGAPI_MOD_KEY_PUB }}
         run: |
           umask 077
           k="$RUNNER_TEMP/keys"
@@ -62,12 +60,9 @@ jobs:
           printf '%s\n' "$APP_PASS" > "$k/app.pass"
           echo "$RELEASE_KEY" | base64 -d > "$k/release.key"
           echo "$RELEASE_KEY_PUB" | base64 -d > "$k/release.key.pub"
-          echo "$MOD_KEY" | base64 -d > "$k/mod.key"
-          echo "$MOD_KEY_PUB" | base64 -d > "$k/mod.key.pub"
-          for f in app.p12 app.pass release.key release.key.pub mod.key mod.key.pub; do test -s "$k/$f" || { echo "secret for $f is missing"; exit 1; }; done
+          for f in app.p12 app.pass release.key release.key.pub; do test -s "$k/$f" || { echo "secret for $f is missing"; exit 1; }; done
           echo "HMGAPI_KEY=$k/app.p12" >> "$GITHUB_ENV"
           echo "HMGAPI_RELEASE_KEY=$k/release.key" >> "$GITHUB_ENV"
-          echo "MOD_KEY_FILE=$k/mod.key" >> "$GITHUB_ENV"
 
       - name: Build and test
         run: |
@@ -78,7 +73,8 @@ jobs:
       - name: Mods, release and downloads
         run: |
           rm -rf out/packages
-          grep -v '^#' tools/release-mods.txt | while read -r m; do [ -n "$m" ] && tools/mkmodpkg.sh "$m" "$MOD_KEY_FILE"; done
+          # the bundled mods: each catalogue entry's download, SHA-256 and signature checked
+          tools/catalog.py fetch out/packages $(grep -v '^#' tools/release-mods.txt)
           tools/mkinstallers.sh   # also each mod as a NEMESIS package, in out/dist/mods
           mkdir -p out/assets
           cp out/dist/hmgapi-"$VERSION"-*.zip out/assets/

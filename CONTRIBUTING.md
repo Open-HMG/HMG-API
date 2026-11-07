@@ -13,6 +13,12 @@ Thanks for helping. Bug reports, Car Reports and ideas go in
 - New or changed hook points: map them for every car (`tools/map-car.py`); if you have
   stock trees, `tools/test-hooks.py` must show no regressions.
 - Mod scripts: only commands the head unit has (`tools/check-scripts.sh <mod>`).
+- The mods HMG-API ships each have their own repo (Wireless CarPlay + Android Auto:
+  [hmgapi-wireless-carplay-aa](https://github.com/Open-HMG/hmgapi-wireless-carplay-aa);
+  [hmgapi-adb](https://github.com/Open-HMG/hmgapi-adb),
+  [hmgapi-adbd](https://github.com/Open-HMG/hmgapi-adbd),
+  [hmgapi-nemesis-shortcut](https://github.com/Open-HMG/hmgapi-nemesis-shortcut)): changes
+  to a mod go there. A new hook point a mod needs starts here ([docs/mod-repos.md](docs/mod-repos.md), section 4).
 - The wiki lives in `wiki/`; changes there are published when merged.
 - Who reviews what (`.github/CODEOWNERS`): VysseCodes reviews root, signing, `/system`
   writes and CI (`.github/`, `core/hmgapid/`, `core/zygote/`, `core/loader/`,

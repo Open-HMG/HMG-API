@@ -14,7 +14,7 @@ REPO = os.path.dirname(HERE)
 ALL = 'ALL'
 RUNTIME = ['core/runtime/*-test.sh']
 INSTALL = ['install/common/test.sh', 'install/common/install-test.sh', 'install/usb/test.sh', 'install/nemesis/mod-test.sh', 'install/nemesis/sync-test.sh']
-MODS = ['mods/*/test.sh', 'mods/*/tools/*/test.sh', 'tools/check-scripts.sh']
+MODS = ['tools/check-scripts.sh']   # the example mods' scripts (their tests run in sdk-test)
 HOOKS = ['core/hookpoints/test.sh']
 SDK = ['tools/sdk-test.sh']
 
@@ -24,17 +24,16 @@ DOCS = ['docs/*', 'wiki/*', '*.md', '.github/ISSUE_TEMPLATE/*', '.github/release
 RULES = [
     # the build itself, the test runner, the CI: everything
     (['build.sh', 'tools/env.sh', 'tools/test-all.sh', 'tools/test-select.py', '.github/workflows/ci.yml',
-      'core/loader/*', 'core/client/*', 'third_party/*'], ALL),
+      'core/loader/*', 'core/client/*'], ALL),
     (['core/hmgapid/*'], ['core/hmgapid/test.sh'] + INSTALL),
     (['core/zygote/*'], ['core/zygote/test.sh'] + INSTALL),
-    (['tools/lpatch/*'], ['tools/lpatch/test.sh', 'core/runtime/native-test.sh', 'core/runtime/engine-test.sh', 'mods/*/tools/recipes/test.sh'] + INSTALL + SDK),
+    (['tools/lpatch/*'], ['tools/lpatch/test.sh', 'core/runtime/native-test.sh', 'core/runtime/engine-test.sh'] + INSTALL + SDK),
     (['core/runtime/unit-commands.txt'], ['tools/check-scripts.sh']),
     (['core/runtime/*'], RUNTIME + HOOKS + MODS + INSTALL + SDK),
     (['core/hookpoints/*'], SDK),   # the SDK's points.txt and catalogue
     (['core/hookpoints/*', 'maps/*', 'tools/map-car.py', 'tools/check-maps.py', 'tools/mkhookdoc.py', 'docs/hook-points.md', 'tools/test-hooks.py', 'tools/probe-test.py'], HOOKS),
     (['core/app/*'], ['core/app/qr-test.sh']),
-    (['mods/examples/*'], ['core/runtime/signing-test.sh', 'install/nemesis/mod-test.sh'] + SDK),   # hello: its test.sh runs in sdk-test
-    (['mods/*'], ['tools/check-scripts.sh']),   # plus the changed mod's own tests (select)
+    (['mods/examples/*'], ['core/runtime/signing-test.sh', 'install/nemesis/mod-test.sh', 'tools/check-scripts.sh'] + SDK),   # hello: its test.sh runs in sdk-test
     (['install/*'], INSTALL + ['core/runtime/packages-test.sh']),
     (['install/nemesis/mod/*', 'install/nemesis/bin/open.sh'], SDK),
     (['tools/mkdelta.py', 'tools/mkrecipe.py', 'tools/mkmemrecipe.py'], ['core/runtime/engine-test.sh', 'core/runtime/safety-test.sh', 'tools/lpatch/test.sh']),
@@ -69,9 +68,8 @@ def select(paths):
         if not p or match(p, DOCS) and not match(p, [r for rule, _ in RULES for r in rule]):
             continue
         hit = False
-        if p.startswith('mods/'):   # a mod: its own tests (mods/<id>/test.sh, mods/<id>/tools/*/test.sh)
-            parts = p.split('/')
-            d = '/'.join(parts[:3] if parts[1] == 'examples' else parts[:2]) + '/'
+        if p.startswith('mods/examples/'):   # an example mod: its own tests, if test-all.sh lists any
+            d = '/'.join(p.split('/')[:3]) + '/'
             want.update(t for t in tests if t.startswith(d))
         for pats, got in RULES:
             if match(p, pats):

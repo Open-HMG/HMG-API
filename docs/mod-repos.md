@@ -137,11 +137,23 @@ on the USB stick, the NEMESIS stick and `mods/*-nemesis*.zip` come out as now.
 So the catalogue entry is the one pin: bumping a bundled mod in the next core release is
 the catalogue PR from 7. No second list of versions and hashes.
 
+Done in `chore/remove-bundled-mods`: `tools/catalog.py fetch out/packages <id>...` (the
+same download, SHA-256, signature and id/version checks as `check --download`), called by
+`release.yml` with the ids in `tools/release-mods.txt`. Until 1.0.3 the entries' downloads
+are the v1.0.2 assets, so a release carries the same mod bytes as v1.0.2.
+
 NEMESIS conflicts: the mod rows of `install/nemesis/conflicts.txt` (`hmgapi.wireless-carplay-aa`,
 `hmgapi.adb`) move into each mod's `mod.json` as `"nemesis_conflicts": [...]`. That's inside
 the signed package, so `mknemesismod.sh` in core and in the mod repo make the same
 NEMESIS package from the same zip. Core keeps the `hmgapi` row. (Job 2 checks the engine
 ignores the new field.)
+
+Engine `nemesis-sync` on the unit (a mod installed through HMG-API, listed in NEMESIS) reads
+the installed mod's `"nemesis_conflicts"` too, after `conflicts.txt`'s row, as
+`nemesis-meta.py` does. The wireless and adb rows stay in `conflicts.txt` for the packages
+from before the field (v1.0.2's `wireless-carplay-aa` 2.1.0 and `adb` 1.0.0, the bundled
+and catalogue versions until their next releases); each goes once no version without the
+field is in use.
 
 ## 7. Catalogue
 
