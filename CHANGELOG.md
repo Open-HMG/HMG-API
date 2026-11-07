@@ -17,6 +17,16 @@
   vehicle service answered the car's `out` array callbacks without the array, which crashed
   system_server. This could happen with any mod that reads the car (US Niro EV 260507).
 
+### For mod authors
+
+- **Readings for the 12V battery sensor:** `battery12v.sensor_state`,
+  `battery12v.sensor_invalid` and `battery12v.sensor_error` (the sensor's flags) and
+  `battery12v.saver` (the Auxiliary Battery Saver option), raw until their values are
+  understood, and read unsigned as the car sends them (0-255; the getters return a byte).
+  On the US and Canada EV6 and Ioniq 5; `-` on cars whose map lacks them.
+- **The script check reads more shell forms:** continued lines, `a|b)` case patterns and
+  nested parentheses in `$(( ))` no longer show up as missing commands.
+
 ## 1.0.2 (2026-11-04)
 
 ### Fixes

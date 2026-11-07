@@ -86,6 +86,8 @@ the HMG-API app, and hooks see new values at once.
 | `steering.angle` | degrees, left negative | telematics CAN service (`getSasAngleVal`) |
 | `pedal.accel`, `brake.pressure` | raw | telematics CAN service |
 | `battery12v.soc` | % | telematics CAN service (`getBatSoc`) |
+| `battery12v.sensor_state`, `battery12v.sensor_invalid`, `battery12v.sensor_error` | raw | the 12V battery sensor's flags, telematics CAN service (`getBATSNSRState`, `getBATSNSRInvalid`, `getBATSNSRError`); meanings not worked out yet |
+| `battery12v.saver` | raw | the Auxiliary Battery Saver option, telematics CAN service (`get_BAT_AuxBattOpt`) |
 | `hv.soc` | %, 0.5 steps | HEV service, `DISPLAY_SOC` |
 | `hv.health`, `hv.ready`, `hv.conditioning`, `charging` | raw | telematics CAN / HEV service |
 | `hv.conditioning_active` | 0/1 | the car's battery conditioning indicator (body control `getBattCondIndSta`): conditioning now |
