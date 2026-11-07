@@ -168,7 +168,7 @@ check "... through engine remove --from-nemesis and apply (no sync from inside N
 check "... NEMESIS lists only HMG-API" "hmgapi " "$(listed)"
 
 # ---- HMG-API's own listing: another version is re-listed; a NEMESIS uninstall uninstalls only if installed
-sed -i 's/^package-version=.*/package-version=0.99.6/' $R/data/nemesis/apps/hmgapi/NEMESIS.data
+f=$R/data/nemesis/apps/hmgapi/NEMESIS.data; sed 's/^package-version=.*/package-version=0.99.6/' $f > $f.new && mv $f.new $f   # no sed -i: BSD sed's differs
 eng nemesis-sync
 check "HMG-API listed at a beta's version: re-listed at its own" "$V" "$(pv hmgapi)"
 D=$R/data/nemesis/apps/hmgapi
