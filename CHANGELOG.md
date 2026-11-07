@@ -17,6 +17,8 @@
   and [NEMESIS in the app menu](https://github.com/Open-HMG/hmgapi-nemesis-shortcut). A
   HMG-API release still carries the wireless, ADB and NEMESIS-menu mods, taken from their
   catalogue entries (same files, signature checked).
+- **`mknemesismod.sh` and HMG-API's downloads give the same zip bytes on any machine.**
+  Outside UTC and the C locale, the times inside the zip and the order of its files changed.
 
 ### Fixes
 
