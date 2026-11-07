@@ -13,6 +13,24 @@ and test fixtures. Hook points and maps stay in core.
 | B | Signing key for the moved mods | Same author key as now (`7251ce71-…`), as `MOD_KEY` in each mod repo's `release` environment. A new key would strand every installed car (5). |
 | C | Who updates `catalog/` on a mod release | A maintainer, by PR (`tools/catalog.py add`, the command printed by the mod's release run). |
 | D | Korean cars (#22, #108) | Not confirmed for now: no Korean car in the wireless mod's `system` list. #22's and #108's car entries wait (10). |
+| E | New regions | On hold: USA and Canada only for now. #22 waits whole, its map included; new firmware for a supported region is fine. |
+| F | Releases | None, core or mod, until the split and the cleanup after it are done; then 1.0.3 is the first release through this setup. Until then, see "Before 1.0.3". |
+
+## Before 1.0.3 (decision F)
+
+No release carries an SDK until 1.0.3, so until then:
+
+| | Before 1.0.3 | From 1.0.3 |
+|---|---|---|
+| SDK pin (`hmgapi-sdk.json`) | `{"ref": "<HMG-API commit SHA>"}`: the workflow checks out HMG-API at that commit and runs `./build.sh sdk` | `{"version": "1.0.3", "sha256": "…"}` (3) |
+| Reusable workflow | `uses: Open-HMG/HMG-API/.github/workflows/mod.yml@<same SHA>` | `@v1.0.3` |
+| `"hmgapi"` points check (4) | a floor before 1.0.3 has no SDK: the workflow reads `core/hookpoints/*.json` at that release's tag | the floor's `points.txt` |
+| Mod releases | release workflows run to a draft; none is published | published, then the catalogue PR (C) |
+| Catalogue `download` | the v1.0.2 assets (same bytes as the moved mods) | each mod's own release (7) |
+| Core's bundled mods | from the catalogue, so the v1.0.2 assets | from the mods' releases |
+
+A mod change that needs a new point (4) waits for 1.0.3 to merge (#111). After 1.0.3, each
+mod repo moves its pin from the SHA to the release in one small PR.
 
 ## 1. Which mods move, to which repos
 
@@ -167,8 +185,8 @@ still own their `release.yml` caller and secrets.
 | PR | Mod part | Plan |
 |---|---|---|
 | #15 CarPlay turns, left-hand traffic | wireless | merge in core before the freeze |
-| #111 Bluetooth kept up | wireless | merge in core: drop its catalogue/map edits (in #120), raise `"hmgapi"` |
-| #22 Niro Hybrid KOR | map + wireless car entry | car entry parked (decision D); later re-opened in the mod repo. Whether the map lands in core without a Supported-cars row is decided at its review |
+| #111 Bluetooth kept up | wireless | drop its catalogue/map edits (in #120), `"hmgapi": ">=1.0.3"`; merge in core before the freeze, or re-open in the mod repo; ships with 1.0.3 (F) |
+| #22 Niro Hybrid KOR | map + wireless car entry | waits whole, map included (decisions D, E); after the hold, the car entry re-opens in the mod repo |
 | #100 CarPlay picture freeze (draft) | wireless | re-open in the mod repo; its points are in core (#120) |
 | #75 AA lanes, car-format turns | wireless + `docs/cluster-turns.md` | rebase onto the mod repo (the author is a maintainer) |
 | #108 Korean K5 (draft) | core + wireless | split: core PR (Wi-Fi probe, install, `SystemCheck`); its by-name hook becomes a hook point; the K5 car entry waits (decision D) |
@@ -186,7 +204,7 @@ core PR.
 | Job | Branch / repo | Acceptance |
 |---|---|---|
 | SDK + reusable CI | `feat/mod-sdk`, HMG-API | `./build.sh sdk` makes the zip listed in 3; `mod.yml` runs green on `mods/examples/hello` in core CI; the tests in 8 off the wireless fixture with the same checks; `"nemesis_conflicts"` read by `mknemesismod.sh`, ignored by the engine; `tools/test-all.sh` passes |
-| Release the SDK | tag in HMG-API | `hmgapi-mod-sdk-<v>.zip` on the release, in `SHA256SUMS` |
-| Extract wireless | `import`, `hmgapi-wireless-carplay-aa` | filter-repo history as in 2; CI green on the pinned SDK; a tag drafts a release whose signed zip installs over v1.0.2's `wireless-carplay-aa-2.1.0` on the mock tester (same key, no warning); stock-tree tests pass locally |
+| Release the SDK | 1.0.3, after the cleanup (F) | `hmgapi-mod-sdk-1.0.3.zip` on the release, in `SHA256SUMS`; mod repos' pins move from the SHA to it |
+| Extract wireless | `import`, `hmgapi-wireless-carplay-aa` | filter-repo history as in 2; CI green on the pinned SDK (a commit SHA before 1.0.3); a tag drafts a release whose signed zip installs over v1.0.2's `wireless-carplay-aa-2.1.0` on the mock tester (same key, no warning); stock-tree tests pass locally |
 | Extract adb, adbd, nemesis-shortcut (one job, three repos) | `import` in `hmgapi-adb`, `hmgapi-adbd`, `hmgapi-nemesis-shortcut` | same, per repo; `adbd` builds from `third_party/` with the NDK |
-| Remove from core | `chore/remove-bundled-mods`, HMG-API | moved folders and `third_party/` gone; `release-mods.txt` is ids; local dry run of the release steps gives the same zip listings as v1.0.2 (differences explained); catalogue points at mod releases, `tools/catalog.py check --download` passes; no hit for the moved ids/paths outside `catalog/`, `wiki/`, `CHANGELOG.md`, release notes; core's `HMGAPI_MOD_KEY` deleted |
+| Remove from core | `chore/remove-bundled-mods`, HMG-API | moved folders and `third_party/` gone; `release-mods.txt` is ids; local dry run of the release steps gives the same zip listings as v1.0.2 (differences explained); catalogue `repo` points at the mod repos and `download` stays on the v1.0.2 assets until 1.0.3 (F), `tools/catalog.py check --download` passes; no hit for the moved ids/paths outside `catalog/`, `wiki/`, `CHANGELOG.md`, release notes; core's `HMGAPI_MOD_KEY` deleted |
