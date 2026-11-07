@@ -1,7 +1,7 @@
 # Contributing
 
 Thanks for helping. Bug reports, Car Reports and ideas go in
-[issues](https://github.com/VysseCodes/HMG-API/issues/new/choose); code and docs in pull requests.
+[issues](https://github.com/Open-HMG/HMG-API/issues/new/choose); code and docs in pull requests.
 
 ## Before a pull request
 
@@ -14,6 +14,10 @@ Thanks for helping. Bug reports, Car Reports and ideas go in
   stock trees, `tools/test-hooks.py` must show no regressions.
 - Mod scripts: only commands the head unit has (`tools/check-scripts.sh <mod>`).
 - The wiki lives in `wiki/`; changes there are published when merged.
+- Who reviews what (`.github/CODEOWNERS`): VysseCodes reviews root, signing, `/system`
+  writes and CI (`.github/`, `core/hmgapid/`, `core/zygote/`, `core/loader/`,
+  `install/`, `tools/lpatch/`, `SECURITY.md`, `CLAUDE.md`); everything else needs one
+  of the Open-HMG maintainers.
 
 ## Rules
 
