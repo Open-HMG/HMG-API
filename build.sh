@@ -113,11 +113,12 @@ payload() {
     mkdir -p "$P/maps/catalogue" && cp core/hookpoints/*.json "$P/maps/catalogue/"
     python3 -c 'import glob,json; [print(p["id"]) for f in sorted(glob.glob("core/hookpoints/*.json")) for p in json.load(open(f))["points"]]' > "$P/maps/points.txt"
     # MAPS.md5, not MAPS: next to the maps folder, names differing only in case are the same
-    # name on FAT/exFAT sticks, Windows and macOS (one of the two was lost when unzipped there)
-    (cd "$P" && find maps -type f | sort | xargs md5sum > MAPS.md5)
+    # name on FAT/exFAT sticks, Windows and macOS (one of the two was lost when unzipped there).
+    # LC_ALL=C here and in MANIFEST: the same order, so the same bytes, in any locale
+    (cd "$P" && find maps -type f | LC_ALL=C sort | xargs md5sum > MAPS.md5)
     sed -n 's/.*HMGAPI_VERSION = "\(.*\)";/\1/p' core/runtime/java/hmgapi/engine/Engine.java > "$P/VERSION"
     echo "$(git rev-parse --short HEAD 2>/dev/null || echo local)$(git diff --quiet HEAD 2>/dev/null || echo +) $(date -u +%Y-%m-%d)" > "$P/BUILD"
-    (cd "$P" && md5sum hmgapid lpatch app_process libhmgapi_hook.so hmgapi-hook.jar HmgApi.apk install.sh uninstall.sh lib.sh stock.txt app-pending.sh app-open.sh hook-check.sh boot.sh MAPS.md5 $(find nemesis -type f | sort) > MANIFEST)
+    (cd "$P" && md5sum hmgapid lpatch app_process libhmgapi_hook.so hmgapi-hook.jar HmgApi.apk install.sh uninstall.sh lib.sh stock.txt app-pending.sh app-open.sh hook-check.sh boot.sh MAPS.md5 $(find nemesis -type f | LC_ALL=C sort) > MANIFEST)
     echo "payload $(cat "$P/VERSION") ($(cat "$P/BUILD")): $P"
 }
 

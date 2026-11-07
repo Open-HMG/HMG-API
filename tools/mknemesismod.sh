@@ -89,7 +89,8 @@ for k, x in v.items():
 sys.stdout.write(t)
 PY
 }
-zipdir() { (cd "$1" && find . -type f | TZ=UTC xargs touch -d 2026-01-01T00:00:00 && find . -type f | sed 's#^\./##' | sort | zip -q -X -D "$2" -@); }
+# zipdir <dir> <zip>: as tools/mkinstallers.sh (the same line: UTC and the C locale throughout)
+zipdir() { (cd "$1" && export TZ=UTC LC_ALL=C && find . -type f | xargs touch -d 2026-01-01T00:00:00 && find . -type f | sed 's#^\./##' | sort | zip -q -X -D "$2" -@); }
 
 N=$W/nemesis
 mkdir -p "$N/mod" "$N/bin"
