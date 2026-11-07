@@ -491,8 +491,10 @@ public final class Hub {
         return Points.has(id) ? raw(call(target, id)) : null;
     }
 
-    /** a number as the car gave it; null (shown as "-") for anything else */
+    /** a number as the car gave it; null (shown as "-") for anything else. A byte is read
+     *  unsigned (the 12V battery getters return byte: 0xFF is 255, not -1). */
     static String raw(Object o) {
+        if (o instanceof Byte) return String.valueOf(((Byte) o).intValue() & 0xff);
         return o instanceof Number ? String.valueOf(((Number) o).intValue()) : null;
     }
 
