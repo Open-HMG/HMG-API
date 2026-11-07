@@ -90,13 +90,15 @@ Uninstalling puts every file and setting HMG-API or a mod changed back to the st
 
 Everything goes to `out/`. Needs clang + lld, a JDK and the Android SDK (build-tools, a platform `android.jar`). No manufacturer files: the loader links against stand-ins for the head unit's libraries (`core/loader/syslib-stubs.sh`, the same bytes as linking the unit's own). Without HMG-API's signing key (`HMGAPI_KEY`) the app is signed with a throwaway key.
 
-GitHub Actions: `ci.yml` builds and runs every off-car test on each push and pull request; `release.yml` turns a version tag (`v1.0.0-beta.1`) into a signed draft release (keys in the `release` environment; the bundled mods, by catalogue id in `tools/release-mods.txt`, come from their catalogue entries' downloads, SHA-256 and signature checked); `wiki.yml` publishes `wiki/` to the GitHub wiki.
+GitHub Actions: `ci.yml` builds and runs the off-car tests a push or pull request touches (`tools/test-select.py`; every one weekly), and the fast tier on macOS; `release.yml` turns a version tag (`v1.0.0-beta.1`) into a signed draft release (keys in the `release` environment; the bundled mods, by catalogue id in `tools/release-mods.txt`, come from their catalogue entries' downloads, SHA-256 and signature checked); `wiki.yml` publishes `wiki/` to the GitHub wiki.
 
 ```
 tools/test-all.sh
 ```
 
-Runs the off-car tests under qemu-arm. With stock trees listed in `tools/hook-trees.local`
+Runs the off-car tests, several at once (`-j N`; ARM code under qemu-arm).
+`tools/test-all.sh --fast` runs the ones that need no build and no ARM toolchain,
+on Linux or macOS. With stock trees listed in `tools/hook-trees.local`
 (private), it also tests every hook point on every car (`tools/test-hooks.py`) and the
 on-car mapper against `tools/map-car.py` (`tools/probe-test.py`).
 

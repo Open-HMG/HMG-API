@@ -74,7 +74,8 @@ echo junk > "$A"
 set +e; u step1-install.sh; rc=$?; set -e
 check "unknown md5 refused" 1 $rc
 check "unknown md5 left alone" "junk" "$(cat "$A")"
-set +e; HMGAPI_FORCE=1 u step1-install.sh; rc=$?; set -e
+# export, then unset: VAR=1 u (a function) leaves VAR set after it in bash 3.2's sh (macOS)
+set +e; export HMGAPI_FORCE=1; u step1-install.sh; rc=$?; unset HMGAPI_FORCE; set -e
 check "HMGAPI_FORCE installs" 0 $rc
 check "forced: first backup kept" "$STOCK" "$(md5sum "$BAK" | cut -d' ' -f1)"
 set +e; env PATH="$T/bin:$PATH" ROOT="$T/root" HERE="$PWD" $SH install/dev/restore.sh >"$T/out" 2>&1; rc=$?; set -e

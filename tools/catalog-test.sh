@@ -18,7 +18,7 @@ G() { git -C $R "$@"; }
 G init -q && G -c user.name=t -c user.email=t@t commit -qm base --allow-empty && G add -A && G -c user.name=t -c user.email=t@t commit -qm tools
 
 CP=$T/engine; mkdir -p $CP
-javac --release 8 -Xlint:-options -nowarn -d $CP core/runtime/java/hmgapi/engine/*.java 2>/dev/null
+sh tools/engine-classes.sh $CP 2>/dev/null
 S() { java -cp $CP hmgapi.engine.Signing "$@"; }
 S keygen $T/a.key >/dev/null; UA=$(S uuid $T/a.key)
 S keygen $T/b.key >/dev/null; UB=$(S uuid $T/b.key)

@@ -186,7 +186,7 @@ on merge.
 Recommended: a reusable workflow in HMG-API, `.github/workflows/mod.yml` (`on:
 workflow_call`), called by each mod repo pinned to a core tag
 (`uses: Open-HMG/HMG-API/.github/workflows/mod.yml@v1.0.3`). Inputs: `mods` (folders,
-default all with a `mod.json`). Steps: fetch the pinned SDK (sha256), the `"hmgapi"` and
+default all with a `mod.json`), `ndk` (an NDK for a native `build.sh`, hmgapi-adbd's r21e). Steps: fetch the pinned SDK (sha256), the `"hmgapi"` and
 points check (4), build, each mod's `test.sh`, `check-scripts`, package with a throwaway
 key. A second reusable workflow, `mod-release.yml`, signs with `MOD_KEY` and drafts the
 release. Why: one place to fix CI for every mod; a template copies drift. Mod repos

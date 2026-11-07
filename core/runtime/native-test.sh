@@ -5,5 +5,5 @@
 set -e
 cd "$(dirname "$0")/../.."
 CP=$(mktemp -d); trap 'rm -rf "$CP"' EXIT
-javac --release 8 -Xlint:-options -nowarn -d "$CP" core/runtime/java/hmgapi/engine/*.java core/runtime/test/hmgapi/engine/MemRecipeTest.java 2>/dev/null
+sh tools/engine-classes.sh "$CP" && javac --release 8 -Xlint:-options -nowarn -cp "$CP" -d "$CP" core/runtime/test/hmgapi/engine/MemRecipeTest.java 2>/dev/null
 exec java -cp "$CP" hmgapi.engine.MemRecipeTest
