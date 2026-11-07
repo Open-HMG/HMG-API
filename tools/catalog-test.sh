@@ -13,7 +13,7 @@ mkdir -p $R/tools $R/maps $R/core/runtime/java/hmgapi
 cp tools/catalog.py $R/tools/
 cp -r core/runtime/java/hmgapi/engine $R/core/runtime/java/hmgapi/
 printf '{"about": "test", "authors": {}}\n' > $R/maps/authors.json
-C() { set +e; out=$(python3 $R/tools/catalog.py "$@" 2>&1); rc=$?; set -e; }
+C() { set +e; out=$(HMGAPI_ENGINE_CLASSES=$CP python3 $R/tools/catalog.py "$@" 2>&1); rc=$?; set -e; }   # $CP: the engine, compiled below
 G() { git -C $R "$@"; }
 G init -q && G -c user.name=t -c user.email=t@t commit -qm base --allow-empty && G add -A && G -c user.name=t -c user.email=t@t commit -qm tools
 

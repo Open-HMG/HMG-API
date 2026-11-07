@@ -21,12 +21,6 @@ Feasibility test for HMG-API's hook runtime (Xposed-style method hooks on Dalvik
 
 Runs the wrapper under qemu-arm: argument passthrough, preload switch, boot guard, disable file, exec failure.
 
-```
-UNIT_SH="<arm busybox> ash" STOCK_APP_PROCESS=<stock app_process> ./unit-test.sh
-```
-
-Runs `install/dev/step1-install.sh`, `install/dev/step2-enable.sh`, `install/dev/hooks-off.sh` and `install/dev/restore.sh` against a fake root: install, no-op reinstall, restore to byte-identical stock, refusal on an unknown md5, `HMGAPI_FORCE=1`.
-
 ## Safety
 
 - A broken `app_process` only stops the zygote. `adbd` (init class `core`) and the NEMESIS root daemon (`flash_recovery`) keep running, so `install/dev/restore.sh` works over ADB with Android down.

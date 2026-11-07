@@ -3,13 +3,11 @@
 #   tools/test-all.sh [--fast] [-j N] [test script...]   only those (default: every one)
 # --fast: the tests that need no ARM toolchain and no build: a JDK, python3 with
 #   tools/requirements.txt and a C compiler (for out/lpatch-host). Seconds, on Linux or macOS.
-# Otherwise every test (CI): needs the build (./build.sh), clang + lld, qemu-arm binfmt and
-#   mksh. install/dev needs an ARM busybox (UNIT_SH="<busybox> ash") and a stock app_process
-#   (STOCK_APP_PROCESS); without them it's skipped.
+# Otherwise every test (CI): needs the build (./build.sh), clang + lld, qemu-arm binfmt, mksh.
 # Each test: "ok" (its checks, and how many it skipped), "skip" (it skipped everything,
 # and why) or "FAIL" (its failed checks).
 cd "$(dirname "$0")/.."
-ALL="core/hmgapid/test.sh core/zygote/test.sh tools/lpatch/test.sh core/runtime/engine-test.sh core/runtime/signing-test.sh core/runtime/system-test.sh core/runtime/safety-test.sh core/runtime/packages-test.sh core/runtime/map-test.sh core/runtime/usb-test.sh core/runtime/hooks-test.sh core/runtime/mod-dex-test.sh core/runtime/live-test.sh core/runtime/native-test.sh core/runtime/runtime-test.sh core/runtime/net-test.sh core/runtime/overlap-test.sh core/runtime/keys-test.sh core/runtime/commands-test.sh core/runtime/scriptcheck-test.sh core/hookpoints/test.sh core/app/qr-test.sh install/common/test.sh install/common/install-test.sh install/usb/test.sh install/nemesis/mod-test.sh install/nemesis/sync-test.sh tools/mod-draft-test.sh tools/catalog-test.sh tools/mkicon-test.sh tools/micom-decode-test.sh tools/sdk-test.sh tools/check-scripts.sh install/dev/test.sh"
+ALL="core/hmgapid/test.sh core/zygote/test.sh tools/lpatch/test.sh core/runtime/engine-test.sh core/runtime/signing-test.sh core/runtime/system-test.sh core/runtime/safety-test.sh core/runtime/packages-test.sh core/runtime/map-test.sh core/runtime/usb-test.sh core/runtime/hooks-test.sh core/runtime/mod-dex-test.sh core/runtime/live-test.sh core/runtime/native-test.sh core/runtime/runtime-test.sh core/runtime/net-test.sh core/runtime/overlap-test.sh core/runtime/keys-test.sh core/runtime/commands-test.sh core/runtime/scriptcheck-test.sh core/hookpoints/test.sh core/app/qr-test.sh install/common/test.sh install/common/install-test.sh install/usb/test.sh install/nemesis/mod-test.sh install/nemesis/sync-test.sh tools/mod-draft-test.sh tools/catalog-test.sh tools/mkicon-test.sh tools/micom-decode-test.sh tools/sdk-test.sh tools/check-scripts.sh"
 # no build, no ARM toolchain: all but hmgapid, the zygote wrapper, lpatch, the installers and the SDK
 FAST="core/runtime/engine-test.sh core/runtime/signing-test.sh core/runtime/system-test.sh core/runtime/safety-test.sh core/runtime/packages-test.sh core/runtime/map-test.sh core/runtime/usb-test.sh core/runtime/hooks-test.sh core/runtime/mod-dex-test.sh core/runtime/live-test.sh core/runtime/native-test.sh core/runtime/runtime-test.sh core/runtime/net-test.sh core/runtime/overlap-test.sh core/runtime/keys-test.sh core/runtime/commands-test.sh core/runtime/scriptcheck-test.sh core/hookpoints/test.sh core/app/qr-test.sh install/common/test.sh install/nemesis/mod-test.sh install/nemesis/sync-test.sh tools/mod-draft-test.sh tools/catalog-test.sh tools/mkicon-test.sh tools/micom-decode-test.sh tools/check-scripts.sh"
 # these write out/ (usb: out/payload and out/dist; sdk: out/mods, out/packages, out/dist) or read
@@ -20,9 +18,6 @@ SERIAL="install/common/install-test.sh install/usb/test.sh tools/sdk-test.sh"
 if [ "$1" = --run ]; then
     for t in $(echo "$3" | sed 's/,/ /g'); do
         f=$2/$(echo "$t" | sed 's#/#_#g')
-        if [ "$t" = install/dev/test.sh ] && { [ -z "$UNIT_SH" ] || [ -z "$STOCK_APP_PROCESS" ]; }; then
-            echo "skip  set UNIT_SH and STOCK_APP_PROCESS" > "$f.out"; echo 0 > "$f.rc"; continue
-        fi
         s=$(date +%s); sh "$t" > "$f.out" 2>&1; echo $? > "$f.rc"; echo $(($(date +%s) - s)) > "$f.time"
     done
     exit 0
