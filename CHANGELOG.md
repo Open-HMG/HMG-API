@@ -9,7 +9,14 @@
   reusable mod workflow (`.github/workflows/mod.yml`) as its CI. See "Building a mod outside
   this repo" in `docs/mod-reference.md`.
 - **`"nemesis_conflicts"` in mod.json:** the NEMESIS packages a mod's own NEMESIS package
-  refuses to be installed with.
+  refuses to be installed with. HMG-API's NEMESIS sync uses it too, when it lists a mod
+  installed through HMG-API in NEMESIS.
+- **The mods HMG-API ships have their own repos:**
+  [Wireless CarPlay + Android Auto](https://github.com/Open-HMG/hmgapi-wireless-carplay-aa),
+  [ADB](https://github.com/Open-HMG/hmgapi-adb), [adbd](https://github.com/Open-HMG/hmgapi-adbd)
+  and [NEMESIS in the app menu](https://github.com/Open-HMG/hmgapi-nemesis-shortcut). A
+  HMG-API release still carries the wireless, ADB and NEMESIS-menu mods, taken from their
+  catalogue entries (same files, signature checked).
 
 ### Fixes
 

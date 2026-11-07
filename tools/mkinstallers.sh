@@ -13,7 +13,8 @@
 #                           (tools/mknemesismod.sh)
 # Every one carries the same payload (out/payload) and ends in install/common/install.sh.
 # HMGAPI/updates gets the signed release (tools/mkrelease.sh, if the release key is
-# here) and every signed mod package in out/packages (tools/mkmodpkg.sh).
+# here) and every signed mod package in out/packages (the release fills it with
+# tools/catalog.py fetch; tools/mkmodpkg.sh for a local build).
 set -e
 cd "$(dirname "$0")/.."
 ./build.sh payload >/dev/null

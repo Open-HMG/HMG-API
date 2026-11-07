@@ -78,9 +78,9 @@ ecalls() { cat $T/calls 2>/dev/null; : > $T/calls; }
 
 # a signed mod
 sig keygen $T/author.key > /dev/null
-mk() {   # mk <version>: $T/demo.zip
+mk() {   # mk <version> [more mod.json fields, each ending in ", "]: $T/demo.zip
     rm -rf $T/m; mkdir -p $T/m/files
-    printf '{"id": "demo", "name": "Demo mod", "version": "%s", "hmgapi": ">=0.1.0", "system": [{"model": ["CVEV"], "region": "USA", "firmware": "260507"}]}\n' "$1" > $T/m/mod.json
+    printf '{"id": "demo", "name": "Demo mod", %s"version": "%s", "hmgapi": ">=0.1.0", "system": [{"model": ["CVEV"], "region": "USA", "firmware": "260507"}]}\n' "${2:-}" "$1" > $T/m/mod.json
     printf '{"changes": [{"type": "props", "path": "/system/build.prop", "set": {"persist.demo": "on"}, "stock": "any"}]}\n' > $T/m/patches.json
     sig sign $T/m $T/author.key > /dev/null
     rm -f $T/demo.zip; (cd $T/m && zip -q -r -X $T/demo.zip .)
@@ -183,6 +183,30 @@ check "... and fails" 1 $r
 echo "version $V" > $R/data/hmgapi/installed.txt
 o=$(cd $D && env ROOT=$R $SH scripts/postinstall.sh 2>&1)
 has "... with HMG-API installed: only lists it" "HMG-API is installed: listed" "$o"
+
+# ---- a mod's own list (mod.json "nemesis_conflicts", as tools/mknemesismod.sh reads it), with conflicts.txt's row
+cp $N/conflicts.txt $T/conflicts.keep
+printf 'hmgapi.demo  row.pkg,mine.pkg\n' >> $N/conflicts.txt
+mk 1.2.0 '"nemesis_conflicts": ["mine.pkg", "other.pkg", "hmgapi", "hmgapi.demo", "not an id"], '
+eng install $T/demo.zip
+check "a mod with nemesis_conflicts: listed" "hmgapi hmgapi.demo 1.2.0" "$(listed)$(pv hmgapi.demo)"
+has "... refusing conflicts.txt's row, then its own (each once)" 'depends="hmgapi@>=1.0,!row.pkg,!mine.pkg,!other.pkg"' "$(cat $R/data/nemesis/apps/hmgapi.demo/NEMESIS.data)"
+has "... HMG-API itself left out, said" '"nemesis_conflicts": hmgapi left out' "$out"
+has "... the mod's own package left out" '"nemesis_conflicts": hmgapi.demo left out' "$out"
+has "... a bad id left out" '"nemesis_conflicts": not an id left out' "$out"
+cp $T/conflicts.keep $N/conflicts.txt
+mk 1.3.0 '"nemesis_conflicts": "mine.pkg", '
+eng install $T/demo.zip
+check "nemesis_conflicts not a list: still listed" "0 1.3.0" "$rc $(pv hmgapi.demo)"
+has "... with only the needs" 'depends="hmgapi@>=1.0"' "$(cat $R/data/nemesis/apps/hmgapi.demo/NEMESIS.data)"
+has "... and says why" "\"nemesis_conflicts\" isn't a list, left out" "$out"
+mk 1.4.0 "\"nemesis_conflicts\": [$(python3 -c 'print(", ".join("\"pkg%03d.long-package-name\"" % i for i in range(30)))')], "
+eng install $T/demo.zip
+check "depends= longer than NEMESIS takes: still listed" "0 1.4.0" "$rc $(pv hmgapi.demo)"
+has "... without the mod's own list" 'depends="hmgapi@>=1.0"' "$(cat $R/data/nemesis/apps/hmgapi.demo/NEMESIS.data)"
+has "... and says why" "longer than NEMESIS takes, left out" "$out"
+eng remove demo
+mk 1.0.0
 
 # ---- a clash: the listing fails, the mod stays in HMG-API, and says why
 printf 'hmgapi.demo  other.pkg\n' >> $N/conflicts.txt

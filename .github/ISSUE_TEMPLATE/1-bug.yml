@@ -1,5 +1,5 @@
 name: Something doesn't work
-description: A bug in HMG-API or one of its mods.
+description: A bug in HMG-API, or in a mod you're not sure about (the wireless mod has its own repo).
 title: "Bug: "
 labels: [bug]
 body:

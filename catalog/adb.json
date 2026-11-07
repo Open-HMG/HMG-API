@@ -8,7 +8,7 @@
   "license": "AGPL-3.0",
   "uuid": "7251ce71-a146-8a1e-958b-dbffc6af7359",
   "version": "1.0.0",
-  "repo": "https://github.com/Open-HMG/HMG-API/tree/main/mods/adb",
+  "repo": "https://github.com/Open-HMG/hmgapi-adb",
   "download": "https://github.com/Open-HMG/HMG-API/releases/download/v1.0.2/adb-1.0.0.zip",
   "sha256": "e5ff1bcaf300f8b39debb877098e5b46d01235c497ee0551a5f7ba0dd095fe01",
   "hmgapi": ">=1.0.0",

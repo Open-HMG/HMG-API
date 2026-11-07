@@ -326,7 +326,8 @@ tools/mkmodpkg.sh my-mod <your key>
 A mod that clashes with a NEMESIS package (both change the same files or settings) lists
 it: `"nemesis_conflicts": ["wireless.projection"]`. The mod's NEMESIS package
 (`tools/mknemesismod.sh`) then refuses to install while that package is there, and the
-other way round. HMG-API's engine ignores the field.
+other way round. A mod installed through HMG-API gets the same refusal when HMG-API lists
+it in NEMESIS (engine `nemesis-sync`). The engine's own install ignores the field.
 
 Your key (`java -cp out/engine-host hmgapi.engine.Signing keygen <file>`) signs every
 version. The mod's id comes with a UUID made from it, and only packages signed
