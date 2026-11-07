@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### For mod authors
+
+- **The mod SDK** (`hmgapi-mod-sdk-<version>.zip` on each release from 1.0.3, or
+  `./build.sh sdk`): build, test and package a mod in its own repository, with HMG-API's
+  reusable mod workflow (`.github/workflows/mod.yml`) as its CI. See "Building a mod outside
+  this repo" in `docs/mod-reference.md`.
+- **`"nemesis_conflicts"` in mod.json:** the NEMESIS packages a mod's own NEMESIS package
+  refuses to be installed with.
+
 ### Fixes
 
 - **The head unit no longer restarts at car start when a car sends Digital Key data.** The

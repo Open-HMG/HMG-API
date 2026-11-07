@@ -87,3 +87,12 @@ jobs:
           name: hmgapi-test-build
           path: out/dist/*.zip
           retention-days: 14
+
+  # The reusable mod workflow (mod.yml), as a mod repo calls it, on mods/examples/hello,
+  # with the SDK built from this commit (the {"ref": ...} pin every mod repo uses until 1.0.3)
+  mod-workflow:
+    uses: ./.github/workflows/mod.yml
+    with:
+      mods: mods/examples/hello
+      sdk: '{"ref": "${{ github.sha }}"}'
+      hmgapi-repo: ${{ github.repository }}

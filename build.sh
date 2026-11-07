@@ -1,9 +1,11 @@
 #!/bin/sh
 # Build HMG-API into out/.
 #   ./build.sh            everything
-#   ./build.sh <part>     hmgapid | zygote | loader | runtime | client | app | mods | lpatch | payload
+#   ./build.sh <part>     hmgapid | zygote | loader | runtime | client | app | mods | lpatch | payload | sdk
 # payload (out/payload): everything install/common/install.sh puts on the unit,
 # with a MANIFEST of md5s; every installer (adb, NEMESIS, USB stick) carries it.
+# sdk (out/dist/hmgapi-mod-sdk-<version>.zip): what a mod in its own repo builds, tests and
+# packages with (docs/mod-repos.md section 3); not in the default build.
 # Needs clang + lld, a JDK and the Android SDK (build-tools, a platform android.jar).
 # The app is signed with HMG-API's key (HMGAPI_KEY, a .p12 with a .pass beside it);
 # without it, with a throwaway key (fine for tests, not for a release).
@@ -43,51 +45,15 @@ runtime() {
 
 mods() {
     [ -d "$OUT/classes" ] || runtime
-    rm -rf "$OUT/mods" "$OUT/mod-classes" && mkdir -p "$OUT/mods"
+    [ -f "$OUT/hmgapi-client.jar" ] || client
+    rm -rf "$OUT/mods" "$OUT/mod-build" && mkdir -p "$OUT/mods"
     for m in mods/examples/*/ mods/*/; do
         [ "$m" = mods/examples/ ] && continue
         id=$(basename "$m")
-        mkdir -p "$OUT/mods/$id"
-        cp "$m"*.json "$OUT/mods/$id/"
-        if [ -d "$m/src" ]; then
-            mkdir -p "$OUT/mod-classes/$id"
-            # mods built before this one are on the classpath: a mod compiles against the API of mods it requires
-            deps=$(find "$OUT/mod-classes" -mindepth 1 -maxdepth 1 -type d ! -name "$id" | tr '\n' ':')
-            # stubs/: signatures of the car's libraries an app part links against (compile only, never in hooks.jar)
-            if [ -d "$m/stubs" ]; then
-                rm -rf "$OUT/mod-stubs/$id" && mkdir -p "$OUT/mod-stubs/$id"
-                javac --release 8 -Xlint:-options -nowarn -cp "$ANDROID_JAR" -d "$OUT/mod-stubs/$id" $(find "$m/stubs" -name '*.java')
-                deps="$deps$OUT/mod-stubs/$id:"
-            fi
-            javac --release 8 -Xlint:-options -nowarn -cp "$ANDROID_JAR:$OUT/classes:$deps" -d "$OUT/mod-classes/$id" $(find "$m/src" -name '*.java')
-            "$D8" --release --min-api 19 --lib "$ANDROID_JAR" --classpath "$OUT/classes" $(for d in $(echo "$deps" | tr ':' ' '); do printf -- '--classpath %s ' "$d"; done) \
-                --output "$OUT/mods/$id/hooks.jar" $(find "$OUT/mod-classes/$id" -name '*.class')
-        fi
-        # app/: the mod's own APK (AndroidManifest.xml, res/, java/), with hmgapi-client.jar inside; built to the
-        # mod's first "apps" entry. Signed with an example key made here (real mods sign with their author's key).
-        if [ -f "$m/app/AndroidManifest.xml" ]; then
-            [ -f "$OUT/hmgapi-client.jar" ] || client
-            apk=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["apps"][0]["apk"])' "$m/mod.json")
-            W="$OUT/mod-app/$id"
-            rm -rf "$W" && mkdir -p "$W/classes" "$OUT/mods/$id/$(dirname "$apk")"
-            "$BT/aapt2" compile --dir "$m/app/res" -o "$W/res.zip"
-            "$BT/aapt2" link -I "$ANDROID_JAR" --manifest "$m/app/AndroidManifest.xml" --min-sdk-version 19 --target-sdk-version 19 \
-                --java "$W/gen" -o "$W/base.apk" "$W/res.zip"
-            javac --release 8 -Xlint:-options -nowarn -cp "$ANDROID_JAR:$OUT/hmgapi-client.jar" -d "$W/classes" \
-                $(find "$m/app/java" "$W/gen" -name '*.java')
-            (cd "$W/classes" && jar xf "$OUT/hmgapi-client.jar" hmgapi)
-            "$D8" --release --min-api 19 --lib "$ANDROID_JAR" --output "$W" $(find "$W/classes" -name '*.class')
-            cp "$W/base.apk" "$W/unsigned.apk"
-            (cd "$W" && zip -q -X unsigned.apk classes.dex)
-            "$BT/zipalign" -f 4 "$W/unsigned.apk" "$W/aligned.apk"
-            K="$OUT/example-app.p12"
-            [ -f "$K" ] || keytool -genkeypair -keystore "$K" -storetype pkcs12 -storepass example -keypass example \
-                -alias example -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=HMG-API example mods" >/dev/null 2>&1
-            "$BT/apksigner" sign --ks "$K" --ks-pass pass:example --min-sdk-version 9 \
-                --v2-signing-enabled false --v3-signing-enabled false --out "$OUT/mods/$id/$apk" "$W/aligned.apk" 2>/dev/null
-            echo "mod $id: app $apk"
-        fi
-        echo "mod $id"
+        # mods built before this one are on the classpath: a mod compiles against the API of mods it requires
+        deps=$(find "$OUT/mod-build" -mindepth 2 -maxdepth 2 -type d -name classes 2>/dev/null | tr '\n' ':')
+        HMGAPI_CP="$OUT/classes" HMGAPI_CLIENT="$OUT/hmgapi-client.jar" HMGAPI_MOD_CP="${deps%:}" HMGAPI_APP_KEY="$OUT/example-app.p12" \
+            sh tools/build-mod.sh "$m" "$OUT/mods/$id" "$OUT/mod-build/$id"
     done
 }
 
@@ -156,12 +122,52 @@ payload() {
     echo "payload $(cat "$P/VERSION") ($(cat "$P/BUILD")): $P"
 }
 
+sdk() {
+    [ -d "$OUT/classes" ] && [ -d "$OUT/runtime-stubs" ] || runtime
+    [ -f "$OUT/hmgapi-client.jar" ] || client
+    [ -x "$OUT/lpatch-host" ] || lpatch
+    S="$OUT/sdk"
+    rm -rf "$S" "$OUT/sdk-build" && mkdir -p "$S/lib" "$S/bin" "$S/src/lpatch" "$S/nemesis/bin" "$S/test" "$S/catalogue" "$OUT/sdk-build/engine"
+    V=$(sed -n 's/.*HMGAPI_VERSION = "\(.*\)";/\1/p' core/runtime/java/hmgapi/engine/Engine.java)
+    # fixed order and times, as tools/mkmodpkg.sh: the same classes give the same jar
+    jarof() { (cd "$1" && find . -type f | sort | TZ=UTC xargs touch -d 2026-01-01T00:00:00 && find . -type f | sed 's#^\./##' | sort | zip -q -X -D "$2" -@); }
+    jarof "$OUT/classes" "$S/lib/hmgapi-runtime.jar"            # compile only, never in a mod
+    jarof "$OUT/runtime-stubs" "$S/lib/hmgapi-runtime-stubs.jar"
+    cp "$OUT/hmgapi-client.jar" "$S/lib/"
+    # the engine on its own (no Android classes): host tests, Signing, ScriptCheck
+    javac --release 8 -Xlint:-options -nowarn -d "$OUT/sdk-build/engine" core/runtime/java/hmgapi/engine/*.java
+    jarof "$OUT/sdk-build/engine" "$S/lib/hmgapi-engine.jar"
+    # MemRecipeTest: a mod's native recipes on real libraries (<stock> <patched> <recipe> triples)
+    mkdir -p "$OUT/sdk-build/engine-test"
+    javac --release 8 -Xlint:-options -nowarn -cp "$OUT/sdk-build/engine" -d "$OUT/sdk-build/engine-test" core/runtime/test/hmgapi/engine/MemRecipeTest.java
+    jarof "$OUT/sdk-build/engine-test" "$S/test/hmgapi-engine-test.jar"
+    cp "$OUT/lpatch-host" "$S/bin/"
+    cp tools/lpatch/lpatch.c tools/lpatch/build.sh "$S/src/lpatch/"
+    cp tools/build-mod.sh tools/env.sh tools/mkmodpkg.sh tools/mknemesismod.sh tools/nemesis-meta.py tools/nemesis-version.py \
+        tools/check-scripts.sh tools/check-points.py tools/mkrecipe.py tools/mkdelta.py tools/mkmemrecipe.py tools/mkicon.sh tools/mod-draft.py "$S/bin/"
+    cp tools/requirements.txt core/runtime/unit-commands.txt "$S/"
+    cp -r install/nemesis/mod "$S/nemesis/mod"
+    cp install/nemesis/bin/open.sh "$S/nemesis/bin/"
+    cp tools/sdk/lib.sh "$S/test/lib.sh"
+    cp tools/sdk/README.txt LICENSE "$S/"
+    cp core/hookpoints/*.json "$S/catalogue/"
+    python3 -c 'import glob,json; [print(p["id"]) for f in sorted(glob.glob("core/hookpoints/*.json")) for p in json.load(open(f))["points"]]' > "$S/points.txt"
+    echo "$V" > "$S/VERSION"
+    echo "$(git rev-parse HEAD 2>/dev/null || echo local)$(git diff --quiet HEAD 2>/dev/null || echo +)" > "$S/BUILD"
+    chmod 755 "$S"/bin/*
+    mkdir -p "$OUT/dist"
+    Z="$OUT/dist/hmgapi-mod-sdk-$V.zip"
+    rm -f "$Z"
+    (cd "$S" && find . -type f | sort | TZ=UTC xargs touch -d 2026-01-01T00:00:00 && find . -type f | sed 's#^\./##' | sort | zip -q -X "$Z" -@)
+    echo "sdk $V: $Z"
+}
+
 if [ $# -eq 0 ]; then
     set -- hmgapid zygote loader runtime client mods app lpatch payload
 fi
 for part in "$@"; do
     case $part in
-        hmgapid|zygote|loader|runtime|client|mods|app|lpatch|payload) $part ;;
+        hmgapid|zygote|loader|runtime|client|mods|app|lpatch|payload|sdk) $part ;;
         *) echo "unknown part: $part"; exit 2 ;;
     esac
 done
