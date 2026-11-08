@@ -17,8 +17,9 @@
   and [NEMESIS in the app menu](https://github.com/Open-HMG/hmgapi-nemesis-shortcut). A
   HMG-API release still carries the wireless, ADB and NEMESIS-menu mods, taken from their
   catalogue entries (same files, signature checked).
-- **`mknemesismod.sh` and HMG-API's downloads give the same zip bytes on any machine.**
-  Outside UTC and the C locale, the times inside the zip and the order of its files changed.
+- **`mknemesismod.sh`, `mkmodpkg.sh`, the mod SDK and HMG-API's downloads give the same zip
+  bytes on any machine.** Outside UTC and the C locale, the times inside the zip and the
+  order of its files changed.
 - **The mod workflow can install an Android NDK** (`with: ndk: "21.4.7075529"`), for a mod
   whose `build.sh` compiles native code.
 - **`tools/test-all.sh --fast`:** the off-car tests that need no build and no ARM
@@ -182,7 +183,7 @@ map lacks, only those parts stay off and the app says why.
   resent the station event (the start) with the route data, so the car was asked to
   start again every 5 s; on a US EV6 its conditioning indicator stayed off. It now
   resends the route data only, as Launchpad does.
-- **Battery conditioning checks the car** ([#68](https://github.com/VysseCodes/HMG-API/issues/68),
+- **Battery conditioning checks the car** ([#68](https://github.com/Open-HMG/HMG-API/issues/68),
   Launchpad's checks): a start is refused when the car isn't READY, Battery Conditioning
   is off in the EV settings, or the car is already conditioning; a warm pack (EV6 and
   Ioniq 6 20 °C / 68 °F, Ioniq 5 21 °C / 70 °F) is refused unless the request ends with

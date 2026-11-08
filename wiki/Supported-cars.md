@@ -22,5 +22,6 @@ and the report is everything needed to add it. You can also try that map yoursel
 has an older version, update it first (the manufacturer's update site or the dealer).
 
 **Not supported:** head units without navigation ("Display Audio") are a different
-system. No Korean car has been confirmed working so far (the units checked had no
-Wi-Fi hardware); reports are welcome.
+system. No Korean car is listed yet: their head units have the Wi-Fi chip, but it stays
+off on cars without the Wi-Fi hotspot feature. New regions are on hold for now (USA
+and Canada only); reports are still welcome.

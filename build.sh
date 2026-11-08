@@ -129,8 +129,9 @@ sdk() {
     S="$OUT/sdk"
     rm -rf "$S" "$OUT/sdk-build" && mkdir -p "$S/lib" "$S/bin" "$S/src/lpatch" "$S/nemesis/bin" "$S/test" "$S/catalogue" "$OUT/sdk-build/engine"
     V=$(sed -n 's/.*HMGAPI_VERSION = "\(.*\)";/\1/p' core/runtime/java/hmgapi/engine/Engine.java)
-    # fixed order and times, as tools/mkmodpkg.sh: the same classes give the same jar
-    jarof() { (cd "$1" && find . -type f | sort | TZ=UTC xargs touch -d 2026-01-01T00:00:00 && find . -type f | sed 's#^\./##' | sort | zip -q -X -D "$2" -@); }
+    # fixed order and times, as tools/mkmodpkg.sh: the same classes give the same jar on any machine
+    # (UTC and the C locale for all of it: zip writes local times, sort follows the locale)
+    jarof() { (cd "$1" && export TZ=UTC LC_ALL=C && find . -type f | sort | xargs touch -d 2026-01-01T00:00:00 && find . -type f | sed 's#^\./##' | sort | zip -q -X -D "$2" -@); }
     jarof "$OUT/classes" "$S/lib/hmgapi-runtime.jar"            # compile only, never in a mod
     jarof "$OUT/runtime-stubs" "$S/lib/hmgapi-runtime-stubs.jar"
     cp "$OUT/hmgapi-client.jar" "$S/lib/"
@@ -158,7 +159,7 @@ sdk() {
     mkdir -p "$OUT/dist"
     Z="$OUT/dist/hmgapi-mod-sdk-$V.zip"
     rm -f "$Z"
-    (cd "$S" && find . -type f | sort | TZ=UTC xargs touch -d 2026-01-01T00:00:00 && find . -type f | sed 's#^\./##' | sort | zip -q -X "$Z" -@)
+    (cd "$S" && export TZ=UTC LC_ALL=C && find . -type f | sort | xargs touch -d 2026-01-01T00:00:00 && find . -type f | sed 's#^\./##' | sort | zip -q -X "$Z" -@)
     echo "sdk $V: $Z"
 }
 

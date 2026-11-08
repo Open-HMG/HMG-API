@@ -60,8 +60,7 @@ RULES = [
     (['tools/micom-*'], ['tools/micom-decode-test.sh']),
     (['tools/check-scripts.sh'], ['tools/check-scripts.sh']),
     (['tools/requirements.txt'], ALL),
-    (['.github/workflows/release.yml', '.github/workflows/wiki.yml', '.github/CODEOWNERS', '.github/FUNDING.yml', '.github/dependabot.yml',
-      'tools/push-dev.sh'], []),
+    (['.github/workflows/release.yml', '.github/workflows/wiki.yml', '.github/CODEOWNERS', '.github/FUNDING.yml', '.github/dependabot.yml'], []),
 ]
 
 

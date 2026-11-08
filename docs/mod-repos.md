@@ -1,9 +1,10 @@
 # Mods in their own repositories
 
 The mods HMG-API ships (`tools/release-mods.txt`: `wireless-carplay-aa`, `adb`,
-`examples/nemesis-shortcut`), and `mods/adbd`, move to their own repositories in the
-Open-HMG org, one repo per mod. The other `mods/examples` stay in core as API examples
-and test fixtures. Hook points and maps stay in core.
+`nemesis-shortcut`) and `adbd` live in their own repositories in the Open-HMG org, one
+repo per mod (section 1). The other `mods/examples` stay in core as API examples and
+test fixtures. Hook points and maps stay in core. Sections 2 to 11 are the plan the split
+followed; what's still open is "Before 1.0.3" and releasing the SDK (section 11).
 
 ## Decided (2026-11-07)
 

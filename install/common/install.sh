@@ -17,14 +17,6 @@ LOG=$D/install.log
 VERSION=$(cat "$P/VERSION" 2>/dev/null)
 
 mkdir -p "$D" 2>/dev/null
-log() { echo "$1"; echo "$1" >> "$LOG" 2>/dev/null; }
-sum() { set -- $(md5 "$1" 2>/dev/null); echo "$1"; }
-REMOUNTED=
-fail() {
-    log "FAIL: $1"
-    [ -n "$REMOUNTED" ] && remount ro >/dev/null 2>&1
-    exit 1
-}
 
 capcheck() {
     [ "${CAPCHECK:-1}" = 1 ] || return 0

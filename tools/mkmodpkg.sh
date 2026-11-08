@@ -44,7 +44,8 @@ java -cp "$CP" hmgapi.engine.Signing sign "$W/$ID" "$KEY"
 mkdir -p "$PKGS"
 Z=$PKGS/$ID-$VER.zip
 rm -f "$Z"
-# fixed order and times: the same mod and key give the same zip
-(cd "$W/$ID" && find . -type f | sort | TZ=UTC xargs touch -d 2026-01-01T00:00:00 && find . -type f | sort | zip -q -X -D "$Z" -@)
+# fixed order and times: the same mod and key give the same zip on any machine
+# (UTC and the C locale for all of it: zip writes local times, sort follows the locale)
+(cd "$W/$ID" && export TZ=UTC LC_ALL=C && find . -type f | sort | xargs touch -d 2026-01-01T00:00:00 && find . -type f | sort | zip -q -X -D "$Z" -@)
 java -cp "$CP" hmgapi.engine.Signing verify "$W/$ID"
 echo "$Z"
