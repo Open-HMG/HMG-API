@@ -13,11 +13,14 @@ there's no shared pot.
 
 Started HMG-API (and HMG Leafia Plus before it), and maintains the core and its releases.
 
-- GitHub Sponsors: [github.com/sponsors/VysseCodes](https://github.com/sponsors/VysseCodes)
-- Ko-fi: [ko-fi.com/vyssecodes](https://ko-fi.com/vyssecodes)
+[![Sponsor VysseCodes on GitHub](https://img.shields.io/badge/Sponsor_on_GitHub-%E2%9D%A4-bf3989?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/VysseCodes)
+[![Buy VysseCodes a coffee on Ko-fi](https://img.shields.io/badge/Buy_me_a_coffee-Ko--fi-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white)](https://ko-fi.com/vyssecodes)
 
 <!-- Maintainers: add yourself below in the same format (name and role, one line on what
-you work on, your links), by PR. See https://github.com/Open-HMG/HMG-API/issues/136. -->
+you work on, your links), by PR. See https://github.com/Open-HMG/HMG-API/issues/136.
+Badges: copy the two above and change the name and the link (sponsors/<you>,
+ko-fi.com/<you>). Another site: https://img.shields.io/badge/<Text>-<Site>-<hex colour>?style=for-the-badge&logo=<simple-icons name>&logoColor=white
+(Buy Me a Coffee: logo=buymeacoffee, FFDD00; Liberapay: logo=liberapay, F6C915; Patreon: logo=patreon, F96854). -->
 
 More maintainers will be listed here as they add their links.
 
