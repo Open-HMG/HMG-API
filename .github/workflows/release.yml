@@ -75,8 +75,8 @@ jobs:
       - name: Mods, release and downloads
         run: |
           rm -rf out/packages
-          # the bundled mods: each catalogue entry's download, SHA-256 and signature checked
-          tools/catalog.py fetch out/packages $(grep -v '^#' tools/release-mods.txt)
+          # the bundled mods: each catalogue entry's download (or a pre-release's pin), SHA-256 and signature checked
+          tools/catalog.py fetch out/packages --list tools/release-mods.txt
           tools/mkinstallers.sh   # also each mod as a NEMESIS package, in out/dist/mods
           mkdir -p out/assets
           cp out/dist/hmgapi-"$VERSION"-*.zip out/assets/

@@ -22,7 +22,7 @@ Thanks for helping. Bug reports, Car Reports and ideas go in
   stock trees, `tools/cars.py test` must show no FAIL.
 - Mod scripts: only commands the head unit has (`tools/check-scripts.sh <mod>`).
 - The mods HMG-API ships each have their own repo (Wireless CarPlay + Android Auto:
-  [hmgapi-wireless-carplay-aa](https://github.com/Open-HMG/hmgapi-wireless-carplay-aa);
+  [hmgapi-wireless-cp-aa](https://github.com/Open-HMG/hmgapi-wireless-cp-aa);
   [hmgapi-adb](https://github.com/Open-HMG/hmgapi-adb),
   [hmgapi-adbd](https://github.com/Open-HMG/hmgapi-adbd),
   [hmgapi-nemesis-shortcut](https://github.com/Open-HMG/hmgapi-nemesis-shortcut)): changes

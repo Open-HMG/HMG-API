@@ -12,7 +12,7 @@
   refuses to be installed with. HMG-API's NEMESIS sync uses it too, when it lists a mod
   installed through HMG-API in NEMESIS.
 - **The mods HMG-API ships have their own repos:**
-  [Wireless CarPlay + Android Auto](https://github.com/Open-HMG/hmgapi-wireless-carplay-aa),
+  [Wireless CarPlay + Android Auto](https://github.com/Open-HMG/hmgapi-wireless-cp-aa),
   [ADB](https://github.com/Open-HMG/hmgapi-adb), [adbd](https://github.com/Open-HMG/hmgapi-adbd)
   and [NEMESIS in the app menu](https://github.com/Open-HMG/hmgapi-nemesis-shortcut). A
   HMG-API release still carries the wireless, ADB and NEMESIS-menu mods, taken from their
@@ -34,6 +34,10 @@
 
 ### Changes
 
+- **The US Ioniq 5 (2023 on) 260903 map has every hook point** (351 of 351): the 26 it
+  lacked, made on the car by HMG-API's own mapper. Thanks to joelsmith for the Car Report.
+  Mods that need them (the 12V battery readings, the iAP2 service points, the cluster and
+  CarPlay points) now run there too. Still waiting for a check on a car.
 - **"Support the project" in the app's Settings** now shows the wiki's
   [Supporting HMG-API](https://github.com/Open-HMG/HMG-API/wiki/Support) page, which lists
   each maintainer's own donation links, instead of one Ko-fi link.

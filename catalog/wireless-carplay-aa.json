@@ -8,7 +8,7 @@
   "license": "AGPL-3.0",
   "uuid": "7251ce71-a146-8a1e-958b-dbffc6af7359",
   "version": "2.1.0",
-  "repo": "https://github.com/Open-HMG/hmgapi-wireless-carplay-aa",
+  "repo": "https://github.com/Open-HMG/hmgapi-wireless-cp-aa",
   "download": "https://github.com/Open-HMG/HMG-API/releases/download/v1.0.2/wireless-carplay-aa-2.1.0.zip",
   "sha256": "07c0baee50362bb3b5ac7aafa6a46c39938479497ec28531c6f74ee3a2698446",
   "hmgapi": ">=1.0.0",

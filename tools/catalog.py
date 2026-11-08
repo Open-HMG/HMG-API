@@ -13,9 +13,12 @@ carries the list. The wiki's Community mods page is made from the entries.
         its SHA-256 and signature and that it is the mod and version the entry says;
         --base refuses an entry whose author key changed, a version that went back, and
         changes to authors who aren't the ones the changed entries name
-  tools/catalog.py fetch <dir> <id>...
+  tools/catalog.py fetch <dir> <id>... | --list tools/release-mods.txt
         each entry's download into <dir>/<id>-<version>.zip, after the same checks as
-        check --download (the release bundles the mods tools/release-mods.txt names so)
+        check --download (the release bundles the mods tools/release-mods.txt names so).
+        A list line "<id> <version> <url> <sha256>" pins a pre-release of a catalogue
+        mod instead, for a HMG-API pre-release only: from the entry's repo's releases,
+        newer than the entry, signed with the entry's author key
   tools/catalog.py wiki <out.md>
         the Community mods page
 """
@@ -330,22 +333,67 @@ def download(n, e, work):
 # ---- fetch
 
 
+def hmgapi_version():
+    m = re.search(r'HMGAPI_VERSION = "([^"]+)"', open(os.path.join(REPO, 'core/runtime/java/hmgapi/engine/Engine.java')).read())
+    return m[1] if m else ''
+
+
+def release_list(path):
+    """[(id, None | {version, download, sha256})] from tools/release-mods.txt"""
+    out = []
+    for i, line in enumerate(open(path).read().split('\n'), 1):
+        w = line.split('#', 1)[0].split()
+        if len(w) == 1:
+            out.append((w[0], None))
+        elif len(w) == 4:
+            out.append((w[0], {'version': w[1], 'download': w[2], 'sha256': w[3]}))
+        elif w:
+            die(f'{path}:{i}: wanted "<id>" or "<id> <version> <url> <sha256>"')
+    return out
+
+
+def check_pin(n, e, pin, core):
+    """why a release-mods.txt pin of a pre-release isn't allowed, or []"""
+    v, url, base = pin['version'], pin['download'], e.get('repo', '').rstrip('/') + '/releases/download/'
+    say = lambda m: [f'tools/release-mods.txt: {n} {v}: {m}']
+    if '-' not in core:
+        return say(f'HMG-API {core} is a final release, which bundles catalogue entries only (list {n} {v} in the catalogue)')
+    if not VERSION.match(v) or '-' not in v:
+        return say('a pin outside the catalogue is for a pre-release (x.y.z-tag); a final goes in the catalogue')
+    if vkey(v) <= vkey(str(e.get('version', ''))):
+        return say(f'not newer than the catalogue\'s {e.get("version")}')
+    if not HTTPS.match(url) or not url.startswith(base):
+        return say(f'the download must be a release of the mod\'s own repo ({base}...)')
+    if not re.match(r'^[0-9a-f]{64}$', pin['sha256']):
+        return say('the SHA-256 isn\'t 64 lowercase hex digits')
+    return []
+
+
 def cmd_fetch(a):
     es, authors = entries(), load(AUTHORS).get('authors', {})
-    p = [f'{n}: not in the catalogue (no catalog/{n}.json)' for n in a.ids if n not in es]
-    for n in a.ids:
+    if bool(a.list) == bool(a.ids):
+        die('fetch: give ids or --list, not both')
+    todo = release_list(a.list) if a.list else [(n, None) for n in a.ids]
+    core = hmgapi_version()
+    p = [f'{n}: not in the catalogue (no catalog/{n}.json)' for n, _ in todo if n not in es]
+    for n, pin in todo:
         if n in es:
             p += check_entry(n, es[n], authors)
+            if pin:
+                p += check_pin(n, es[n], pin, core)
     if not p:
         os.makedirs(a.dir, exist_ok=True)
         work = tempfile.mkdtemp(prefix='catalog-fetch-')
         try:
-            for n in a.ids:
-                z, why = download(n, es[n], work)
+            for n, pin in todo:
+                e = dict(es[n], **pin) if pin else es[n]   # a pin: the entry's id and author key, its own file
+                z, why = download(n, e, work)
                 if why:
-                    p.append(why)
+                    p.append(why.replace(f'catalog/{n}.json', f'tools/release-mods.txt: {n}') if pin else why)
                 else:
-                    shutil.copyfile(z, os.path.join(a.dir, f'{n}-{es[n]["version"]}.zip'))
+                    if pin:
+                        print(f'ok    {n} {e["version"]}: pinned by tools/release-mods.txt, not the catalogue ({es[n]["version"]})')
+                    shutil.copyfile(z, os.path.join(a.dir, f'{n}-{e["version"]}.zip'))
         finally:
             shutil.rmtree(work, ignore_errors=True)
     for x in p:
@@ -427,7 +475,8 @@ def main():
     s.add_argument('--base')
     s = sub.add_parser('fetch')
     s.add_argument('dir')
-    s.add_argument('ids', nargs='+')
+    s.add_argument('ids', nargs='*')
+    s.add_argument('--list', help='the ids (and pre-release pins) from this file, e.g. tools/release-mods.txt')
     s = sub.add_parser('wiki')
     s.add_argument('out')
     a = ap.parse_args()
