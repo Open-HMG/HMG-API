@@ -13,7 +13,9 @@
 # (bin/build-mod.sh), its test.sh and tools/*/test.sh (with HMGAPI_SDK and HMGAPI_MOD_BUILD),
 # check-scripts, and the package and NEMESIS package, signed with a throwaway key (a test
 # build: releases are signed by the mod repo's own release workflow, with its MOD_KEY).
-# HMG-API's own CI runs it on mods/examples/hello (ci.yml, mod-workflow).
+# With ndk: that Android NDK (sdkmanager's version) installed first, in NDK and ANDROID_NDK_HOME,
+# for a mod whose build.sh compiles native code (hmgapi-adbd: 21.4.7075529, r21e, for API 19).
+# HMG-API's own CI runs it on mods/examples/hello (ci.yml, mod-workflow; weekly with an NDK too).
 name: Mod
 
 on:
@@ -31,6 +33,10 @@ on:
         description: "Where HMG-API is (the SDK's source and releases)"
         type: string
         default: Open-HMG/HMG-API
+      ndk:
+        description: "An Android NDK to install, as sdkmanager names it (21.4.7075529 is r21e); NDK and ANDROID_NDK_HOME point at it (default: none)"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -56,6 +62,19 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get install -yq clang lld zip unzip mksh
+
+      - name: NDK
+        if: inputs.ndk != ''
+        env:
+          NDK_VERSION: ${{ inputs.ndk }}
+        run: |
+          echo "$NDK_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "ndk: sdkmanager's version (21.4.7075529), not $NDK_VERSION"; exit 1; }
+          printf 'y\n' | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" > /dev/null
+          N="$ANDROID_HOME/ndk/$NDK_VERSION"
+          [ -d "$N/toolchains" ] || { echo "no NDK at $N"; exit 1; }
+          echo "NDK=$N" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$N" >> "$GITHUB_ENV"
+          echo "NDK $NDK_VERSION" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Which SDK
         id: pin

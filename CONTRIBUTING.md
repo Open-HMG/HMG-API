@@ -5,10 +5,16 @@ Thanks for helping. Bug reports, Car Reports and ideas go in
 
 ## Before a pull request
 
-- Build and test off the car: `./build.sh`, then `tools/test-all.sh` (or only what your
-  change touches: `git diff --name-only main | tools/test-select.py` names the tests,
-  the same ones CI runs). Needs clang + lld, a JDK, the Android SDK and the Python
-  packages in `tools/requirements.txt`; no car files or keys.
+- Test off the car. No car files or keys needed for any of it.
+  - `tools/test-all.sh --fast`: 27 of the 34 suites (the engine, the NEMESIS package
+    scripts, the tools) in under a minute, on Linux or macOS. Needs a JDK, a C compiler
+    and the Python packages at the versions in `tools/requirements.txt`:
+    `pip install --require-hashes -r tools/requirements.txt` (in a venv if pip refuses).
+    A plain `pip install bsdiff4` gets 1.4, which the delta tools don't work with.
+  - `./build.sh`, then `tools/test-all.sh`: every suite, as CI runs them. Also needs
+    clang + lld, qemu-arm (binfmt), mksh and the Android SDK, so in practice Linux.
+    `git diff --name-only main | tools/test-select.py` names the tests your change
+    needs, the same ones CI runs.
 - Say which cars (model, region, software version) a change was tested on, or "off-car only".
 - New or changed hook points: map them for every car (`tools/map-car.py`); if you have
   stock trees, `tools/test-hooks.py` must show no regressions.
