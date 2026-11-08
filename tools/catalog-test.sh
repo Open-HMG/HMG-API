@@ -64,6 +64,44 @@ pkg h4 1.0.0 $T/b.key $T/h4.zip; cp $T/h4.zip $T/dl/hello.zip
 J $R/catalog/hello.json "d['sha256']='$(sha256sum $T/h4.zip | cut -d' ' -f1)'"
 F fetch $T/pk4 hello; check "fetch: signed by another key than the entry's refused" 1 $rc
 G checkout -q -- .
+cp $T/h1.zip $T/dl/hello.zip
+
+# fetch --list (tools/release-mods.txt): ids, and a HMG-API pre-release's pins of mod pre-releases
+PB=https://example.org/hello/releases/download/v1.1.0-beta.1
+pkg hp 1.1.0-beta.1 $T/a.key $T/dl/hello-1.1.0-beta.1.zip
+SP=$(sha256sum $T/dl/hello-1.1.0-beta.1.zip | cut -d' ' -f1)
+L() { printf '# test\n%s\n' "$@" > $T/list.txt; }
+core() { sed -i "s/HMGAPI_VERSION = \"[^\"]*\"/HMGAPI_VERSION = \"$1\"/" $R/core/runtime/java/hmgapi/engine/Engine.java; }
+L hello; F fetch $T/pl1 --list $T/list.txt; check "fetch --list: ids" 0 $rc
+check "... the entry's download" "$(sha256sum < $T/h1.zip)" "$(sha256sum < $T/pl1/hello-1.0.0.zip)"
+F fetch $T/pl1 hello --list $T/list.txt; check "fetch: ids and --list together refused" 1 $rc
+core 1.0.2
+L "hello 1.1.0-beta.1 $PB/hello-1.1.0-beta.1.zip $SP"
+F fetch $T/pl2 --list $T/list.txt; check "pin: refused for a final HMG-API" 1 $rc; has "says why" "HMG-API 1.0.2 is a final release" "$out"
+core 1.1.0-beta.1
+F fetch $T/pl3 --list $T/list.txt; check "pin: a HMG-API pre-release bundles the mod pre-release" 0 $rc
+has "says it's pinned outside the catalogue" "hello 1.1.0-beta.1: pinned by tools/release-mods.txt, not the catalogue (1.0.0)" "$out"
+check "... the pinned bytes, named <id>-<version>.zip" "$(sha256sum < $T/dl/hello-1.1.0-beta.1.zip)" "$(sha256sum < $T/pl3/hello-1.1.0-beta.1.zip)"
+check "... the catalogue unchanged" "" "$(G status --porcelain catalog)"
+L "hello 1.1.0 $PB/hello-1.1.0-beta.1.zip $SP"
+F fetch $T/pl4 --list $T/list.txt; check "pin: a final version refused" 1 $rc; has "says why" "a pin outside the catalogue is for a pre-release" "$out"
+L "hello 1.0.0-beta.1 $PB/hello-1.1.0-beta.1.zip $SP"
+F fetch $T/pl4 --list $T/list.txt; check "pin: not newer than the entry refused" 1 $rc; has "says why" "not newer than the catalogue's 1.0.0" "$out"
+L "hello 1.1.0-beta.1 https://example.org/hello-fork/releases/download/v1/hello-1.1.0-beta.1.zip $SP"
+F fetch $T/pl4 --list $T/list.txt; check "pin: a download outside the entry's repo releases refused" 1 $rc; has "says why" "a release of the mod's own repo" "$out"
+L "hello 1.1.0-beta.1 $PB/hello-1.1.0-beta.1.zip $(sha256sum < $T/h1.zip | cut -d' ' -f1)"
+F fetch $T/pl4 --list $T/list.txt; check "pin: other bytes than the pin's refused" 1 $rc; has "says why" "tools/release-mods.txt: hello: the download's SHA-256 is" "$out"
+L "hello 1.1.0-beta.2 $PB/hello-1.1.0-beta.1.zip $SP"
+F fetch $T/pl4 --list $T/list.txt; check "pin: a zip of another version refused" 1 $rc; has "says why" "the download is hello 1.1.0-beta.1" "$out"
+pkg hq 1.1.0-beta.1 $T/b.key $T/dl/hello-1.1.0-beta.1.zip
+L "hello 1.1.0-beta.1 $PB/hello-1.1.0-beta.1.zip $(sha256sum < $T/dl/hello-1.1.0-beta.1.zip | cut -d' ' -f1)"
+F fetch $T/pl4 --list $T/list.txt; check "pin: signed by another key than the entry's refused" 1 $rc
+L "nothere 1.1.0-beta.1 $PB/hello-1.1.0-beta.1.zip $SP"
+F fetch $T/pl4 --list $T/list.txt; check "pin: an id not in the catalogue refused" 1 $rc; has "says why" "nothere: not in the catalogue" "$out"
+L "hello 1.1.0-beta.1 $PB/hello-1.1.0-beta.1.zip"
+F fetch $T/pl4 --list $T/list.txt; check "pin: a line of another shape refused" 1 $rc; has "says why" 'wanted "<id>" or "<id> <version> <url> <sha256>"' "$out"
+check "... nothing kept" "" "$(ls $T/pl4 2>/dev/null)"
+G checkout -q -- .
 
 pkg h2 1.1.0 $T/a.key $T/h2.zip
 C add $T/h2.zip --download $DL --repo https://example.org/hello/sub; check "update" 0 $rc

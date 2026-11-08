@@ -2,6 +2,11 @@
 # stick, and as their own downloads), by catalogue id. Each one's catalog/<id>.json is its
 # pin: the release fetches that entry's download and checks its SHA-256 and signature
 # (tools/catalog.py fetch). Bumping a bundled mod is the catalogue PR for its release.
+# A HMG-API pre-release may bundle a mod's pre-release, which the catalogue never lists:
+#   <id> <version> <url> <sha256>
+# The url is a release asset of the catalogue entry's repo, the version newer than the
+# entry's, and the zip must be signed with the entry's author key (checked like an entry).
+# A final HMG-API release refuses such a line: put the mod's final in the catalogue first.
 # The mods live in their own repos (docs/mod-repos.md); core signs none of them.
 wireless-carplay-aa
 adb

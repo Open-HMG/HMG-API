@@ -143,6 +143,15 @@ same download, SHA-256, signature and id/version checks as `check --download`), 
 `release.yml` with the ids in `tools/release-mods.txt`. Until 1.0.3 the entries' downloads
 are the v1.0.2 assets, so a release carries the same mod bytes as v1.0.2.
 
+Pre-releases: the catalogue lists finals only, so a HMG-API pre-release that bundles a mod's
+pre-release pins it in `tools/release-mods.txt` itself, as `<id> <version> <url> <sha256>`
+(`release.yml` runs `catalog.py fetch out/packages --list tools/release-mods.txt`). The id
+must have a catalogue entry; the url must be a release asset of that entry's `repo`; the
+version a pre-release newer than the entry's; and the zip gets the entry's checks (SHA-256,
+signature with the entry's author key, id and version). A final HMG-API release refuses
+such a line, so a final ships catalogue entries only: the mod's final goes in the catalogue
+first, and the line goes back to its id.
+
 NEMESIS conflicts: the mod rows of `install/nemesis/conflicts.txt` (`hmgapi.wireless-carplay-aa`,
 `hmgapi.adb`) move into each mod's `mod.json` as `"nemesis_conflicts": [...]`. That's inside
 the signed package, so `mknemesismod.sh` in core and in the mod repo make the same
