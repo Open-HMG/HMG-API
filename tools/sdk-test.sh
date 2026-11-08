@@ -80,7 +80,7 @@ check "mknemesismod.sh: ./out/dist" yes "$([ -f $M/out/dist/hello-1.0.0-nemesis-
 (cd $REPO && tools/mknemesismod.sh out/packages/hello-1.0.0.zip $T/core-dist > /dev/null)
 check "... the same NEMESIS package as HMG-API's" "$(md5 $T/core-dist/hello-1.0.0-nemesis-package.zip)" "$(md5 $M/out/dist/hello-1.0.0-nemesis-package.zip)"
 
-# zipdir (tools/mkinstallers.sh, tools/mknemesismod.sh): the same zip bytes in any time zone and locale
+# zipdir (tools/mkinstallers.sh, tools/mknemesismod.sh) and the other zip steps: the same zip bytes in any time zone and locale
 ZD=$(grep '^zipdir()' $REPO/tools/mkinstallers.sh)
 check "zipdir: the same line in mkinstallers.sh and mknemesismod.sh" "$ZD" "$(grep '^zipdir()' $REPO/tools/mknemesismod.sh)"
 if locale -a 2>/dev/null | grep -qiE '^en_US\.utf-?8$' && [ -f /usr/share/zoneinfo/America/Los_Angeles ]; then
@@ -90,8 +90,14 @@ if locale -a 2>/dev/null | grep -qiE '^en_US\.utf-?8$' && [ -f /usr/share/zonein
         # mkinstallers.sh's line, on names that C and en_US sort apart (case, punctuation)
         mkdir -p $d/tree/sub && for f in B.txt a.txt _x a-b ab sub/Z sub/y; do echo $f > $d/tree/$f; done
         env $e sh -c "$ZD; zipdir $d/tree $d/tree.zip"
+        # the same names through build.sh's SDK jars and zip, tools/mkmodpkg.sh's and tools/mkrelease.sh's zip lines
+        env $e sh -c "$(grep '^    jarof()' $REPO/build.sh); jarof $d/tree $d/jar.zip"
+        env $e S=$d/tree Z=$d/sdk.zip sh -c "$(grep '^    (cd "\$S" && ' $REPO/build.sh)"
+        env $e W=$d ID=tree Z=$d/pkg.zip sh -c "$(grep '^(cd "\$W/\$ID" && ' $REPO/tools/mkmodpkg.sh)"
+        mkdir -p $d/rel && cp -R $d/tree $d/rel/hmgapi-0
+        env $e W=$d/rel V=0 Z=$d/rel.zip sh -c "$(grep '^(cd "\$W" && ' $REPO/tools/mkrelease.sh)"
     done
-    for z in hello-1.0.0-nemesis-package.zip hello-1.0.0-nemesis.zip tree.zip; do
+    for z in hello-1.0.0-nemesis-package.zip hello-1.0.0-nemesis.zip tree.zip jar.zip sdk.zip pkg.zip rel.zip; do
         check "zipdir: $z the same in UTC/C and Los Angeles/en_US.UTF-8" "$(md5 $T/zd-utc/$z)" "$(md5 $T/zd-la/$z)"
     done
 else
