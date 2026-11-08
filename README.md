@@ -2,10 +2,9 @@
 
 # HMG-API
 
-[![Sponsor on GitHub](https://img.shields.io/badge/Sponsor_on_GitHub-%E2%9D%A4-bf3989?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/VysseCodes)
-[![Buy me a coffee on Ko-fi](https://img.shields.io/badge/Buy_me_a_coffee-Ko--fi-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white)](https://ko-fi.com/vyssecodes)
+[![Support HMG-API](https://img.shields.io/badge/Support_HMG--API-%E2%9D%A4-bf3989?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/Open-HMG/HMG-API/wiki/Support)
 
-> **HMG-API is free.** If it saved you a dealer visit or made your drives nicer, please consider chipping in through [GitHub Sponsors](https://github.com/sponsors/VysseCodes) or [Ko-fi](https://ko-fi.com/vyssecodes). It keeps the testing and new-car ports going.
+> **HMG-API is free**, made by volunteers. If it saved you a dealer visit or made your drives nicer, please consider [supporting the people who build it](https://github.com/Open-HMG/HMG-API/wiki/Support): each maintainer has their own links there. It keeps the testing and new-car ports going.
 
 A mod manager for Hyundai, Kia and Genesis **Gen5W** navigation head units.
 

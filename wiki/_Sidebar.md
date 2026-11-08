@@ -14,3 +14,4 @@
 - [What HMG-API never does](What-HMG-API-never-does)
 - [Uninstalling](Uninstalling)
 - [Making mods](Making-mods)
+- [Supporting HMG-API](Support)
