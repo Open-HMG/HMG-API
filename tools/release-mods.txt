@@ -8,6 +8,6 @@
 # entry's, and the zip must be signed with the entry's author key (checked like an entry).
 # A final HMG-API release refuses such a line: put the mod's final in the catalogue first.
 # The mods live in their own repos (docs/mod-repos.md); core signs none of them.
-wireless-carplay-aa
+wireless-carplay-aa 2.2.0-beta.1 https://github.com/Open-HMG/hmgapi-wireless-cp-aa/releases/download/v2.2.0-beta.1/wireless-carplay-aa-2.2.0-beta.1.zip 3ca6682a7d86d01f4831b760bd039404dde89996bf5bf7f0360c8cf0aa6f9664
 adb
 nemesis-shortcut

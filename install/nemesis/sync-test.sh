@@ -23,6 +23,7 @@ mkdir -p $R/system/bin $R/system/xbin $R/system/etc/permissions $R/data/hmgapi/m
 printf 'ro.build.product=CVEV.USA.0000.V015.012.260507\npersist.demo=stock\n' > $R/system/build.prop
 : > $R/data/hmgapi/uninstall.sh
 V=$(sed -n 's/.*HMGAPI_VERSION = "\(.*\)";/\1/p' core/runtime/java/hmgapi/engine/Engine.java)   # HMG-API's own version
+PV=$(tools/nemesis-version.py "$V")   # and NEMESIS's listing of it (dotted numbers: a pre-release is x.y.97-99.N)
 echo "version $V" > $R/data/hmgapi/installed.txt
 N=$R/data/hmgapi/nemesis
 mkdir -p $N/mod $N/bin
@@ -100,7 +101,7 @@ nlog > /dev/null; ecalls > /dev/null
 # ---- HMG-API listed
 eng nemesis-sync
 check "HMG-API installed, not in NEMESIS: listed" "0 hmgapi " "$rc $(listed)"
-check "... at its package-version" "$V" "$(pv hmgapi)"
+check "... at its package-version" "$PV" "$(pv hmgapi)"
 D=$R/data/nemesis/apps/hmgapi
 check "... a small package: no payload, a registered marker" "no yes" "$([ -d $D/payload ] && echo yes || echo no) $([ -f $D/registered ] && echo yes || echo no)"
 has "... refusing the packages conflicts.txt lists" 'depends="!wireless.carplay.aa,!carplay.session,!voicehandler.vr-gates"' "$(cat $D/NEMESIS.data)"
@@ -170,7 +171,7 @@ check "... NEMESIS lists only HMG-API" "hmgapi " "$(listed)"
 # ---- HMG-API's own listing: another version is re-listed; a NEMESIS uninstall uninstalls only if installed
 f=$R/data/nemesis/apps/hmgapi/NEMESIS.data; sed 's/^package-version=.*/package-version=0.99.6/' $f > $f.new && mv $f.new $f   # no sed -i: BSD sed's differs
 eng nemesis-sync
-check "HMG-API listed at a beta's version: re-listed at its own" "$V" "$(pv hmgapi)"
+check "HMG-API listed at a beta's version: re-listed at its own" "$PV" "$(pv hmgapi)"
 D=$R/data/nemesis/apps/hmgapi
 o=$(cd $D && env HMGAPI_NEMESIS_SYNC=1 ROOT=$R $SH scripts/preuninstall.sh 2>&1)
 has "HMG-API's preuninstall, list-only: does nothing" "list only, nothing uninstalled" "$o"
