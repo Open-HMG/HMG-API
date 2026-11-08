@@ -73,8 +73,8 @@ jobs:
       - name: Mods, release and downloads
         run: |
           rm -rf out/packages
-          # the bundled mods: each catalogue entry's download, SHA-256 and signature checked
-          tools/catalog.py fetch out/packages $(grep -v '^#' tools/release-mods.txt)
+          # the bundled mods: each catalogue entry's download (or a pre-release's pin), SHA-256 and signature checked
+          tools/catalog.py fetch out/packages --list tools/release-mods.txt
           tools/mkinstallers.sh   # also each mod as a NEMESIS package, in out/dist/mods
           mkdir -p out/assets
           cp out/dist/hmgapi-"$VERSION"-*.zip out/assets/
@@ -90,7 +90,7 @@ jobs:
         run: |
           notes=".github/release-notes/$GITHUB_REF_NAME.md"
           [ -f "$notes" ] || notes=CHANGELOG.md
-          pre=""; case "$GITHUB_REF_NAME" in *-*) pre="--prerelease" ;; esac
+          pre=""; case "$GITHUB_REF_NAME" in *-*) pre="--prerelease --latest=false" ;; esac   # a pre-release is never "Latest"
           gh release create "$GITHUB_REF_NAME" --draft $pre --title "HMG-API $VERSION" --notes-file "$notes" out/assets/*
 
       - name: Forget the keys
