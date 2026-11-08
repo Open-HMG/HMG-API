@@ -26,6 +26,12 @@
   toolchain, in under a minute on Linux or macOS. The full run is several tests at once
   (`-j`), and a test that skipped everything shows as `skip`.
 
+### Changes
+
+- **"Support the project" in the app's Settings** now shows the wiki's
+  [Supporting HMG-API](https://github.com/Open-HMG/HMG-API/wiki/Support) page, which lists
+  each maintainer's own donation links, instead of one Ko-fi link.
+
 ### Fixes
 
 - **The head unit no longer restarts at car start when a car sends Digital Key data.** The
