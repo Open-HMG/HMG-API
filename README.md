@@ -36,6 +36,7 @@ needed to add your car ([Supported cars](https://github.com/Open-HMG/HMG-API/wik
 | Kia EV6 | USA | 260507 | checked on a car |
 | Kia EV6, Hyundai Ioniq 5 | Canada | 260206 | waiting for a Car Report |
 | Hyundai Ioniq 5 | USA | 260507 | waiting for a Car Report |
+| Hyundai Ioniq 5 (2023 on) | USA | 260903 | waiting for a check on a car |
 
 ## Help and requests
 
@@ -62,7 +63,7 @@ hook point, or an idea. Guides are in the [wiki](https://github.com/Open-HMG/HMG
 | `core/runtime` | `hmgapi-hook.jar`: hook API, mod loader, launcher and ★-key extension points |
 | `core/app` | the HMG-API app (`hmgapi.app`) |
 | `core/client` | `hmgapi-client.jar`: for mods' own apps and services (settings, services, USB folders, notices) |
-| `install/` | installers: `adb/`, `nemesis/`, `usb/` (DSP OTA), shared `common/`; `dev/` has the scripts used while building the core |
+| `install/` | installers: `adb/`, `nemesis/`, `usb/` (DSP OTA), shared `common/` |
 | `core/hookpoints`, `maps/` | the hook point catalogue (stable names; every point and the cars that have it: [docs/hook-points.md](docs/hook-points.md)) and each car's map (`maps/coverage.json`: which points every car has) |
 | `mods/examples` | API examples and test fixtures: `hello`, `hello-service`, `side-panel`, `car-check` and more. The mods HMG-API ships live in their own repos: [Wireless CarPlay + Android Auto](https://github.com/Open-HMG/hmgapi-wireless-carplay-aa), [ADB](https://github.com/Open-HMG/hmgapi-adb), [adbd](https://github.com/Open-HMG/hmgapi-adbd), [NEMESIS in the app menu](https://github.com/Open-HMG/hmgapi-nemesis-shortcut) ([docs/mod-repos.md](docs/mod-repos.md)) |
 | `docs/` | `mod-reference.md` (the `mod.json` reference; `tools/mod-draft.py` drafts one from an existing package), `api-plan.md` (what each community project uses), `vehicle-commands.md`, `micom-map.md`, `car-test.md` (the on-car test session) |

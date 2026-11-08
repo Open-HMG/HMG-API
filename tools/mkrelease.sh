@@ -16,5 +16,6 @@ java -cp "$CP" hmgapi.engine.Signing sign-hmgapi "$W/hmgapi-$V" "$KEY"
 mkdir -p out/releases
 Z=$PWD/out/releases/hmgapi-$V.zip
 rm -f "$Z"
-(cd "$W" && find "hmgapi-$V" -type f | sort | TZ=UTC xargs touch -d 2026-01-01T00:00:00 && find "hmgapi-$V" -type f | sort | zip -q -X -D "$Z" -@)
+# fixed order and times: UTC and the C locale for all of it (zip writes local times, sort follows the locale)
+(cd "$W" && export TZ=UTC LC_ALL=C && find "hmgapi-$V" -type f | sort | xargs touch -d 2026-01-01T00:00:00 && find "hmgapi-$V" -type f | sort | zip -q -X -D "$Z" -@)
 echo "$Z"

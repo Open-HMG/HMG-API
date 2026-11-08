@@ -6,7 +6,7 @@ Thanks for helping. Bug reports, Car Reports and ideas go in
 ## Before a pull request
 
 - Test off the car. No car files or keys needed for any of it.
-  - `tools/test-all.sh --fast`: 27 of the 34 suites (the engine, the NEMESIS package
+  - `tools/test-all.sh --fast`: 27 of the 33 suites (the engine, the NEMESIS package
     scripts, the tools) in under a minute, on Linux or macOS. Needs a JDK, a C compiler
     and the Python packages at the versions in `tools/requirements.txt`:
     `pip install --require-hashes -r tools/requirements.txt` (in a venv if pip refuses).

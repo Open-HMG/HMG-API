@@ -1,7 +1,7 @@
 out/
 *.pyc
 __pycache__/
-tools/mock/cars.local
+.DS_Store
 tools/map-trees.local
 HANDOFF.md
 tools/hook-trees.local

@@ -82,10 +82,6 @@ public final class Dex {
 
     // ---- raw reads (little endian; dex offsets are from the dex's own start)
 
-    int u1(int o) {
-        return b[o] & 0xff;
-    }
-
     int u2(int o) {
         return (b[o] & 0xff) | (b[o + 1] & 0xff) << 8;
     }

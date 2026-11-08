@@ -1,6 +1,6 @@
 # HMG-API: notes for Claude
 
-HMG-API (1.0.2) is a mod manager for Hyundai/Kia/Genesis **Gen5W** head units (Telechips TCC803x/TCC897x, Android 4.4.2, Dalvik). It replaces HMG Leafia Plus 1.x (separate, archived repo). It can install through NEMESIS (xwtk/hmg_nemesis, AGPL-3.0), over adb, or with NEMESIS's DSP OTA entry. Maintainer: VysseCodes (Ko-fi vyssecodes). Reference car: 2023 Kia EV6 (CVEV.USA, firmware 260507, with HUD).
+HMG-API (1.0.2) is a mod manager for Hyundai/Kia/Genesis **Gen5W** head units (Telechips TCC803x/TCC897x, Android 4.4.2, Dalvik). It replaces HMG Leafia Plus 1.x (separate, archived repo). It can install through NEMESIS (xwtk/hmg_nemesis, AGPL-3.0), over adb, or with NEMESIS's DSP OTA entry. Repo: `Open-HMG/HMG-API` on GitHub; each mod lives in its own repo there (`Open-HMG/hmgapi-<id>`). Maintainer: VysseCodes (Ko-fi vyssecodes). Reference car: 2023 Kia EV6 (CVEV.USA, firmware 260507, with HUD).
 
 ## Working conventions
 
@@ -19,14 +19,14 @@ HMG-API (1.0.2) is a mod manager for Hyundai/Kia/Genesis **Gen5W** head units (T
 
 Owners get to decide for their own units. Follow these by default. If the user asks to go against one, say the risk in a line or two, then do what they asked. HMG-API does the same for its users: a warning plus an override, never a silent block.
 
-- Only each car's newest firmware for its region is supported (US 260507, Canada 260206; each region has its own builds, so `patches/cars` and `compat.json` match the full region, e.g. `CVEV.USA.`). Don't port older firmware by default; ask the owner to update the head unit. On a known car with other firmware the installer falls back to basic mode and says to update (`MODE_UPDATE`).
+- Only each car's newest firmware for its region is supported: US 260507 (some models are on 260903: `maps/hyundai/neev23/usa/260903`), Canada 260206. Each region has its own builds, so maps (`maps/<make>/<model>/<region>/<firmware>`, `car.json` `products`) and a mod's `"system"` match the full region, e.g. `CVEV.USA.`. Don't port older firmware by default; ask the owner to update the head unit. With no map for the car, mods still install, points it can't find stay off, and a car missing from a mod's `"system"` is a warning with an override.
 - Don't flash MICOM, the bootloader or modem firmware, or firmware meant for another car: these can brick the unit or the car beyond what a USB stick can fix.
 - Don't send our own CAN frames. Send vehicle commands through the stock services (BCMManager etc.), and review each new one on its own first.
 
 ## Facts
 
 - Gen5W is only in navigation trims; non-navigation trims have a "Display Audio" head unit (e.g. Display Audio Gen2V on the Tucson), unsupported and absent from the update catalogue.
-- Korea: no Korean car confirmed working (every unit checked had no Wi-Fi hardware), so Korean cars are on no list; reports are still welcome.
+- Korea: Korean head units have the Wi-Fi chip, unpowered without the `wifihotspot` feature (#21, #22, #108). No Korean car is listed; new regions are on hold (USA and Canada only), reports still welcome.
 
 ## Layout
 
@@ -37,9 +37,12 @@ Owners get to decide for their own units. Follow these by default. If the user a
 | `core/loader` | `libhmgapi_hook.so`: interposes `JNI_CreateJavaVM`, loads `/system/framework/hmgapi-hook.jar` before `ZygoteInit.main`, Dalvik method hooks (Xposed-style, offsets checked on the EV6 libdvm). |
 | `core/runtime` | `hmgapi-hook.jar`: `Bridge`, `Hooks`, `MethodHook`, `ModEntry`/`ModContext`/`LoadedApp` (mod API), `Mods` (loader), launcher/editor hooks (`HMG-API`), ★ choices (`StarKey`). |
 | `core/app` | `hmgapi.app`: status + mod list (from `HmgApiStatus.json`, set by the hooks). |
-| `install/` | `adb/`, `nemesis/` (`mod/`: the template for a mod as a NEMESIS package, `tools/mknemesismod.sh`), `usb/`, `common/` (planned); `dev/`: the scripts used to bring up the core on a car. |
-| `mods/examples` | `hello` and the other API examples. The shipped mods (wireless, `adb`, `adbd`, `nemesis-shortcut`) are in their own Open-HMG repos (`docs/mod-repos.md`); the release bundles them from `catalog/` (`tools/release-mods.txt`). |
-| `tools/` | `lpatch`, `mkrecipe.py`, `mkdelta.py`, `mkicon.sh` (stock-style tile pictures; `mkicon-hmgapi.sh` makes HMG-API's own from the logo), `env.sh`, `push-dev.sh`, `test-all.sh`; `map-car.py` (partial maps), `test-hooks.py` (points × cars, `maps/coverage.json`), `probe-test.py` (on-car mapper vs map-car.py); cars in `tools/hook-trees.local` (private). |
+| `core/client` | `hmgapi-client.jar`: for mods' own apps and services (bundled in their APKs). |
+| `install/` | `adb/`, `nemesis/` (`mod/`: the template for a mod as a NEMESIS package, `tools/mknemesismod.sh`), `usb/` (DSP OTA), `common/` (`install.sh`, `uninstall.sh`, `lib.sh`: where every route ends). |
+| `mods/examples` | `hello` and the other API examples and test fixtures. No shipped mod is in this repo: `wireless-carplay-aa`, `adb`, `nemesis-shortcut` and `adbd` each have their own, `Open-HMG/hmgapi-<id>` (`docs/mod-repos.md`). |
+| `catalog/` | the mod catalogue (`tools/catalog.py`): per mod its download, SHA-256 and author key; the wiki's Community mods page. The release bundles `tools/release-mods.txt`'s ids from it. |
+| `tools/sdk`, `./build.sh sdk` | the mod SDK (`hmgapi-mod-sdk-<version>.zip`, a release asset from 1.0.3): what a mod repo builds, tests and packages with; `.github/workflows/mod.yml` is their reusable CI. |
+| `tools/` | `lpatch`, `mkrecipe.py`, `mkdelta.py`, `mkicon.sh` (stock-style tile pictures; `mkicon-hmgapi.sh` makes HMG-API's own from the logo), `env.sh`, `test-all.sh`; `map-car.py` (partial maps), `test-hooks.py` (points × cars, `maps/coverage.json`), `probe-test.py` (on-car mapper vs map-car.py); cars in `tools/hook-trees.local` (private). |
 
 ## Gotchas learned the hard way
 

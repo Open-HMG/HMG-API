@@ -2,7 +2,7 @@ package hmgapi.hook;
 
 /**
  * Off-zygote test of the hook runtime, run on the head unit as a plain
- * app_process with HMGAPI_SELFTEST=<jar> (see unit/selftest.sh). The native
+ * app_process with HMGAPI_SELFTEST=<jar> (command in core/README.md). The native
  * loader calls selfTest() in its own copy of the jar; main() only ends the run.
  */
 public final class SelfTest {

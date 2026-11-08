@@ -4,6 +4,17 @@ ROOT=${ROOT:-}
 HOOK_BEGIN="# HMGAPI_HOOK begin"
 HOOK_END="# HMGAPI_HOOK end"
 
+# install.sh's and uninstall.sh's: a line to the screen and $LOG; an md5; give up (putting
+# /system back to read-only first when the script set REMOUNTED; each script has its own remount)
+log() { echo "$1"; echo "$1" >> "$LOG" 2>/dev/null; }
+sum() { set -- $(md5 "$1" 2>/dev/null); echo "$1"; }
+REMOUNTED=
+fail() {
+    log "FAIL: $1"
+    [ -n "$REMOUNTED" ] && remount ro >/dev/null 2>&1
+    exit 1
+}
+
 # The boot hook: `hmgapid boot`, which returns at once (the boot script goes straight on
 # to NEMESIS's start) and, detached, starts hmgapid and runs /data/hmgapi/boot.sh
 # (HMG-API's boot steps) once per boot.

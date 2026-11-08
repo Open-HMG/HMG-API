@@ -14,6 +14,10 @@ off or removed. In the repository:
 - `tools/mkicon.sh <picture> <folder>`: app-menu tile pictures that match the car's
   own (the stock gradient, day and night, and the greyed-out look) from any shape.
 - `docs/api-plan.md`: what each community project uses and what's planned.
+- In your own repository: the mod SDK (`hmgapi-mod-sdk-<version>.zip`, on each HMG-API
+  release from 1.0.3) and HMG-API's reusable mod workflow as its CI ("Building a mod
+  outside this repo" in `docs/mod-reference.md`). The mods HMG-API ships are built
+  that way, each in its own repo in the [Open-HMG](https://github.com/Open-HMG) org.
 
 Packaging: `tools/mkmodpkg.sh <mod folder> <your key>` (make a key once with
 `java -cp out/engine-host hmgapi.engine.Signing keygen <file>`). Keep the key safe:
