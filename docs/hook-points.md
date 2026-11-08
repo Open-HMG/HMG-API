@@ -23,7 +23,7 @@ mod SDK ([mod-repos.md](mod-repos.md), section 4).
 |---|---|---|
 | Hyundai Ioniq 5 CAN 260206 | mapped from stock files | 351 of 351 |
 | Hyundai Ioniq 5 USA 260507 | mapped from stock files | 351 of 351 |
-| Hyundai Ioniq 5 USA 260903 | mapped on cars by HMG-API's own mapper | 325 of 351 |
+| Hyundai Ioniq 5 USA 260903 | mapped on cars by HMG-API's own mapper | 351 of 351 |
 | Kia EV6 CAN 260206 | mapped from stock files | 351 of 351 |
 | Kia EV6 USA 260507 | checked on a car | 351 of 351 |
 
@@ -135,10 +135,10 @@ Android framework and the car's service interfaces (any process).
 | `framework.hscan_service.battery_12v_soc` | method | `getBatSoc()` → int | 12V battery state of charge, % | all |
 | `framework.hscan_service.hv_health` | method | `getXEV_Bms_GDS_SOH()` → int |  | all |
 | `framework.hscan_service.charging_status` | method | `getChargingStatus()` → int |  | all |
-| `framework.hscan_service.battery_12v_sensor_state` | method | `getBATSNSRState()` → byte | 12V battery sensor's state (raw) | not on Hyundai Ioniq 5 USA 260903 |
-| `framework.hscan_service.battery_12v_sensor_invalid` | method | `getBATSNSRInvalid()` → byte | 12V battery sensor's invalid flag (raw) | not on Hyundai Ioniq 5 USA 260903 |
-| `framework.hscan_service.battery_12v_sensor_error` | method | `getBATSNSRError()` → byte | 12V battery sensor's error flag (raw) | not on Hyundai Ioniq 5 USA 260903 |
-| `framework.hscan_service.battery_12v_saver` | method | `get_BAT_AuxBattOpt()` → byte | the Auxiliary Battery Saver option (raw) | not on Hyundai Ioniq 5 USA 260903 |
+| `framework.hscan_service.battery_12v_sensor_state` | method | `getBATSNSRState()` → byte | 12V battery sensor's state (raw) | all |
+| `framework.hscan_service.battery_12v_sensor_invalid` | method | `getBATSNSRInvalid()` → byte | 12V battery sensor's invalid flag (raw) | all |
+| `framework.hscan_service.battery_12v_sensor_error` | method | `getBATSNSRError()` → byte | 12V battery sensor's error flag (raw) | all |
+| `framework.hscan_service.battery_12v_saver` | method | `get_BAT_AuxBattOpt()` → byte | the Auxiliary Battery Saver option (raw) | all |
 | `framework.car_services` | class | `com.hkmc.Service` | the car services' registered names | all |
 | `framework.car_services.system` | field | `static SYSTEM_SERVICE`: String |  | all |
 | `framework.car_services.hev` | field | `static HEV_SERVICE`: String |  | all |
@@ -232,18 +232,18 @@ Android framework and the car's service interfaces (any process).
 | `framework.bcm_service.ast_seat_heat_option` | method | `getAstSeatHeatOption()` → int |  | all |
 | `framework.bcm_service.rl_seat_heat_option` | method | `getRLSeatHeatOption()` → int | 1 on the EV6: 2 levels, no ventilation | all |
 | `framework.bcm_service.rr_seat_heat_option` | method | `getRRSeatHeatOption()` → int |  | all |
-| `framework.bcm_service.batt_cond_indicator` | method | `getBattCondIndSta()` → int | battery conditioning indicator: 1 conditioning, 0 not (as Launchpad reads it) | not on Hyundai Ioniq 5 USA 260903 |
-| `framework.hev_flag.batt_cond_failure` | field | `static BMS_BATTCONDFAILPOPUP`: int | battery conditioning failure popup (raw; -1 seen when nothing's wrong) | not on Hyundai Ioniq 5 USA 260903 |
-| `framework.car_services.cluster` | field | `static CLUSTER_SERVICE`: String |  | not on Hyundai Ioniq 5 USA 260903 |
-| `framework.cluster_service` | class | `com.hkmc.cluster.IClusterService` |  | not on Hyundai Ioniq 5 USA 260903 |
-| `framework.cluster_service_stub` | class | `com.hkmc.cluster.IClusterService$Stub` |  | not on Hyundai Ioniq 5 USA 260903 |
-| `framework.cluster_service_stub.as_interface` | method | `static asInterface(android.os.IBinder)` → framework.cluster_service |  | not on Hyundai Ioniq 5 USA 260903 |
-| `framework.cluster_listener` | class | `com.hkmc.cluster.INavigationClusterListener` |  | not on Hyundai Ioniq 5 USA 260903 |
-| `framework.cluster_listener_stub` | class | `com.hkmc.cluster.INavigationClusterListener$Stub` | HMG-API answers its callbacks with a plain binder (only the ones it reads) | not on Hyundai Ioniq 5 USA 260903 |
-| `framework.cluster_listener_stub.as_interface` | method | `static asInterface(android.os.IBinder)` → framework.cluster_listener |  | not on Hyundai Ioniq 5 USA 260903 |
-| `framework.cluster_listener_stub.battery_info` | field | `static TRANSACTION_onHandleBatteryInfoResp`: int | onHandleBatteryInfoResp(int[8]): [1] minimum pack temperature (whole C), [5] conditioning indicator; the answer to requestBatteryInfoReq, sent to every listener | not on Hyundai Ioniq 5 USA 260903 |
-| `framework.cluster_service.add_listener` | method | `addNavigationClusterListener(framework.cluster_listener)` → void | the service keeps a list and calls every listener: the navigation's own stays registered | not on Hyundai Ioniq 5 USA 260903 |
-| `framework.cluster_service.battery_info` | method | `requestBatteryInfoReq()` → void | asks the cluster for the battery info; answered through onHandleBatteryInfoResp | not on Hyundai Ioniq 5 USA 260903 |
+| `framework.bcm_service.batt_cond_indicator` | method | `getBattCondIndSta()` → int | battery conditioning indicator: 1 conditioning, 0 not (as Launchpad reads it) | all |
+| `framework.hev_flag.batt_cond_failure` | field | `static BMS_BATTCONDFAILPOPUP`: int | battery conditioning failure popup (raw; -1 seen when nothing's wrong) | all |
+| `framework.car_services.cluster` | field | `static CLUSTER_SERVICE`: String |  | all |
+| `framework.cluster_service` | class | `com.hkmc.cluster.IClusterService` |  | all |
+| `framework.cluster_service_stub` | class | `com.hkmc.cluster.IClusterService$Stub` |  | all |
+| `framework.cluster_service_stub.as_interface` | method | `static asInterface(android.os.IBinder)` → framework.cluster_service |  | all |
+| `framework.cluster_listener` | class | `com.hkmc.cluster.INavigationClusterListener` |  | all |
+| `framework.cluster_listener_stub` | class | `com.hkmc.cluster.INavigationClusterListener$Stub` | HMG-API answers its callbacks with a plain binder (only the ones it reads) | all |
+| `framework.cluster_listener_stub.as_interface` | method | `static asInterface(android.os.IBinder)` → framework.cluster_listener |  | all |
+| `framework.cluster_listener_stub.battery_info` | field | `static TRANSACTION_onHandleBatteryInfoResp`: int | onHandleBatteryInfoResp(int[8]): [1] minimum pack temperature (whole C), [5] conditioning indicator; the answer to requestBatteryInfoReq, sent to every listener | all |
+| `framework.cluster_service.add_listener` | method | `addNavigationClusterListener(framework.cluster_listener)` → void | the service keeps a list and calls every listener: the navigation's own stays registered | all |
+| `framework.cluster_service.battery_info` | method | `requestBatteryInfoReq()` → void | asks the cluster for the battery info; answered through onHandleBatteryInfoResp | all |
 
 ## btsettings
 
@@ -307,10 +307,10 @@ App `com.daudio.app.dipo`.
 | `dipo.carplay.session_finalized` | method | `onSessionFinalized(int)` → void | a CarPlay session ended | all |
 | `dipo.carplay.iap_message` | method | `oniAPSendMessage(byte[], int)` → void | iAP2 bytes the phone sent over the CarPlay session's own channel | all |
 | `dipo.carplay.native_iap_send` | method | `TccCarPlayNativeMethod_iAPSendMessage(byte[], int)` → int | sends iAP2 bytes to the phone over the CarPlay session's channel (0: sent) | all |
-| `dipo.carplay.disable_bluetooth` | method | `onDisableBluetooth(String)` → void | the CarPlay library's disableBluetooth, about 80 ms into a session: DiPO then disconnects the phone's Bluetooth (wired CarPlay's way) | not on Hyundai Ioniq 5 USA 260903 |
-| `dipo.carplay.decode_failure` | method | `onNotifyDecodeFailure(int)` → void | the CarPlay video decoder reported a failure (1 no output frame, 2 sequence header failed, 3 black screen; 0 resets the black-screen count). Stock DiPO only logs it | not on Hyundai Ioniq 5 USA 260903 |
-| `dipo.carplay.screen_timeout` | method | `onScreenTimeout()` → void | the CarPlay screen stream got no data for the library's timeout (10 s on these units). Stock DiPO only sets a flag | not on Hyundai Ioniq 5 USA 260903 |
-| `dipo.carplay.force_key_frame` | method | `forceKeyFrame()` → com.daudio.app.dipo.telechips.CarPlayReturn | asks the phone for a new key frame (IDR) on the CarPlay screen stream. Stock DiPO never calls it | not on Hyundai Ioniq 5 USA 260903 |
+| `dipo.carplay.disable_bluetooth` | method | `onDisableBluetooth(String)` → void | the CarPlay library's disableBluetooth, about 80 ms into a session: DiPO then disconnects the phone's Bluetooth (wired CarPlay's way) | all |
+| `dipo.carplay.decode_failure` | method | `onNotifyDecodeFailure(int)` → void | the CarPlay video decoder reported a failure (1 no output frame, 2 sequence header failed, 3 black screen; 0 resets the black-screen count). Stock DiPO only logs it | all |
+| `dipo.carplay.screen_timeout` | method | `onScreenTimeout()` → void | the CarPlay screen stream got no data for the library's timeout (10 s on these units). Stock DiPO only sets a flag | all |
+| `dipo.carplay.force_key_frame` | method | `forceKeyFrame()` → com.daudio.app.dipo.telechips.CarPlayReturn | asks the phone for a new key frame (IDR) on the CarPlay screen stream. Stock DiPO never calls it | all |
 | `dipo.iap2_listener` | class | a class in `com.daudio.app.dipo` (no fixed name) | DiPO's own iAP2 listener (connected, disconnected, notify from the iAP2 server) | all |
 | `dipo.iap2_listener.connected` | method | `connected(int, String)` → void | an iAP2 session is up (component: 1 USB, 4 Bluetooth CarPlay, 5 the CarPlay session's channel) | all |
 | `dipo.iap2_listener.disconnected` | method | `disconnected(int)` → void | an iAP2 session ended (component) | all |
@@ -392,12 +392,12 @@ App `com.tcc.iap2server`.
 | `iap2.service_receiver` | class | a class in `com.tcc.iap2server` (no fixed name) | the iAP2 service's own broadcast receiver (USB CarPlay attach and more); an inner class, so its number can differ | all |
 | `iap2.service_receiver.on_receive` | method | `onReceive(android.content.Context, android.content.Intent)` → void |  | all |
 | `iap2.service_receiver.service` | field | `?`: iap2.service |  | all |
-| `iap2.service.on_destroy` | method | `onDestroy()` → void |  | not on Hyundai Ioniq 5 USA 260903 |
-| `iap2.service.on_bind` | method | `onBind(android.content.Intent)` → android.os.IBinder |  | not on Hyundai Ioniq 5 USA 260903 |
-| `iap2.service.native_handle` | field | `static mHandleIap2`: long |  | not on Hyundai Ioniq 5 USA 260903 |
-| `iap2.service.native_lock` | field | `static mLock`: Object |  | not on Hyundai Ioniq 5 USA 260903 |
-| `iap2.init_info.use_vehicle_information` | field | `static iAP2UsedVehicelInformation`: int |  | not on Hyundai Ioniq 5 USA 260903 |
-| `iap2.init_info.use_vehicle_status` | field | `static iAP2UsedVehicleStatus`: int |  | not on Hyundai Ioniq 5 USA 260903 |
+| `iap2.service.on_destroy` | method | `onDestroy()` → void |  | all |
+| `iap2.service.on_bind` | method | `onBind(android.content.Intent)` → android.os.IBinder |  | all |
+| `iap2.service.native_handle` | field | `static mHandleIap2`: long |  | all |
+| `iap2.service.native_lock` | field | `static mLock`: Object |  | all |
+| `iap2.init_info.use_vehicle_information` | field | `static iAP2UsedVehicelInformation`: int |  | all |
+| `iap2.init_info.use_vehicle_status` | field | `static iAP2UsedVehicleStatus`: int |  | all |
 
 ## launcher
 
