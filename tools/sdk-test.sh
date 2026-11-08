@@ -79,6 +79,24 @@ o=$(sh $S/mknemesismod.sh out/packages/hello-1.0.0.zip 2>&1) || echo "$o"
 check "mknemesismod.sh: ./out/dist" yes "$([ -f $M/out/dist/hello-1.0.0-nemesis-package.zip ] && [ -f $M/out/dist/hello-1.0.0-nemesis.zip ] && echo yes)"
 (cd $REPO && tools/mknemesismod.sh out/packages/hello-1.0.0.zip $T/core-dist > /dev/null)
 check "... the same NEMESIS package as HMG-API's" "$(md5 $T/core-dist/hello-1.0.0-nemesis-package.zip)" "$(md5 $M/out/dist/hello-1.0.0-nemesis-package.zip)"
+
+# zipdir (tools/mkinstallers.sh, tools/mknemesismod.sh): the same zip bytes in any time zone and locale
+ZD=$(grep '^zipdir()' $REPO/tools/mkinstallers.sh)
+check "zipdir: the same line in mkinstallers.sh and mknemesismod.sh" "$ZD" "$(grep '^zipdir()' $REPO/tools/mknemesismod.sh)"
+if locale -a 2>/dev/null | grep -qiE '^en_US\.utf-?8$' && [ -f /usr/share/zoneinfo/America/Los_Angeles ]; then
+    for e in utc:"TZ=UTC LC_ALL=C" la:"TZ=America/Los_Angeles LC_ALL=en_US.UTF-8"; do
+        d=$T/zd-${e%%:*}; e=${e#*:}
+        (cd $REPO && env $e tools/mknemesismod.sh out/packages/hello-1.0.0.zip $d > /dev/null)
+        # mkinstallers.sh's line, on names that C and en_US sort apart (case, punctuation)
+        mkdir -p $d/tree/sub && for f in B.txt a.txt _x a-b ab sub/Z sub/y; do echo $f > $d/tree/$f; done
+        env $e sh -c "$ZD; zipdir $d/tree $d/tree.zip"
+    done
+    for z in hello-1.0.0-nemesis-package.zip hello-1.0.0-nemesis.zip tree.zip; do
+        check "zipdir: $z the same in UTC/C and Los Angeles/en_US.UTF-8" "$(md5 $T/zd-utc/$z)" "$(md5 $T/zd-la/$z)"
+    done
+else
+    echo "skip  zipdir across time zones and locales (needs the en_US.UTF-8 locale and America/Los_Angeles)"
+fi
 rm -f $REPO/out/packages/hello-1.0.0.zip
 
 # "nemesis_conflicts" in mod.json: depends= refuses them (no conflicts.txt in the SDK)
