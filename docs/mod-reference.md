@@ -365,6 +365,10 @@ The workflow checks the mod's `"hmgapi"` floor (at or below the SDK; every
 release workflow signs with your own key. A new hook point is a HMG-API pull request
 first (`docs/mod-repos.md`, section 4).
 
+A mod whose `build.sh` compiles native code can ask for an Android NDK with
+`with: ndk: "<version>"`, as `sdkmanager` names it (hmgapi-adbd: `21.4.7075529`, r21e).
+The workflow installs it before the build, with `NDK` and `ANDROID_NDK_HOME` pointing at it.
+
 On your machine, with the SDK unpacked in `$HMGAPI_SDK` and the Android SDK in `ANDROID_HOME`:
 
 ```

@@ -6,7 +6,7 @@ set -e
 cd "$(dirname "$0")/../.."
 CP=$(mktemp -d); T=$(mktemp -d)
 trap 'rm -rf "$CP" "$T"' EXIT
-javac --release 8 -Xlint:-options -nowarn -d "$CP" core/runtime/java/hmgapi/engine/*.java 2>/dev/null
+sh tools/engine-classes.sh "$CP" 2>/dev/null
 fail=0
 check() { if [ "$2" = "$3" ]; then echo "ok    $1"; else echo "FAIL  $1: wanted [$2], got [$3]"; fail=1; fi; }
 run() { printf '%s\n' "$2" > "$T/$1.sh"; java -cp "$CP" hmgapi.engine.ScriptCheck core/runtime/unit-commands.txt "$T/$1.sh" 2>/dev/null | sed "s|$T/||" || true; }

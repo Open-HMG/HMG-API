@@ -17,6 +17,11 @@
   and [NEMESIS in the app menu](https://github.com/Open-HMG/hmgapi-nemesis-shortcut). A
   HMG-API release still carries the wireless, ADB and NEMESIS-menu mods, taken from their
   catalogue entries (same files, signature checked).
+- **The mod workflow can install an Android NDK** (`with: ndk: "21.4.7075529"`), for a mod
+  whose `build.sh` compiles native code.
+- **`tools/test-all.sh --fast`:** the off-car tests that need no build and no ARM
+  toolchain, in under a minute on Linux or macOS. The full run is several tests at once
+  (`-j`), and a test that skipped everything shows as `skip`.
 
 ### Fixes
 

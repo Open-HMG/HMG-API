@@ -73,5 +73,5 @@ Owners get to decide for their own units. Follow these by default. If the user a
 
 ## Testing without a car
 
-`tools/test-all.sh`: hmgapid (real daemon/client under qemu-arm), zygote wrapper, lpatch, and the dev install scripts (needs an ARM busybox and a stock `app_process`). Stock trees and full builds stay out of the repo (`~/hmg-private`).
+`tools/test-all.sh`: hmgapid (real daemon/client under qemu-arm), zygote wrapper, lpatch, the engine, the installers and the tools; `--fast` for the ones that need no build or ARM toolchain. Stock trees and full builds stay out of the repo (`~/hmg-private`).
 

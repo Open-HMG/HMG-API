@@ -7,7 +7,7 @@ set -e
 cd "$(dirname "$0")/../.."
 SH=${UNIT_SH:-sh}
 CP=$(mktemp -d); T=$(mktemp -d); trap 'rm -rf "$T" "$CP"' EXIT
-javac --release 8 -Xlint:-options -nowarn -d "$CP" core/runtime/java/hmgapi/engine/*.java 2>/dev/null
+sh tools/engine-classes.sh "$CP" 2>/dev/null
 R=$T/root S=$T/stick
 fail=0
 check() { if [ "$2" = "$3" ]; then echo "ok    $1"; else echo "FAIL  $1: wanted [$2], got [$3]"; fail=1; fi; }
@@ -175,12 +175,17 @@ check "... its settings kept" '{"keep": true}' "$(cat $R/data/hmgapi/settings/de
 check "... package gone" "" "$(ls $R/data/nemesis/apps)"
 
 # an uninstall with a stage left by an interrupted install still uninstalls
-nem install $P
-mkdir -p $R/data/local/tmp/nemesis/stage/hmgapi.demo; unzip -q -o $P -d $R/data/local/tmp/nemesis/stage/hmgapi.demo
-nem uninstall hmgapi.demo
-check "uninstall with a stale stage: still removes the mod" "" "$(mods)"
-check "... back to stock" "$STOCK" "$(tree)"
-rm -rf $R/data/local/tmp/nemesis/stage/hmgapi.demo
+# (preuninstall tells an uninstall from an update by /proc/$PPID/cmdline, as on the unit)
+if [ -f /proc/self/cmdline ]; then
+    nem install $P
+    mkdir -p $R/data/local/tmp/nemesis/stage/hmgapi.demo; unzip -q -o $P -d $R/data/local/tmp/nemesis/stage/hmgapi.demo
+    nem uninstall hmgapi.demo
+    check "uninstall with a stale stage: still removes the mod" "" "$(mods)"
+    check "... back to stock" "$STOCK" "$(tree)"
+    rm -rf $R/data/local/tmp/nemesis/stage/hmgapi.demo
+else
+    echo "skip  uninstall with a stale stage (no /proc here)"
+fi
 
 # removed in the HMG-API app first: the package uninstalls without touching anything
 nem install $P

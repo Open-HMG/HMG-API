@@ -85,8 +85,12 @@ _engine = None
 
 
 def verify(moddir, uuid=None):
-    """hmgapi.engine.Signing verify, the same code the head unit runs"""
+    """hmgapi.engine.Signing verify, the same code the head unit runs (compiled once per
+    run; HMGAPI_ENGINE_CLASSES: already compiled from this repo's engine, as the tests do)"""
     global _engine
+    given = os.environ.get('HMGAPI_ENGINE_CLASSES', '')
+    if _engine is None and given and os.path.isdir(os.path.join(given, 'hmgapi', 'engine')):
+        _engine = given
     if _engine is None:
         _engine = tempfile.mkdtemp(prefix='catalog-engine-')
         src = [os.path.join(REPO, 'core/runtime/java/hmgapi/engine', f)
@@ -422,7 +426,7 @@ def main():
     if a.cmd == 'add' and a.repo and not HTTPS.match(a.repo):
         die('--repo is an https:// link')
     {'add': cmd_add, 'check': cmd_check, 'fetch': cmd_fetch, 'wiki': cmd_wiki}[a.cmd](a)
-    if _engine:
+    if _engine and _engine != os.environ.get('HMGAPI_ENGINE_CLASSES'):   # ours, not the caller's
         shutil.rmtree(_engine, ignore_errors=True)
 
 
