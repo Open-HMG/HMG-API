@@ -6,10 +6,14 @@ workflow runs it on every mod before building.
     check-points.py <mod dir>... [--repo Open-HMG/HMG-API]
 
 For each mod: the floor (the lower bound of "hmgapi": ">=1.0.2", "^1.0.2", "~1.0.2",
-"=1.0.2" or "1.0.2") is at or below this SDK's VERSION, and every point in
-hooks.points is in the floor release's list of points. That list is the release's SDK
+"=1.0.2" or "1.0.2"; a mod's pre-release may name a core pre-release, ">=1.1.0-rc.1")
+is at or below this SDK's VERSION (semver precedence: an rc.2 SDK meets an rc.1 floor),
+a mod's final release has a final floor (docs/releasing.md), and every point in hooks.points is in the floor release's list of points. That list is the release's SDK
 points.txt (its hmgapi-mod-sdk zip, checked against the release's SHA256SUMS); a
 release before 1.0.3 has no SDK, so it's the core/hookpoints/*.json at its tag.
+A final floor is met by a pre-release SDK of that release, as the engine takes it
+(Version.meetsHmgapi): ">=1.1.0" on a 1.1.0-rc.2 SDK, its points this SDK's own (the final
+is the last rc's code), so a mod's final can be released before core's.
 HMGAPI_FLOOR_POINTS=<file> uses that list instead of fetching one (tests, offline).
 """
 import glob, hashlib, io, json, os, re, subprocess, sys, tempfile, urllib.request, zipfile
@@ -25,8 +29,12 @@ def ver(s):
     return (int(m.group(1)), int(m.group(2) or 0), int(m.group(3) or 0), m.group(4) or "")
 
 
-def key(v):   # "-tag" sorts before the plain release, as hmgapi.engine.Version
-    return v[:3] + ((0, v[3]) if v[3] else (1, ""))
+def key(v):
+    """semver precedence, as hmgapi.engine.Version: a "-tag" before the plain release, its
+    dot-separated parts one at a time, numbers as numbers and before words (rc.9 < rc.10)"""
+    if not v[3]:
+        return v[:3] + ((1,),)
+    return v[:3] + ((0, tuple((0, int(i), "") if re.fullmatch(r"0|[1-9]\d*", i) else (1, 0, i) for i in v[3].split("."))),)
 
 
 def text(v):
@@ -48,6 +56,13 @@ def sdk_version():
         return ver(open(f).read())
     src = open(os.path.join(HERE, "..", "core/runtime/java/hmgapi/engine/Engine.java")).read()
     return ver(re.search(r'HMGAPI_VERSION = "(.*?)";', src).group(1))
+
+
+def own_points():
+    f = os.path.join(HERE, "..", "points.txt")
+    if os.path.isfile(f):
+        return set(open(f).read().split())
+    return points_of(sorted(glob.glob(os.path.join(HERE, "..", "core/hookpoints/*.json"))))
 
 
 def points_of(cat_files):
@@ -90,7 +105,16 @@ def main(argv):
             f = floor(rng)
         except ValueError as e:
             print("FAIL  %s: \"hmgapi\": %s" % (mid, e)); bad = 1; continue
-        if f is not None and key(f) > key(sdk):
+        try:
+            final = not ver(str(m.get("version", "0")))[3]
+        except ValueError as e:
+            print("FAIL  %s: \"version\": %s" % (mid, e)); bad = 1; continue
+        if f is not None and f[3] and final:
+            print("FAIL  %s %s: \"hmgapi\": %r names a HMG-API pre-release; a mod's final release needs a final one (\">=%s\")"
+                  % (mid, m.get("version"), rng, "%d.%d.%d" % f[:3]))
+            bad = 1; continue
+        ahead = f is not None and not f[3] and sdk[3] and f[:3] == sdk[:3]   # ">=1.1.0" on a 1.1.0-rc SDK
+        if f is not None and key(f) > key(sdk) and not ahead:
             print("FAIL  %s: \"hmgapi\": %r needs HMG-API %s, but the SDK is %s (pin a newer SDK in hmgapi-sdk.json)"
                   % (mid, rng, text(f), text(sdk)))
             bad = 1; continue
@@ -100,7 +124,7 @@ def main(argv):
             print("FAIL  %s: uses hook points, so \"hmgapi\" needs a floor (\">=1.0.2\"), not %r" % (mid, rng))
             bad = 1; continue
         if text(f) not in cache:
-            cache[text(f)] = fetch_points(f, repo)
+            cache[text(f)] = own_points() if ahead and not os.environ.get("HMGAPI_FLOOR_POINTS") else fetch_points(f, repo)
         missing = [p for p in points if p not in cache[text(f)]]
         if missing:
             print("FAIL  %s: not in HMG-API %s's hook points: %s (raise \"hmgapi\" to the release that has them)"

@@ -20,6 +20,12 @@
 - **`mknemesismod.sh`, `mkmodpkg.sh`, the mod SDK and HMG-API's downloads give the same zip
   bytes on any machine.** Outside UTC and the C locale, the times inside the zip and the
   order of its files changed.
+- **Versions: alpha, beta, rc and final** ([docs/releasing.md](docs/releasing.md)).
+  Pre-releases sort by semver (`rc.9` < `rc.10`, alpha < beta < rc < final), in the engine,
+  the catalogue and the mod checks. A mod's `"hmgapi"` may name a core pre-release
+  (`">=1.1.0-rc.1"`, for a mod's own pre-release), checked against the full core version.
+  NEMESIS package-versions: `.97.N` alpha, `.98.N` beta, `.99.N` rc. The catalogue lists
+  final releases only.
 - **The mod workflow can install an Android NDK** (`with: ndk: "21.4.7075529"`), for a mod
   whose `build.sh` compiles native code.
 - **`tools/test-all.sh --fast`:** the off-car tests that need no build and no ARM

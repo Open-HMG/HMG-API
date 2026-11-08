@@ -61,9 +61,9 @@ import java.util.TreeMap;
 public final class Engine {
     public static final String HMGAPI_VERSION = "1.0.2";
     /**
-     * What a mod's "hmgapi" requirement is checked against: the release a beta leads to
-     * (1.0.0-beta.1 meets ">=1.0.0", so mods made for 1.0.0 run on its betas). Updates
-     * compare the full version: 1.0.0 is newer than 1.0.0-beta.1.
+     * The release a pre-release leads to (1.1.0 for 1.1.0-rc.1): what a mod's "hmgapi"
+     * range of final versions is checked against (Version.meetsHmgapi). Updates compare
+     * the full version: 1.1.0 is newer than 1.1.0-rc.1.
      */
     public static final String HMGAPI_API = HMGAPI_VERSION.replaceFirst("-.*$", "");
     final String root = env("HMGAPI_ROOT", "");
@@ -407,7 +407,7 @@ public final class Engine {
                 m.requires = Version.deps(m.json.get("requires"));
                 m.conflicts = Version.deps(m.json.get("conflicts"));
                 Object need = m.json.get("hmgapi");
-                if (need != null && !Version.satisfies(HMGAPI_API, String.valueOf(need))) {
+                if (need != null && !Version.meetsHmgapi(HMGAPI_VERSION, String.valueOf(need))) {
                     problems.add(m.id + " " + m.version + ": needs HMG-API " + need + " (this is " + HMGAPI_VERSION + ")");
                     continue;
                 }

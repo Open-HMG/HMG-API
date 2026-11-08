@@ -110,6 +110,9 @@ The mod's PR can be open (draft) during 1 and 2; its CI fails until the SDK has 
 `"hmgapi"` rule, checked by the mod workflow: the floor is at or below the pinned SDK,
 and every point in `hooks.points` is in the floor release's `points.txt` (the workflow
 fetches that SDK too). A mod that raises its floor says so in its release notes.
+Pre-releases ([releasing.md](releasing.md)): a mod's final names a final floor; a final
+floor is met by that release's rc SDK (its points the SDK's own); a mod pre-release may
+name a core pre-release (`">=1.1.0-rc.1"`).
 
 ## 5. Signing
 

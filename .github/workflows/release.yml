@@ -1,7 +1,8 @@
-# A HMG-API release from a version tag (v1.0.0, v1.0.0-beta.1): built and tested,
+# A HMG-API release from a version tag (v1.1.0; pre-releases v1.1.0-alpha.N, -beta.N,
+# -rc.N: docs/releasing.md): built and tested,
 # with the mod SDK (hmgapi-mod-sdk-<version>.zip, in SHA256SUMS: what mod repos pin),
 # signed with HMG-API's keys (repository secrets), then attached to a *draft* GitHub
-# release (a pre-release when the tag has a "-"). Publishing it stays a person's call.
+# release (a pre-release, never "Latest", when the tag has a "-"). Publishing it stays a person's call.
 #
 # Secrets (in the "release" environment, which only v* tags can use): HMGAPI_APP_P12 (base64) and HMGAPI_APP_PASS, the app's signing key;
 # HMGAPI_RELEASE_KEY and HMGAPI_RELEASE_KEY_PUB (base64), the release key the app
@@ -44,6 +45,7 @@ jobs:
         run: |
           v=$(sed -n 's/.*HMGAPI_VERSION = "\(.*\)";/\1/p' core/runtime/java/hmgapi/engine/Engine.java)
           test "v$v" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME, but HMG-API's version is $v"; exit 1; }
+          echo "$v" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.(0|[1-9][0-9]*))?$' || { echo "$v: x.y.z or x.y.z-alpha.N, -beta.N, -rc.N (docs/releasing.md)"; exit 1; }
           echo "VERSION=$v" >> "$GITHUB_ENV"
 
       - name: Keys
@@ -90,7 +92,10 @@ jobs:
         run: |
           notes=".github/release-notes/$GITHUB_REF_NAME.md"
           [ -f "$notes" ] || notes=CHANGELOG.md
-          pre=""; case "$GITHUB_REF_NAME" in *-*) pre="--prerelease" ;; esac
+          pre=""; case "$GITHUB_REF_NAME" in *-*) pre="--prerelease --latest=false" ;; esac   # a pre-release is never "Latest"
+          # nor a hotfix to an older line (1.0.3 after 1.1.0): only the highest final is
+          newest=$(git ls-remote --tags --refs "https://github.com/$GITHUB_REPOSITORY" 'v*' | sed 's#.*refs/tags/v##' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
+          case "$GITHUB_REF_NAME" in *-*) ;; *) [ "$newest" = "$VERSION" ] || pre="--latest=false" ;; esac
           gh release create "$GITHUB_REF_NAME" --draft $pre --title "HMG-API $VERSION" --notes-file "$notes" out/assets/*
 
       - name: Forget the keys
