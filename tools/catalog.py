@@ -32,6 +32,7 @@ MAX_FILES, MAX_BYTES = 2000, 64 << 20   # the engine's limits (Packages.java)
 ID = re.compile(r'^[a-z0-9][a-z0-9-]{0,63}$')
 UUID = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
 VERSION = re.compile(r'^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$')
+FINAL = re.compile(r'^\d+\.\d+\.\d+$')   # what an entry's "version" is: no pre-releases (docs/releasing.md)
 HTTPS = re.compile(r'^https://[A-Za-z0-9.-]+(:\d+)?/[^\s<>()\[\]"\']*$')
 FIELDS = {'id', 'name', 'description', 'authors', 'license', 'uuid', 'version', 'repo', 'download', 'sha256', 'system', 'hmgapi'}
 NEEDED = ['id', 'name', 'description', 'authors', 'uuid', 'version', 'repo', 'download', 'sha256']
@@ -54,11 +55,16 @@ def save(path, obj):
 
 
 def vkey(v):
-    """a version for ordering: numbers, then a release above its pre-releases"""
+    """a version for ordering, by semver precedence as hmgapi.engine.Version: numbers, then a
+    release above its pre-releases, whose dot-separated parts compare one at a time,
+    numbers as numbers and before words (rc.9 < rc.10 < rc.a)"""
     m = re.match(r'^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?', v)
     if not m:
-        return (0, 0, 0, 0, '')
-    return (int(m[1]), int(m[2]), int(m[3]), 0 if m[4] else 1, m[4] or '')
+        return (0, 0, 0, (0, ()))
+    if not m[4]:
+        return (int(m[1]), int(m[2]), int(m[3]), (1,))
+    return (int(m[1]), int(m[2]), int(m[3]),
+            (0, tuple((0, int(i), '') if re.fullmatch(r'0|[1-9]\d*', i) else (1, 0, i) for i in m[4].split('.'))))
 
 
 def unpack(zpath, dest):
@@ -147,6 +153,8 @@ def entries():
 def cmd_add(a):
     mod, man, sha = package(a.zip)
     mid, ver, uuid = man['id'], man['version'], man['uuid'].lower()
+    if not FINAL.match(ver):
+        die(f'{mid} {ver} is a pre-release: the catalogue lists final releases only (docs/releasing.md)')
     if mod.get('id') != mid or mod.get('version') != ver:
         die(f'{a.zip}: mod.json says {mod.get("id")} {mod.get("version")}, the signature {mid} {ver}')
     repo = a.repo or mod.get('repo')
@@ -212,6 +220,8 @@ def check_entry(name, e, authors):
         say(f'author key {e["uuid"]} isn\'t in maps/authors.json')
     if e.get('version') and not VERSION.match(str(e['version'])):
         say(f'"version" {e["version"]!r} isn\'t x.y.z')
+    elif e.get('version') and not FINAL.match(str(e['version'])):
+        say(f'"version" {e["version"]!r} is a pre-release: the catalogue lists final releases only')
     for k in ('repo', 'download'):
         if e.get(k) and not HTTPS.match(str(e[k])):
             say(f'"{k}" isn\'t an https:// link')

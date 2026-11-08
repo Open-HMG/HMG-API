@@ -113,6 +113,8 @@ pkg hb 1.2.0 $T/b.key $T/hb.zip
 C add $T/hb.zip --download $DL; check "another key refused" 1 $rc; has "says why" "Only the same key updates a mod" "$out"
 pkg h0 0.9.0 $T/a.key $T/h0.zip
 C add $T/h0.zip --download $DL; check "older version refused" 1 $rc
+pkg hp 1.2.0-rc.1 $T/a.key $T/hp.zip
+C add $T/hp.zip --download $DL; check "a pre-release refused (finals only)" 1 $rc; has "says why" "the catalogue lists final releases only" "$out"
 C add $T/h1.zip --download http://example.org/x.zip; check "plain http refused" 1 $rc
 echo x > $T/h1/extra.txt; (cd $T/h1 && zip -qr $T/bad.zip .)
 C add $T/bad.zip --download $DL; check "unsigned package refused" 1 $rc; has "says why" "file not in the manifest: extra.txt" "$out"
@@ -128,6 +130,9 @@ C check --base HEAD; check "key change refused (base)" 1 $rc; has "says why" "th
 G checkout -q -- .
 J $R/catalog/hello.json "d['version']='0.1.0'"
 C check --base HEAD; check "version back refused (base)" 1 $rc
+G checkout -q -- .
+J $R/catalog/hello.json "d['version']='1.1.0-beta.1'"
+C check; check "a pre-release entry refused" 1 $rc; has "says why" "is a pre-release: the catalogue lists final releases only" "$out"
 G checkout -q -- .
 J $R/maps/authors.json "d['authors']['$UA']['name']='Someone else'"
 C check --base HEAD; check "someone else's author entry refused (base)" 1 $rc; has "says why" "$UA changed, but no catalogue entry" "$out"

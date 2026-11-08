@@ -5,9 +5,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Mod versions (semver: major.minor.patch, missing parts are 0, a "-tag" sorts
- * before the plain release) and version ranges for "hmgapi", "requires" and
- * "conflicts" in mod.json:
+ * Mod and HMG-API versions (semver: major.minor.patch, missing parts are 0) and
+ * version ranges for "hmgapi", "requires" and "conflicts" in mod.json. A "-tag"
+ * is a pre-release, ordered by semver precedence (docs/releasing.md): below the
+ * plain release, compared one dot-separated identifier at a time, numbers as
+ * numbers and below words, words by ASCII, fewer identifiers first:
+ *   1.1.0-alpha.1 < 1.1.0-beta.1 < 1.1.0-rc.1 < 1.1.0-rc.2 < 1.1.0-rc.10 < 1.1.0
+ * A "+build" suffix is ignored. Ranges:
  *
  *   ">=2.0.0"   ">1.2"   "<=3"   "<3"   "=1.4.2"   "1.4.2" (same as =)
  *   "^1.2.3"    same major, at least 1.2.3   (^0.x: same minor)
@@ -23,6 +27,8 @@ public final class Version implements Comparable<Version> {
     public Version(String s) {
         s = s.trim();
         if (s.startsWith("v")) s = s.substring(1);
+        int plus = s.indexOf('+');
+        if (plus >= 0) s = s.substring(0, plus);
         int dash = s.indexOf('-');
         tag = dash >= 0 ? s.substring(dash + 1) : "";
         String[] p = (dash >= 0 ? s.substring(0, dash) : s).split("\\.");
@@ -41,7 +47,27 @@ public final class Version implements Comparable<Version> {
         if (tag.equals(o.tag)) return 0;
         if (tag.isEmpty()) return 1;      // 2.0.0 > 2.0.0-beta
         if (o.tag.isEmpty()) return -1;
-        return tag.compareTo(o.tag);
+        return prerelease(tag, o.tag);
+    }
+
+    /** semver precedence of two pre-release tags (neither empty) */
+    static int prerelease(String a, String b) {
+        String[] x = a.split("\\.", -1), y = b.split("\\.", -1);
+        for (int i = 0; i < x.length && i < y.length; i++) {
+            boolean nx = numeric(x[i]), ny = numeric(y[i]);
+            int c;
+            if (nx && ny) c = x[i].length() != y[i].length() ? x[i].length() - y[i].length() : x[i].compareTo(y[i]);
+            else if (nx || ny) c = nx ? -1 : 1;   // rc.1 < rc.a
+            else c = x[i].compareTo(y[i]);
+            if (c != 0) return c < 0 ? -1 : 1;
+        }
+        return x.length == y.length ? 0 : x.length < y.length ? -1 : 1;   // rc < rc.1
+    }
+
+    private static boolean numeric(String s) {
+        if (s.isEmpty() || s.length() > 1 && s.charAt(0) == '0') return false;   // semver: no leading zeros
+        for (int i = 0; i < s.length(); i++) if (s.charAt(i) < '0' || s.charAt(i) > '9') return false;
+        return true;
     }
 
     @Override
@@ -59,6 +85,18 @@ public final class Version implements Comparable<Version> {
             if (!one(have, part)) return false;
         }
         return true;
+    }
+
+    /**
+     * Does HMG-API version core meet a mod's "hmgapi" range? A range of final versions
+     * is checked against the release a pre-release leads to (1.1.0-rc.1 meets ">=1.1.0",
+     * so mods made for 1.1.0 run on its betas and rcs); a range naming a pre-release
+     * (">=1.1.0-rc.1", for a mod's own pre-release) against the full version, so
+     * 1.1.0-beta.1 doesn't meet it and 1.1.0-rc.2 and 1.1.0 do.
+     */
+    public static boolean meetsHmgapi(String core, String range) {
+        if (range == null || range.indexOf('-') < 0) core = core.replaceFirst("-.*$", "");
+        return satisfies(core, range);
     }
 
     private static boolean one(Version have, String c) {

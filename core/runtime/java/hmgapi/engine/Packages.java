@@ -142,7 +142,7 @@ final class Packages {
         }
         // what it needs
         Object need = mod.get("hmgapi");
-        if (need != null && !Version.satisfies(Engine.HMGAPI_API, String.valueOf(need))) {
+        if (need != null && !Version.meetsHmgapi(Engine.HMGAPI_VERSION, String.valueOf(need))) {
             return refuse(v, v.id + " " + v.version + " needs HMG-API " + need + " (this is " + Engine.HMGAPI_VERSION + ")");
         }
         Map<String, Object> car = (Map<String, Object>) e.hmgapi.get("car");

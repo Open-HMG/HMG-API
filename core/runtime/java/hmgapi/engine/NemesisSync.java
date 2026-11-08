@@ -256,15 +256,21 @@ final class NemesisSync {
         return b.toString();
     }
 
-    /** NEMESIS's package-version (dotted numbers only); a beta before its release (tools/nemesis-version.py) */
+    /**
+     * NEMESIS's package-version (dotted numbers only), sorting as the versions do: a
+     * pre-release is the version before it, then .97.n (-alpha.n), .98.n (-beta.n) or
+     * .99.n (-rc.n), as tools/nemesis-version.py
+     */
     static String packageVersion(String v) {
         if (v.matches("[0-9]+(\\.[0-9]+)*")) return v;
-        Matcher m = Pattern.compile("([0-9]+)\\.([0-9]+)\\.([0-9]+)-beta\\.([0-9]+)").matcher(v);
+        Matcher m = Pattern.compile("([0-9]+)\\.([0-9]+)\\.([0-9]+)-(alpha|beta|rc)\\.(0|[1-9][0-9]*)").matcher(v);
         if (!m.matches()) throw new IllegalArgumentException("no NEMESIS package-version for " + v);
-        int x = Integer.parseInt(m.group(1)), y = Integer.parseInt(m.group(2)), z = Integer.parseInt(m.group(3)), n = Integer.parseInt(m.group(4));
-        if (z > 0) return x + "." + y + "." + (z - 1) + ".99." + n;
-        if (y > 0) return x + "." + (y - 1) + ".99." + n;
-        return (x - 1) + ".99." + n;
+        int x = Integer.parseInt(m.group(1)), y = Integer.parseInt(m.group(2)), z = Integer.parseInt(m.group(3));
+        String s = "alpha".equals(m.group(4)) ? "97" : "beta".equals(m.group(4)) ? "98" : "99", n = m.group(5);
+        if (z > 0) return x + "." + y + "." + (z - 1) + "." + s + "." + n;
+        if (y > 0) return x + "." + (y - 1) + "." + s + "." + n;
+        if (x > 0) return (x - 1) + "." + s + "." + n;
+        throw new IllegalArgumentException("no NEMESIS package-version for " + v + ": nothing comes before 0.0.0");
     }
 
     /**

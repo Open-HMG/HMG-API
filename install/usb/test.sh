@@ -55,7 +55,7 @@ val() { ini "$NZ" NEMESIS.data "$1" | sed 's/^"\(.*\)"$/\1/'; }
 check "package: descriptor version 1.1" 1.1 "$(val version)"
 check "package: type= (1.1), not types=" "application " "$(val type) $(val types)"
 check "package: package-version is dotted numbers" yes "$(val package-version | grep -qxE '[0-9]+(\.[0-9]+)*' && echo yes)"
-check "package: a beta's package-version comes before its release" yes "$(case $V in *-beta.*) python3 -c 'import sys; a=[int(x) for x in sys.argv[1].split(".")]; b=[int(x) for x in sys.argv[2].split("-")[0].split(".")]; print("yes" if a < b else "no")' "$(val package-version)" "$V" ;; *) echo yes ;; esac)"
+check "package: a pre-release's package-version comes before its release" yes "$(case $V in *-*) python3 -c 'import sys; a=[int(x) for x in sys.argv[1].split(".")]; b=[int(x) for x in sys.argv[2].split("-")[0].split(".")]; print("yes" if a < b else "no")' "$(val package-version)" "$V" ;; *) echo yes ;; esac)"
 check "package: short-desc at most 64 characters" yes "$([ -n "$(val short-desc)" ] && [ ${#V} -gt 0 ] && python3 -c 'import sys; print("yes" if len(sys.argv[1]) <= 64 else "no")' "$(val short-desc)")"
 check "package: detailed-desc at most 256 characters" yes "$(python3 -c 'import sys; print("yes" if len(sys.argv[1]) <= 256 else "no")' "$(val detailed-desc)")"
 check "package: os, models and depends set" yes "$([ -n "$(val os)" ] && [ -n "$(val models)" ] && unzip -p "$NZ" NEMESIS.data | grep -q '^depends=' && echo yes)"

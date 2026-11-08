@@ -19,7 +19,7 @@ ENGINE = ['core/runtime/engine-test.sh', 'core/runtime/signing-test.sh', 'core/r
           'core/runtime/packages-test.sh', 'core/runtime/map-test.sh', 'core/runtime/usb-test.sh', 'core/runtime/hooks-test.sh',
           'core/runtime/live-test.sh', 'core/runtime/native-test.sh', 'core/runtime/runtime-test.sh', 'core/runtime/net-test.sh',
           'core/runtime/overlap-test.sh', 'core/runtime/scriptcheck-test.sh', 'install/nemesis/mod-test.sh', 'install/nemesis/sync-test.sh',
-          'tools/catalog-test.sh', 'tools/check-scripts.sh']
+          'tools/catalog-test.sh', 'tools/version-test.sh', 'tools/check-scripts.sh']
 INSTALL = ['install/common/test.sh', 'install/common/install-test.sh', 'install/usb/test.sh', 'install/nemesis/mod-test.sh', 'install/nemesis/sync-test.sh']
 MODS = ['tools/check-scripts.sh']   # the example mods' scripts (their tests run in sdk-test)
 HOOKS = ['core/hookpoints/test.sh']
@@ -56,6 +56,8 @@ RULES = [
     # the mod SDK and the reusable mod workflow
     (['tools/build-mod.sh', 'tools/check-points.py', 'tools/sdk/*', 'tools/sdk-test.sh', 'tools/mkrecipe.py', 'tools/mkdelta.py', 'tools/mkmemrecipe.py', 'tools/mkicon.sh', 'tools/mod-draft.py', 'tools/check-scripts.sh', '.github/workflows/mod.yml'], SDK),
     (['tools/mod-draft*'], ['tools/mod-draft-test.sh']),
+    # every tool that orders versions, against Version (docs/releasing.md)
+    (['tools/nemesis-version.py', 'tools/check-points.py', 'tools/catalog.py', 'tools/version-test.sh'], ['tools/version-test.sh']),
     (['tools/mkicon.sh', 'tools/mkicon-hmgapi.sh', 'tools/mkicon-test.sh'], ['tools/mkicon-test.sh']),
     (['tools/mark-verified.py', 'tools/report-map.py'], HOOKS),   # they write or read the maps
     (['catalog/*', 'tools/catalog*', 'maps/authors.json', '.github/workflows/catalog.yml'], ['tools/catalog-test.sh']),
