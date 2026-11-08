@@ -18,3 +18,10 @@ eng() { set +e; out=$(HMGAPI_ROOT=$R HMGAPI_HOST=1 HMGAPI_TEST_ANY_CAR=${HMGAPI_
 tree() { (cd $R/system && find . -type f | sort | while read f; do echo "$(md5sum < "$f" | cut -c1-32) $f"; done) }
 # put the mod (its folder, without test.sh) on the head unit: install_mod <mod dir>
 install_mod() { mkdir -p $R/data/hmgapi/mods && rm -rf "$R/data/hmgapi/mods/$(basename "$1")" && cp -r "$1" $R/data/hmgapi/mods/ && rm -f "$R/data/hmgapi/mods/$(basename "$1")/test.sh"; }
+# a car's stock files, when tools/cars.py test runs this test on them (docs/car-trees.md in HMG-API):
+# HMGAPI_CAR is that car's stock /system (maybe partial), HMGAPI_CAR_ID its map folder (kia/ev6/usa/260507),
+# HMGAPI_CAR_PRODUCTS its map's products (CVEV.USA.). car_tree prints the tree, or fails without one:
+#   S=$(car_tree) || { echo "no stock tree (skipped)"; exit 0; }
+car_tree() { [ -n "${HMGAPI_CAR:-}" ] && [ -d "$HMGAPI_CAR" ] && echo "$HMGAPI_CAR"; }
+# a value from that tree's build.prop, e.g. car_prop ro.build.product
+car_prop() { [ -f "$HMGAPI_CAR/build.prop" ] && sed -n "s/^$1=//p" "$HMGAPI_CAR/build.prop" | sed -n 1p; }

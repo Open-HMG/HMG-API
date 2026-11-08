@@ -16,8 +16,10 @@ Thanks for helping. Bug reports, Car Reports and ideas go in
     `git diff --name-only main | tools/test-select.py` names the tests your change
     needs, the same ones CI runs.
 - Say which cars (model, region, software version) a change was tested on, or "off-car only".
+  With stock car files ([docs/car-trees.md](docs/car-trees.md)), paste
+  `tools/cars.py test --report` in the PR: results only, never the files.
 - New or changed hook points: map them for every car (`tools/map-car.py`); if you have
-  stock trees, `tools/test-hooks.py` must show no regressions.
+  stock trees, `tools/cars.py test` must show no FAIL.
 - Mod scripts: only commands the head unit has (`tools/check-scripts.sh <mod>`).
 - The mods HMG-API ships each have their own repo (Wireless CarPlay + Android Auto:
   [hmgapi-wireless-carplay-aa](https://github.com/Open-HMG/hmgapi-wireless-carplay-aa);
