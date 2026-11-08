@@ -6,7 +6,7 @@
       "projects": "HMG-API, its example mods, wireless CarPlay + Android Auto, ADB, adbd, NEMESIS in the app menu",
       "repos": [
         "https://github.com/Open-HMG/HMG-API",
-        "https://github.com/Open-HMG/hmgapi-wireless-carplay-aa",
+        "https://github.com/Open-HMG/hmgapi-wireless-cp-aa",
         "https://github.com/Open-HMG/hmgapi-adb",
         "https://github.com/Open-HMG/hmgapi-adbd",
         "https://github.com/Open-HMG/hmgapi-nemesis-shortcut"

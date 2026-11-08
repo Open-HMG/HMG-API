@@ -37,7 +37,7 @@ mod repo moves its pin from the SHA to the release in one small PR.
 
 | Mod | Repo | Notes |
 |---|---|---|
-| `wireless-carplay-aa` | `Open-HMG/hmgapi-wireless-carplay-aa` | most of the mod PRs |
+| `wireless-carplay-aa` | `Open-HMG/hmgapi-wireless-cp-aa` | most of the mod PRs. Renamed from `hmgapi-wireless-carplay-aa` on 2026-11-08 (the old URL redirects); the mod's id stays `wireless-carplay-aa` |
 | `adb` | `Open-HMG/hmgapi-adb` | |
 | `adbd` | `Open-HMG/hmgapi-adbd` | its build needs `third_party/` (AOSP 4.4.4 adbd, Apache-2.0, used only here), which moves with it. Still not released or listed. |
 | `nemesis-shortcut` | `Open-HMG/hmgapi-nemesis-shortcut` | `mod.json` only, no code |
@@ -59,7 +59,7 @@ that PR's rebase; the path is listed so a later import still catches it.
 
 | Repo | filter-repo arguments (scratch clone only) |
 |---|---|
-| `hmgapi-wireless-carplay-aa` | `--path mods/wireless-carplay-aa/ --path docs/cluster-turns.md --path-rename mods/wireless-carplay-aa/:wireless-carplay-aa/` |
+| `hmgapi-wireless-cp-aa` | `--path mods/wireless-carplay-aa/ --path docs/cluster-turns.md --path-rename mods/wireless-carplay-aa/:wireless-carplay-aa/` |
 | `hmgapi-adb` | `--path mods/adb/ --path-rename mods/adb/:adb/` |
 | `hmgapi-adbd` | `--path mods/adbd/ --path third_party/ --path-rename mods/adbd/:adbd/` (`adbd/build.sh` then finds `third_party/` one level up, not two) |
 | `hmgapi-nemesis-shortcut` | `--path mods/examples/nemesis-shortcut/ --path-rename mods/examples/nemesis-shortcut/:nemesis-shortcut/` |
@@ -160,7 +160,7 @@ field is in use.
 
 | Field | After |
 |---|---|
-| `repo` | `https://github.com/Open-HMG/hmgapi-<id>` (`wireless-carplay-aa`, `adb`, `nemesis-shortcut`; `adbd` gets an entry only when it's released) |
+| `repo` | `https://github.com/Open-HMG/hmgapi-<id>` (`adb`, `nemesis-shortcut`; `adbd` gets an entry only when it's released), and `hmgapi-wireless-cp-aa` for `wireless-carplay-aa` |
 | `download` | the mod repo's release asset; the current v1.0.2 links stay until each mod's next release |
 | `sha256`, `version` | from `tools/catalog.py add`, as now |
 
@@ -218,6 +218,6 @@ core PR.
 |---|---|---|
 | SDK + reusable CI | `feat/mod-sdk`, HMG-API | `./build.sh sdk` makes the zip listed in 3; `mod.yml` runs green on `mods/examples/hello` in core CI; the tests in 8 off the wireless fixture with the same checks; `"nemesis_conflicts"` read by `mknemesismod.sh`, ignored by the engine; `tools/test-all.sh` passes |
 | Release the SDK | 1.0.3, after the cleanup (F) | `hmgapi-mod-sdk-1.0.3.zip` on the release, in `SHA256SUMS`; mod repos' pins move from the SHA to it |
-| Extract wireless | `import`, `hmgapi-wireless-carplay-aa` | filter-repo history as in 2; CI green on the pinned SDK (a commit SHA before 1.0.3); a tag drafts a release whose signed zip installs over v1.0.2's `wireless-carplay-aa-2.1.0` on the mock tester (same key, no warning); stock-tree tests pass locally |
+| Extract wireless | `import`, `hmgapi-wireless-cp-aa` | filter-repo history as in 2; CI green on the pinned SDK (a commit SHA before 1.0.3); a tag drafts a release whose signed zip installs over v1.0.2's `wireless-carplay-aa-2.1.0` on the mock tester (same key, no warning); stock-tree tests pass locally |
 | Extract adb, adbd, nemesis-shortcut (one job, three repos) | `import` in `hmgapi-adb`, `hmgapi-adbd`, `hmgapi-nemesis-shortcut` | same, per repo; `adbd` builds from `third_party/` with the NDK |
 | Remove from core | `chore/remove-bundled-mods`, HMG-API | moved folders and `third_party/` gone; `release-mods.txt` is ids; local dry run of the release steps gives the same zip listings as v1.0.2 (differences explained); catalogue `repo` points at the mod repos and `download` stays on the v1.0.2 assets until 1.0.3 (F), `tools/catalog.py check --download` passes; no hit for the moved ids/paths outside `catalog/`, `wiki/`, `CHANGELOG.md`, release notes; core's `HMGAPI_MOD_KEY` deleted |
