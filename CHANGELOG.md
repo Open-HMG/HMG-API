@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.0-beta.1 (2026-11-08)
 
 ### For mod authors
 
@@ -16,7 +16,8 @@
   [ADB](https://github.com/Open-HMG/hmgapi-adb), [adbd](https://github.com/Open-HMG/hmgapi-adbd)
   and [NEMESIS in the app menu](https://github.com/Open-HMG/hmgapi-nemesis-shortcut). A
   HMG-API release still carries the wireless, ADB and NEMESIS-menu mods, taken from their
-  catalogue entries (same files, signature checked).
+  catalogue entries (same files, signature checked). A HMG-API pre-release may instead pin
+  a mod's pre-release in `tools/release-mods.txt`, with the same checks.
 - **`mknemesismod.sh`, `mkmodpkg.sh`, the mod SDK and HMG-API's downloads give the same zip
   bytes on any machine.** Outside UTC and the C locale, the times inside the zip and the
   order of its files changed.
@@ -34,6 +35,10 @@
 
 ### Changes
 
+- **Wireless CarPlay + Android Auto 2.2.0-beta.1** comes with this beta (ADB 1.0.0 and NEMESIS
+  in the app menu 1.1.0 as before): CarPlay turns for more maneuvers (#15), lanes only from
+  the phone and Android Auto turns in the car's own format, a setting (wireless #4), no
+  loading spinner at roundabouts (wireless #11).
 - **The US Ioniq 5 (2023 on) 260903 map has every hook point** (351 of 351): the 26 it
   lacked, made on the car by HMG-API's own mapper. Thanks to joelsmith for the Car Report.
   Mods that need them (the 12V battery readings, the iAP2 service points, the cluster and
