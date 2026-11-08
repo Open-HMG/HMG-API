@@ -28,7 +28,8 @@ run() { set +e; out=$(cd $T && env PATH="$T/bin:$PATH" ROOT=$R CAPCHECK=0 $SH "$
 tree() { (cd $R/system && find . -type f | sort | while read f; do echo "$(md5sum < "$f" | cut -c1-32) $f"; done) }
 
 mkdir -p $R/system/bin $R/system/lib $R/system/framework $R/system/etc $R/data/dalvik-cache $R/dev
-STOCK=$HOME/hmg-private/stock/ev6-sysimg/bin/app_process
+# a car's own app_process when tools/cars.py runs this on its stock tree (HMGAPI_CAR, docs/car-trees.md)
+STOCK=${HMGAPI_CAR:+$HMGAPI_CAR/bin/app_process}
 if [ -f "$STOCK" ]; then cp $STOCK $R/system/bin/app_process; else head -c 9000 /dev/urandom > $R/system/bin/app_process; fi
 chmod 755 $R/system/bin/app_process
 printf '#!/system/bin/sh\n# NEMESIS\nnemesis watchdog\nexit 0\n' > $R/system/etc/install-recovery.sh; chmod 755 $R/system/etc/install-recovery.sh

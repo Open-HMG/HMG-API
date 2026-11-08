@@ -96,7 +96,8 @@ tree() { (cd $R/system && find . -type f | sort | while read f; do echo "$(md5su
 installed() { [ -f $R/system/bin/hmgapid ] && [ -f $R/system/bin/app_process.hmgapi-stock ] && echo yes || echo no; }
 
 mkdir -p $R/system/bin $R/system/lib $R/system/framework $R/system/etc $R/data/dalvik-cache $R/data/local/tmp
-STOCK=$HOME/hmg-private/stock/ev6-sysimg/bin/app_process
+# a car's own app_process when tools/cars.py runs this on its stock tree (HMGAPI_CAR, docs/car-trees.md)
+STOCK=${HMGAPI_CAR:+$HMGAPI_CAR/bin/app_process}
 if [ -f "$STOCK" ]; then cp $STOCK $R/system/bin/app_process; else head -c 9000 /dev/urandom > $R/system/bin/app_process; fi
 chmod 755 $R/system/bin/app_process
 printf 'echo qb stock\n' > $R/system/etc/qb_runtime.sh

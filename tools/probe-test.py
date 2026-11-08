@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """The on-car mapper (hmgapi.engine.MapProbe, `engine map-car`) against tools/map-car.py,
-on every car in tools/hook-trees.local: both must find the same points with the same
+on every stock tree in $HMGAPI_CARS (docs/car-trees.md): both must find the same points with the same
 names. MapProbe reads the dex in each .odex instead of baksmali's output; points that
 only a smali pattern finds, it takes "by reference" from the committed maps of other
 cars (the car's own map is left out, so that path is really tested).
 
-usage: probe-test.py [--only LABEL[,LABEL]]
+usage: probe-test.py [--only CAR[,CAR]]
 """
 import argparse, glob, json, os, shutil, subprocess, sys, tempfile
 
@@ -24,7 +24,7 @@ def main():
     if a.only:
         cars = [c for c in cars if c[0] in a.only.split(',')]
     if not cars:
-        print('ok    no tools/hook-trees.local: the on-car mapper isn\'t compared')
+        print('ok    no stock trees (docs/car-trees.md): the on-car mapper isn\'t compared')
         return
     problems = []
     with tempfile.TemporaryDirectory(prefix='hmgapi-probe-') as t:
@@ -50,9 +50,8 @@ def main():
             # the committed maps of other cars, as references
             maps = os.path.join(t, 'maps-' + label)
             shutil.copytree(os.path.join(REPO, 'maps'), maps, ignore=shutil.ignore_patterns('coverage.json'))
-            for cj in glob.glob(os.path.join(maps, '*', '*', '*', '*', 'car.json')):
-                if os.path.realpath(tree) == os.path.realpath(own_tree(cj)):
-                    shutil.rmtree(os.path.dirname(cj))
+            if os.path.isfile(os.path.join(maps, label, 'car.json')):   # the car's own map
+                shutil.rmtree(os.path.join(maps, label))
             r = subprocess.run(['java', '-cp', cp, 'hmgapi.engine.MapProbe', tree, os.path.join(REPO, 'core', 'hookpoints'), maps],
                                capture_output=True, text=True)
             if r.returncode:
@@ -76,16 +75,6 @@ def main():
     for p in problems:
         print('FAIL  ' + p)
     sys.exit(1 if problems else 0)
-
-
-def own_tree(car_json):
-    """the stock tree a committed map was made from (tools/map-trees.local), or ''"""
-    folder = os.path.relpath(os.path.dirname(car_json), os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(car_json))))))
-    p = os.path.join(HERE, 'map-trees.local')
-    for line in (open(p).read().split('\n') if os.path.isfile(p) else []):
-        if line.strip() and not line.startswith('#') and line.split()[0] == folder:
-            return os.path.expanduser(line.split()[1])
-    return ''
 
 
 if __name__ == '__main__':

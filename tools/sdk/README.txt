@@ -17,7 +17,8 @@ the Android SDK (build-tools, a platform android.jar) and set ANDROID_HOME.
   bin/check-points.py <mod>     the "hmgapi" floor and hooks.points against HMG-API's releases
   bin/lpatch-host, src/lpatch/  lpatch for host tests (src/lpatch/build.sh builds it elsewhere)
   bin/mkrecipe.py, mkdelta.py, mkmemrecipe.py, mkicon.sh, mod-draft.py   as in HMG-API's tools/
-  test/lib.sh                   check/has/eng/tree for a mod's test.sh
+  test/lib.sh                   check/has/eng/tree for a mod's test.sh; car_tree/car_prop: the
+                                stock car files tools/cars.py test runs it on (HMGAPI_CAR)
   test/hmgapi-engine-test.jar   hmgapi.engine.MemRecipeTest: native recipes on real libraries
   points.txt, catalogue/        the hook points this release has, and their catalogue
   nemesis/                      the NEMESIS package templates

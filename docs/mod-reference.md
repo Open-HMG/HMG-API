@@ -381,3 +381,13 @@ $HMGAPI_SDK/bin/mkmodpkg.sh my-mod <your key>
 A `test.sh` sources `$HMGAPI_SDK/test/lib.sh` for `check`, `has`, `eng` (the engine on
 your machine, on a fake head unit in `$R`) and `tree`. `mods/examples/hello/test.sh` is
 the template. The README in the SDK lists the rest.
+
+A test that needs a car's stock files gets them from `car_tree` (and `car_prop`), and
+skips without them; never a path of your own. `tools/cars.py test --mods <your repo>`
+in an HMG-API checkout then runs your tests on every stock tree you have
+([car-trees.md](car-trees.md)), one car at a time, with that car in `HMGAPI_CAR`:
+
+```
+S=$(car_tree) || { echo "no stock tree (skipped)"; exit 0; }
+PRODUCT=$(car_prop ro.build.product)
+```

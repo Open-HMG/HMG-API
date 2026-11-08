@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
 """Check the hook point catalogue and every car's map.
 
-usage: check-maps.py [--rebuild]
+usage: check-maps.py [--rebuild [--only CAR[,CAR]]]
 
 - point ids are unique; a member point's "of" is a class point
 - every map (maps/<make>/<model>/<region>/<firmware>/) has every catalogue point,
   with an entry of the right kind, or lists it in car.json "missing" (with why), and
   a valid car.json
-- --rebuild: maps whose stock tree is known (tools/map-trees.local: "<map folder> <tree>")
-  are made again with map-car.py and must come out identical
+- --rebuild: maps with a stock tree on this machine ($HMGAPI_CARS, docs/car-trees.md)
+  are made again with map-car.py and must come out identical; trees whose files aren't
+  exactly the map's (tools/cars.py list) are skipped
 Exit 1 on any problem: a new hook point has to be mapped for every car.
 """
 import glob, json, os, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
+sys.path.insert(0, HERE)
+import cartrees
 problems = []
 points = {}
 for f in sorted(glob.glob(os.path.join(REPO, 'core', 'hookpoints', '*.json'))):
@@ -59,16 +62,15 @@ for cj in maps:
         if pid not in points:
             problems.append('%s: %s isn\'t in the catalogue' % (rel, pid))
 if '--rebuild' in sys.argv:
-    trees = os.path.join(HERE, 'map-trees.local')
-    for line in (open(trees).read().split('\n') if os.path.isfile(trees) else []):
-        if not line.strip() or line.startswith('#'):
+    only = sys.argv[sys.argv.index('--only') + 1] if '--only' in sys.argv[:-1] else None
+    for t in cartrees.pick(only):
+        folder, tree, car = t.id, t.path, t.map
+        if car is None:
             continue
-        folder, tree = line.split()[:2]
-        tree = os.path.expanduser(tree)
-        if not os.path.isdir(tree):
-            print('skip  %s: no stock tree at %s' % (folder, tree))
+        m = cartrees.match(t)[0]
+        if m != 'exact':
+            print('skip  %s: %s tree (tools/cars.py list)' % (folder, m))
             continue
-        car = json.load(open(os.path.join(REPO, 'maps', folder, 'car.json')))
         with tempfile.TemporaryDirectory() as t:
             mk, mo, rg, fw = folder.split('/')
             r = subprocess.run([sys.executable, os.path.join(HERE, 'map-car.py'), tree, '--make', mk, '--model', mo,

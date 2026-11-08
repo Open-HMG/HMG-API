@@ -98,9 +98,9 @@ tools/test-all.sh
 
 Runs the off-car tests, several at once (`-j N`; ARM code under qemu-arm).
 `tools/test-all.sh --fast` runs the ones that need no build and no ARM toolchain,
-on Linux or macOS. With stock trees listed in `tools/hook-trees.local`
-(private), it also tests every hook point on every car (`tools/test-hooks.py`) and the
-on-car mapper against `tools/map-car.py` (`tools/probe-test.py`).
+on Linux or macOS. With stock car files in `~/hmg-cars` (private,
+[docs/car-trees.md](docs/car-trees.md)), `tools/cars.py test` runs every test that needs
+them on every car you have, and `--report` gives the results to paste in a PR.
 
 ## Licence
 
