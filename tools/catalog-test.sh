@@ -71,7 +71,7 @@ PB=https://example.org/hello/releases/download/v1.1.0-beta.1
 pkg hp 1.1.0-beta.1 $T/a.key $T/dl/hello-1.1.0-beta.1.zip
 SP=$(sha256sum $T/dl/hello-1.1.0-beta.1.zip | cut -d' ' -f1)
 L() { printf '# test\n%s\n' "$@" > $T/list.txt; }
-core() { sed -i "s/HMGAPI_VERSION = \"[^\"]*\"/HMGAPI_VERSION = \"$1\"/" $R/core/runtime/java/hmgapi/engine/Engine.java; }
+core() { python3 -c "import re,sys; f=sys.argv[1]; s=open(f).read(); open(f,'w').write(re.sub(r'HMGAPI_VERSION = \"[^\"]*\"', 'HMGAPI_VERSION = \"%s\"' % sys.argv[2], s))" $R/core/runtime/java/hmgapi/engine/Engine.java "$1"; }   # not sed -i (BSD's differs)
 L hello; F fetch $T/pl1 --list $T/list.txt; check "fetch --list: ids" 0 $rc
 check "... the entry's download" "$(sha256sum < $T/h1.zip)" "$(sha256sum < $T/pl1/hello-1.0.0.zip)"
 F fetch $T/pl1 hello --list $T/list.txt; check "fetch: ids and --list together refused" 1 $rc
