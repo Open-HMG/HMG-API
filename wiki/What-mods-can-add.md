@@ -37,6 +37,14 @@ A mod can change how Android Auto looks (its density: smaller text and icons, mo
 map) and what the phone is told about the car (for example, no tap limit while
 moving, or EV data so Maps plans charging stops).
 
+
+## CarPlay identification
+
+Before CarPlay starts, the car tells the iPhone what it is and what it can do. A mod can
+add to that (a CarPlay theme, electric-vehicle details for Apple Maps) by saying what it
+needs; HMG-API combines what every mod asks, and one mod writes it for all. Two mods that
+want different values for the same thing: the plan says which has it, and you can pick.
+
 ## Network rules
 
 Some cars' head units have a firewall that blocks what a mod needs (on the Ioniq 6 it

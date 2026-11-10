@@ -36,6 +36,7 @@ setting). It never edits your code.
 | buttons | `"input": [{"key": "tune_enter", "press": "hold", "stock": "replace", "open": "<your app>/.Grid"}]`: one reader for every mod (see Buttons) |
 | a page in the right-hand split-screen panel | `"provides": {"panel": [{"title": "Battery", "widget": "<your app>/.MyWidget"}]}`: a standard Android app widget from your app (example: `mods/examples/side-panel`) |
 | Android Auto settings and events | `"projection"` (see Phone projection) |
+| parameters and messages in CarPlay's iAP2 identification | `"projection": {"cp_identification": ...}` (see CarPlay identification): every mod's additions are combined, one mod writes them |
 | firewall rules, routes, network settings | `"network"` (see Network): HMG-API keeps them in place, the stock firewall can't take them away |
 | your app closed while driving | `"not_while_driving": ["<your app's package>"]`: the car's own driving restriction and popup |
 | feature flags, the Wi-Fi client, codecs, keyboard lists | see Files and settings that several mods share |
@@ -224,6 +225,49 @@ A car without a button ignores bindings to it. The key names are the car's own
   library patch (the Wireless CarPlay/AA mod): require it to get them.
 
 Settings apply through hooks when GPM starts, and every mod's asks are combined.
+
+### CarPlay identification
+
+Before CarPlay starts, the head unit's iAP2 server tells the iPhone what the car is and
+what it can do, in one message (IdentificationInformation, 0x1D01). A mod that needs
+something in it (a parameter the stock car doesn't send, a message it will exchange) says
+so here instead of rewriting the message, so two such mods work side by side:
+
+```json
+"projection": {
+  "cp_identification": {
+    "parameters": [
+      {"component": "wireless_carplay", "id": 5, "type": "none"},
+      {"component": "wireless_carplay", "id": 6, "type": "utf8", "value": "44C9FA31EC:985:19.0"}
+    ],
+    "messages_sent": ["0x4301"],
+    "messages_received": ["0x4300"]
+  }
+}
+```
+
+- `parameters`: one entry of one of the message's components, by its number in that group.
+  - `component`: `usb_host_transport`, `vehicle_information`, `vehicle_status`,
+    `location_information`, `wireless_carplay` or `route_guidance_display`. The message's
+    own top-level entries (name, serial number, the message lists) aren't offered.
+  - `type`: `none` (a parameter that is only there, a flag: no `value`), `uint8`, `uint16`,
+    `uint32`, `utf8` (text, up to 512 characters) or `blob` (bytes as hex, up to 1024).
+  - The same parameter asked with the same type and value by two mods is one parameter.
+    Asked differently it's a conflict: the first mod by id has it, the plan says so, and the
+    owner picks (`overrides.projection {"cp_identification": {"wireless_carplay 6": "<mod>"}}`).
+- `messages_sent`, `messages_received`: iAP2 message ids (numbers, or text like `"0x4301"`)
+  the car will send or take as well. What all mods ask, together.
+- `"provider": true`: this mod writes the additions into the message. HMG-API settles and
+  publishes them; it doesn't change the message itself: the stock serializer can't write a
+  parameter it has no table entry for, so that takes a patch of the car's iAP2 library,
+  which stays a mod's own (`hooks.native`). The provider reads the settled list in the iAP2
+  server's process with `ModContext.carPlayIdentification()` (null for any other mod) and
+  serializes every mod's additions along with its own.
+  - One provider at a time: two is a conflict the owner settles
+    (`overrides.projection {"cp_identification": {"provider": "<mod>"}}`).
+  - A mod that only adds parameters `requires` nothing: with no provider installed the plan
+    says nothing applies what it adds, and the car's identification stays stock.
+- The list is the one published at the last Apply; the iAP2 server reads it when it starts.
 
 ## Network
 

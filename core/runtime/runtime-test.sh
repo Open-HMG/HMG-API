@@ -201,6 +201,61 @@ has "plan: density" "projection Android Auto density 200 [tube]" "$out"
 has "plan: sensor removal says it's for every mod" "projection Android Auto: the phone isn't offered [speed] (for every mod) [dpi]" "$out"
 rm -r "$D/mods/dpi" "$D/settings/hmgapi.json"
 
+# CarPlay identification: what mods add to the iAP2 identification, settled; one mod applies it
+mkdir -p "$D/mods/theme" "$D/mods/evinfo" "$D/mods/other"
+cat > "$D/mods/theme/mod.json" <<'J'
+{"id": "theme", "version": "1.0.0",
+ "projection": {"cp_identification": {
+   "parameters": [{"component": "wireless_carplay", "id": 5, "type": "none"},
+                  {"component": "wireless_carplay", "id": 6, "type": "utf8", "value": "AAAA:1:1.0"},
+                  {"component": "dashboard", "id": 1, "type": "none"},
+                  {"component": "vehicle_status", "id": 3, "type": "uint8", "value": 300},
+                  {"component": "vehicle_status", "id": 4, "type": "none", "value": 1}],
+   "messages_sent": ["0x4301", 70000], "messages_received": ["0x4300"]}}}
+J
+eng publish-state
+st=$(tr -d ' \n' < $D/public/state.json)
+has "identification: a mod's parameters, with who asked" '"cp_identification":[{"component":"wireless_carplay","group":24,"id":5,"type":"none","by":"theme"},{"component":"wireless_carplay","group":24,"id":6,"type":"utf8","value":"AAAA:1:1.0","by":"theme"}]' "$st"
+has "identification: messages as numbers" '"cp_messages_sent":[17153],"cp_messages_received":[17152]' "$st"
+has "identification: an unknown component is refused" "theme: projection cp_identification parameter: component dashboard (one of [usb_host_transport, vehicle_information, vehicle_status, location_information, wireless_carplay, route_guidance_display])" "$out"
+has "identification: a value outside its type is refused" "theme: projection cp_identification parameter vehicle_status 3: value 300 isn't 0-255" "$out"
+has "identification: a flag takes no value" 'theme: projection cp_identification parameter vehicle_status 4: a "none" parameter has no value' "$out"
+has "identification: a message id outside 16 bits is refused" "theme: projection cp_identification messages_sent: 70000 isn't a message id (0-0xFFFF)" "$out"
+has "identification: with no provider, the owner is told nothing applies it" 'CarPlay identification: nothing applies what [theme] adds (it takes a mod whose projection cp_identification has "provider": true)' "$out"
+hasnt "... and no provider is published" 'cp_identification_by' "$st"
+cat > "$D/mods/evinfo/mod.json" <<'J'
+{"id": "evinfo", "version": "1.0.0",
+ "projection": {"cp_identification": {"provider": true,
+   "parameters": [{"component": "vehicle_information", "id": 2, "type": "uint8", "value": 2},
+                  {"component": "wireless_carplay", "id": 6, "type": "utf8", "value": "BBBB:2:2.0"},
+                  {"component": "wireless_carplay", "id": 5, "type": "none"}],
+   "messages_sent": [17153, "0xA101"]}}}
+J
+eng publish-state
+st=$(tr -d ' \n' < $D/public/state.json)
+has "identification: two mods' parameters together; the same ask twice is one" '"cp_identification":[{"component":"vehicle_information","group":20,"id":2,"type":"uint8","value":2,"by":"evinfo"},{"component":"wireless_carplay","group":24,"id":6,"type":"utf8","value":"BBBB:2:2.0","by":"evinfo"},{"component":"wireless_carplay","group":24,"id":5,"type":"none","by":"evinfo"}]' "$st"
+has "identification: a parameter asked differently is a conflict, the first by id has it" 'conflict: theme sets CarPlay identification wireless_carplay 6 to "AAAA:1:1.0", evinfo to "BBBB:2:2.0"; evinfo has it (pick another: hmgapi.json overrides.projection {"cp_identification": {"wireless_carplay 6": "<mod>"}})' "$out"
+has "identification: messages together" '"cp_messages_sent":[17153,41217],"cp_messages_received":[17152]' "$st"
+has "identification: the provider is published" '"cp_identification_by":"evinfo"' "$st"
+hasnt "... and nothing is left unapplied" 'nothing applies' "$out"
+printf '{"overrides": {"projection": {"cp_identification": {"wireless_carplay 6": "theme"}}}}\n' > "$D/settings/hmgapi.json"
+eng publish-state
+st=$(tr -d ' \n' < $D/public/state.json)
+has "identification: the owner's pick wins" '{"component":"wireless_carplay","group":24,"id":6,"type":"utf8","value":"AAAA:1:1.0","by":"theme"}' "$st"
+has "... and the plan says it was the owner's choice" 'conflict: evinfo sets CarPlay identification wireless_carplay 6 to "BBBB:2:2.0", theme to "AAAA:1:1.0"; theme has it (the owner'"'"'s choice)' "$out"
+printf '{"id": "other", "version": "1.0.0", "projection": {"cp_identification": {"provider": true}}}\n' > "$D/mods/other/mod.json"
+eng publish-state
+has "identification: two providers is a conflict, the first by id applies" 'conflict: [evinfo, other] each apply CarPlay identification; evinfo does (pick another: hmgapi.json overrides.projection {"cp_identification": {"provider": "<mod>"}})' "$out"
+printf '{"overrides": {"projection": {"cp_identification": {"provider": "other"}}}}\n' > "$D/settings/hmgapi.json"
+eng publish-state
+has "identification: the owner's provider" '"cp_identification_by":"other"' "$(tr -d ' \n' < $D/public/state.json)"
+eng plan
+has "plan: a parameter" 'projection CarPlay identification: wireless_carplay 6 = "AAAA:1:1.0" [theme]' "$out"
+has "plan: a flag" "projection CarPlay identification: wireless_carplay 5 set [theme]" "$out"
+has "plan: messages" "projection CarPlay identification: messages sent [0x4301], received [0x4300] [theme]" "$out"
+has "plan: the provider" "projection CarPlay identification: applies every mod's additions [evinfo]" "$out"
+rm -r "$D/mods/theme" "$D/mods/evinfo" "$D/mods/other" "$D/settings/hmgapi.json"
+
 # side panel pages: the mod's own apps' widgets
 cat > "$D/mods/tube/mod.json" <<'J'
 {"id": "tube", "version": "1.0.0",

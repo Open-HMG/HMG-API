@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### For mod authors
+
+- **CarPlay identification additions** (`"projection": {"cp_identification": ...}`): a mod
+  declares the parameters and messages it needs in the iAP2 identification the head unit
+  sends an iPhone. HMG-API combines every mod's additions, the plan reports a parameter two
+  mods set differently (the owner can pick), and the one mod that patches the car's iAP2
+  library (`"provider": true`) reads the settled list with
+  `ModContext.carPlayIdentification()` and writes it for all. See "CarPlay identification"
+  in `docs/mod-reference.md`.
+
 ## 1.1.0-beta.1 (2026-11-08)
 
 ### For mod authors

@@ -8,6 +8,8 @@ HMG-API settles it, and the plan says how. Mods never overwrite each other.
 | a button press, both keeping the car's action | both get it |
 | a button press, both replacing the car's action | one gets it (the plan says which) |
 | Android Auto's density | one value wins (the plan says which) |
+| A parameter in CarPlay's iAP2 identification | the same value from two mods is fine; different values: one wins (the plan says which) |
+| Writing CarPlay's iAP2 identification | one mod does it for all (the plan says which) |
 | the ambient light, the rear camera | one mod at a time; the other is told who has it |
 | battery conditioning | one shared on/off; a stop you or a mod asks for wins over an automatic start |
 | the same feature flag or Wi-Fi client | shared: it stays on while any mod wants it |
@@ -28,6 +30,9 @@ in the app is planned):
 2. Add, inside `"overrides"` (create it if it isn't there):
    `"input": {"tune_enter hold": "<mod id>"}` for a button press, or
    `"projection": {"aa_density": "<mod id>"}` for Android Auto's density.
+   `"projection": {"cp_identification": {"wireless_carplay 6": "<mod id>"}}` for a parameter
+   of CarPlay's identification (the plan names it), and `{"provider": "<mod id>"}` there for
+   which mod writes the identification.
 3. Copy it back and apply:
    ```
    adb push hmgapi.json /data/local/tmp/hmgapi.json
