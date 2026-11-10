@@ -21,7 +21,8 @@ import java.util.Set;
  *
  * "input" (top level): the enabled mods' button bindings, clashes settled (Keys).
  * "projection" (top level): Android Auto density, sensors, fuel and connector types,
- * and which apps hear projection events (Projection.settle).
+ * and which apps hear projection events (Projection.settle); what mods add to CarPlay's
+ * iAP2 identification and which mod writes it (CarPlayIdentification.settle).
  *
  * A mod is "enabled" only if it's turned on and every mod it requires is too. Mods'
  * mod.json and declared hook JARs are made readable (their folders traversable), so an app can

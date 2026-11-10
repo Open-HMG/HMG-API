@@ -161,6 +161,31 @@ public final class ModContext {
         return m == null ? null : m.get(name);
     }
 
+    /**
+     * What every enabled mod adds to the iAP2 identification (mod.json "projection" "cp_identification"),
+     * settled by the engine, for the one mod that writes it into the message (its "provider"):
+     *   {"parameters": [{"component": "wireless_carplay", "group": 24, "id": 6, "type": "utf8",
+     *                    "value": "...", "by": "<mod>"}, ...],     value: a number, text, or hex (blob); none for "none"
+     *    "messages_sent": [17153, ...], "messages_received": [...]}
+     * Null for a mod that isn't the provider (the engine names one: state.json "cp_identification_by"), so
+     * two mods never both write it. Read it in the iAP2 server's process (com.tcc.iap2server) before the
+     * identification is built; the state is the one published at the last Apply.
+     */
+    public JSONObject carPlayIdentification() {
+        try {
+            JSONObject p = new JSONObject(Mods.read(Live.STATE)).optJSONObject("projection");
+            if (p == null || !id.equals(p.optString("cp_identification_by", null))) return null;
+            JSONObject out = new JSONObject();
+            out.put("parameters", p.has("cp_identification") ? p.getJSONArray("cp_identification") : new org.json.JSONArray());
+            out.put("messages_sent", p.has("cp_messages_sent") ? p.getJSONArray("cp_messages_sent") : new org.json.JSONArray());
+            out.put("messages_received", p.has("cp_messages_received") ? p.getJSONArray("cp_messages_received") : new org.json.JSONArray());
+            return out;
+        } catch (Exception e) {
+            Bridge.log(5, "[" + id + "] CarPlay identification additions not read: " + e);
+            return null;
+        }
+    }
+
     /** A setting: the owner's value if set, else the default from the mod's settings.json. */
     public Object setting(String key) {
         return settings.opt(key);

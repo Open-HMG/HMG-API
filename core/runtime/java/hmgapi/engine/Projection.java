@@ -18,6 +18,8 @@ import java.util.Map;
  * Density: one value; two mods asking differently is a conflict (the first by id
  * wins, the owner picks with hmgapi.json overrides.projection {"aa_density": "<mod>"}).
  * Sensors, fuel types and connectors: what all mods ask, together.
+ *
+ * CarPlay: "cp_identification", what mods add to the iAP2 identification (CarPlayIdentification).
  */
 public final class Projection {
     private Projection() {}
@@ -30,6 +32,7 @@ public final class Projection {
         final List<String> remove = new ArrayList<String>();
         final List<Integer> add = new ArrayList<Integer>(), fuel = new ArrayList<Integer>(), connectors = new ArrayList<Integer>();
         boolean events;
+        CarPlayIdentification.Ask identification;
     }
 
     @SuppressWarnings("unchecked")
@@ -61,6 +64,7 @@ public final class Projection {
         ints(id, "aa_fuel_types", m.get("aa_fuel_types"), 0, 31, a.fuel, errors);
         ints(id, "aa_ev_connectors", m.get("aa_ev_connectors"), 0, 31, a.connectors, errors);
         a.events = Boolean.TRUE.equals(m.get("events"));
+        a.identification = CarPlayIdentification.of(id, m.get("cp_identification"), errors);
         return a;
     }
 
@@ -112,6 +116,9 @@ public final class Projection {
         if (!fuel.isEmpty()) out.put("aa_fuel_types", fuel);
         if (!conn.isEmpty()) out.put("aa_ev_connectors", conn);
         if (!events.isEmpty()) out.put("events", events);
+        List<CarPlayIdentification.Ask> identification = new ArrayList<CarPlayIdentification.Ask>();
+        for (Ask a : asks) if (a.identification != null) identification.add(a.identification);
+        CarPlayIdentification.settle(identification, overrides, out, notes);
         return out;
     }
 
@@ -123,6 +130,7 @@ public final class Projection {
         if (!a.add.isEmpty()) out.add("projection Android Auto sensors added " + a.add + " [" + a.mod + "]");
         if (!a.fuel.isEmpty() || !a.connectors.isEmpty()) out.add("projection Android Auto fuel types " + a.fuel + ", EV connectors " + a.connectors + " [" + a.mod + "]");
         if (a.events) out.add("projection events to its apps [" + a.mod + "]");
+        out.addAll(CarPlayIdentification.describe(a.identification));
         return out;
     }
 }
