@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- **A Wi-Fi chip that was never switched on is found.** Korean head units have the Wi-Fi
+  chip but no Wi-Fi switch and no hotspot feature, so the chip was never powered, never
+  showed on SDIO, and HMG-API said "no Wi-Fi chip" (every Korean Car Report so far). On a
+  unit like that HMG-API now turns Wi-Fi on once, for up to 20 seconds, to look, then off
+  again, and remembers the answer (checked on a Korean K5 Hybrid, 260902: a BCM4359).
+  Units with the stock hotspot are left alone.
+
 ## 1.1.0-beta.1 (2026-11-08)
 
 ### For mod authors
