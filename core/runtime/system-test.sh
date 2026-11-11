@@ -11,6 +11,7 @@ R=$T/root
 fail=0
 has() { case "$3" in *"$2"*) echo "ok    $1" ;; *) echo "FAIL  $1: wanted [$2] in [$3]"; fail=1 ;; esac; }
 sc() { set +e; out=$(HMGAPI_ROOT=$R java -cp "$CP" hmgapi.engine.SystemCheck "$@" 2>&1); rc=$?; set -e; }
+sc_product() { set +e; out=$(env HMGAPI_ROOT="$R" HMGAPI_PRODUCT="$1" java -cp "$CP" hmgapi.engine.SystemCheck 2>&1); rc=$?; set -e; }
 eng() { set +e; out=$(HMGAPI_ROOT=$R HMGAPI_HOST=1 HMGAPI_TEST_ANY_CAR=1 java -cp "$CP" hmgapi.engine.Engine "$@" 2>&1); rc=$?; set -e; }
 mod() {   # mod <id> <system json> [parts json]
     mkdir -p $R/data/hmgapi/mods/$1
@@ -29,7 +30,7 @@ printf '<permissions><feature name="com.hkmc.software.wifi.module"/></permission
 sc
 has "facts from the props" "model CVEV, region USA, firmware 260507, make kia, name EV6, platform tcc803x" "$out"
 has "Wi-Fi chip seen on SDIO" "Wi-Fi chip found" "$out"
-HMGAPI_PRODUCT=CEEV.USA.0000.V016.010.260903 sc
+sc_product CEEV.USA.0000.V016.010.260903
 has "Ioniq 6 facts from the model table" "model CEEV, region USA, firmware 260903, make hyundai, name Ioniq 6" "$out"
 
 mod a '{"make": ["kia", "hyundai"], "region": ["USA", "CAN"], "firmware": ">=260206"}'; ok a "lists and a range"
