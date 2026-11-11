@@ -31,6 +31,9 @@ method's code), a catalogue's `patterns` match a regex once in one class's smali
 (`"in"`: a class name or `@<class point>`), and a point takes a named group:
 `{"pattern", "class_group", "package"}` for a class, `{"pattern", "group", ...}` for
 a method or field (the group is its name; the rest of `find` must still fit).
+A pattern-based class may also list its ordinary shape constraints. The on-car mapper,
+which can't run a smali regex, can then identify a unique new class by that shape before
+it falls back to names borrowed from other cars' maps.
 
 `files` are the stock files the names come from: the app's odex, plus any library
 it declares (`uses-library`) whose classes have points, an odex or a jar holding a

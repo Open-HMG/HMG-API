@@ -21,6 +21,7 @@ mod SDK ([mod-repos.md](mod-repos.md), section 4).
 
 | Car | Map | Points |
 |---|---|---|
+| Hyundai Ioniq 6 USA 260903 | checked on a car | 351 of 351 |
 | Hyundai Ioniq 5 CAN 260206 | mapped from stock files | 351 of 351 |
 | Hyundai Ioniq 5 USA 260507 | mapped from stock files | 351 of 351 |
 | Hyundai Ioniq 5 USA 260903 | mapped on cars by HMG-API's own mapper | 351 of 351 |

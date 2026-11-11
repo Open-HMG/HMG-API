@@ -18,7 +18,40 @@
       "find": {
         "pattern": "phone_projection_menu",
         "class_group": "helper",
-        "package": "com.android.settings2.bluetooth"
+        "package": "com.android.settings2.bluetooth",
+        "methods": [
+          {
+            "name": "aQ",
+            "params": [
+              "android.content.Context"
+            ],
+            "ret": "void",
+            "static": true
+          },
+          {
+            "name": "ih",
+            "params": [],
+            "ret": "boolean",
+            "static": true
+          },
+          {
+            "name": "a",
+            "params": [
+              "android.content.Context",
+              "int"
+            ],
+            "ret": "void",
+            "static": true
+          },
+          {
+            "name": "aj",
+            "params": [
+              "android.content.Context"
+            ],
+            "ret": "void",
+            "static": true
+          }
+        ]
       },
       "about": "BtSettings' static helper that opens the Phone Projection pages"
     },

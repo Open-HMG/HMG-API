@@ -16,7 +16,7 @@ import java.util.TreeSet;
  *
  *   "system": {
  *     "make":     ["kia", "hyundai"],          car make (from the model table, or the owner's setting)
- *     "model":    ["CVEV", "NEEV", "NEEV23"],  model code: first field of ro.build.product
+ *     "model":    ["CVEV", "CEEV", "NEEV"],    model code: first field of ro.build.product
  *     "name":     ["EV6"],                     model name (table / owner's setting)
  *     "year":     ">=2022 <2025",              model year: the owner's setting (the unit doesn't know it)
  *     "region":   ["USA", "CAN"],              second field of ro.build.product
@@ -50,6 +50,7 @@ public final class SystemCheck {
     /** model code -> {make, name}. Owner's hmgapi.json "car" overrides it. */
     static final String[][] MODELS = {
         {"CVEV", "kia", "EV6"},
+        {"CEEV", "hyundai", "Ioniq 6"},
         {"NEEV", "hyundai", "Ioniq 5"},
         {"NEEV23", "hyundai", "Ioniq 5"},
         {"DL3", "kia", "K5"},

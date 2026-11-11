@@ -29,6 +29,8 @@ printf '<permissions><feature name="com.hkmc.software.wifi.module"/></permission
 sc
 has "facts from the props" "model CVEV, region USA, firmware 260507, make kia, name EV6, platform tcc803x" "$out"
 has "Wi-Fi chip seen on SDIO" "Wi-Fi chip found" "$out"
+HMGAPI_PRODUCT=CEEV.USA.0000.V016.010.260903 sc
+has "Ioniq 6 facts from the model table" "model CEEV, region USA, firmware 260903, make hyundai, name Ioniq 6" "$out"
 
 mod a '{"make": ["kia", "hyundai"], "region": ["USA", "CAN"], "firmware": ">=260206"}'; ok a "lists and a range"
 mod a '{"make": "all", "model": "*", "region": ["all"]}'; ok a "all and *"
