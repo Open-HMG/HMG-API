@@ -13,7 +13,7 @@
     "date": "2026-11-10",
     "product": "CEEV.USA.0000.V016.010.260903",
     "points": 351,
-    "report": "hmgapid engine verify-map passed on the car (CEEV.USA.0000.V016.010.260903, Tue Nov 10 19:06:49 GMT-06:00 2026)"
+    "report": "hmgapid engine verify-map passed on the car (CEEV.USA.0000.V016.010.260903, Tue Nov 10 20:07:38 GMT-06:00 2026)"
   },
   "files": {
     "/system/app/ButtonSettings.odex": "f0867c1b46d33fdc6849d7128e9661c3",
@@ -122,15 +122,5 @@
         "/system/app/ThemeSettings.odex"
       ]
     }
-  },
-  "by_reference": [
-    "dipo.iap2.bt_address",
-    "dipo.iap2.set_notify_on",
-    "panel.home.build_views",
-    "panel.home.test_page",
-    "panel.test_gate",
-    "panel.test_gate.on",
-    "panel.test_page",
-    "themesettings.split_item.type"
-  ]
+  }
 }

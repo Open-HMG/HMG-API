@@ -4,8 +4,8 @@
 
 ### Cars
 
-- **Hyundai Ioniq 6 (US 260903) hook map:** all 351 points, from an owner's Car
-  Report with its four missing BtSettings points resolved from the stock files.
+- **Hyundai Ioniq 6 (US 260903) hook map:** all 351 points, rebuilt from the stock
+  files after an owner's Car Report. It is waiting for a check on the corrected map.
   CEEV units are now identified as Hyundai Ioniq 6 in reports and system checks.
 - **`tools/report-map.py`:** `--make` and `--name` can identify reports from cars absent
   from HMG-API's model table, and points not mapped by a report are listed as missing.

@@ -52,7 +52,7 @@
     "class": "com.mobis.splitscreen.right.n.v"
   },
   "panel.test_gate.on": {
-    "method": "py",
+    "method": "pB",
     "params": [],
     "ret": "boolean",
     "static": true

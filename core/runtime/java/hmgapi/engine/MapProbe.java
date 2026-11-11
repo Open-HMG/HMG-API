@@ -229,6 +229,7 @@ public final class MapProbe {
         if (ms.containsKey("ret") && !x.ret.equals(resolve(String.valueOf(ms.get("ret"))))) return false;
         if (ms.containsKey("static") && x.isStatic != Boolean.TRUE.equals(ms.get("static"))) return false;
         for (Object s : list(ms.get("strings"))) if (!x.strings.contains(String.valueOf(s))) return false;
+        for (Object s : list(ms.get("not_strings"))) if (x.strings.contains(String.valueOf(s))) return false;
         return true;
     }
 
@@ -290,6 +291,7 @@ public final class MapProbe {
 
     void byRef(String id, int hits) throws Miss {
         if (!references.containsKey(id)) throw new Miss("found by a smali pattern only, and no other car's map has it", false);
+        if (hits == 0) throw new Miss("found by a smali pattern only, and no other car's map has a fitting name", false);
         if (hits == 1) byReference.add(id);
     }
 
