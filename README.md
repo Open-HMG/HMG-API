@@ -36,6 +36,7 @@ needed to add your car ([Supported cars](https://github.com/Open-HMG/HMG-API/wik
 | Kia EV6, Hyundai Ioniq 5 | Canada | 260206 | waiting for a Car Report |
 | Hyundai Ioniq 5 | USA | 260507 | waiting for a Car Report |
 | Hyundai Ioniq 5 (2023 on) | USA | 260903 | waiting for a check on a car |
+| Hyundai Ioniq 6 | USA | 260903 | from a Car Report and stock files, checked on a car |
 
 ## Help and requests
 

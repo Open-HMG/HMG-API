@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Cars
+
+- **Hyundai Ioniq 6 (US 260903) hook map:** all 351 points, rebuilt from the stock
+  files after an owner's Car Report. CEEV units are now identified as Hyundai Ioniq 6
+  in reports and system checks.
+- **`tools/report-map.py`:** `--make` and `--name` can identify reports from cars absent
+  from HMG-API's model table, and points not mapped by a report are listed as missing.
+
 ## 1.1.0-beta.1 (2026-11-08)
 
 ### For mod authors

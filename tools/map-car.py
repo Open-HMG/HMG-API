@@ -198,6 +198,9 @@ class Mapper:
         for st in ms.get('strings', []):   # const-strings in the method's own code
             if 'const-string' not in x['code'] or ('"%s"' % st) not in x['code']:
                 return False
+        for st in ms.get('not_strings', []):
+            if 'const-string' in x['code'] and ('"%s"' % st) in x['code']:
+                return False
         if 'code' in ms and not re.search(ms['code'], x['code']):
             return False
         return True

@@ -16,9 +16,10 @@ import java.util.TreeMap;
  * head unit itself (`engine map-car`) and off-car on a stock tree (tests: it must
  * find what map-car.py finds).
  *
- * Points described by a regex over smali ("pattern", "code") can't be matched from
- * the dex: for those it tries the names the other cars' maps give the same point,
- * and keeps one only if this car has it with the point's shape ("by reference").
+ * A regex over smali ("pattern", "code") can't be matched from the dex. A class
+ * point that also has a unique structural shape can still be found by that shape;
+ * otherwise these points try the names the other cars' maps give the same point,
+ * and keep one only if this car has it with the point's shape ("by reference").
  * Everything else that doesn't match exactly once is missing, with why.
  *
  *   java -cp <engine classes> hmgapi.engine.MapProbe <stock tree> <catalogue dir> [<maps dir>]
@@ -228,6 +229,7 @@ public final class MapProbe {
         if (ms.containsKey("ret") && !x.ret.equals(resolve(String.valueOf(ms.get("ret"))))) return false;
         if (ms.containsKey("static") && x.isStatic != Boolean.TRUE.equals(ms.get("static"))) return false;
         for (Object s : list(ms.get("strings"))) if (!x.strings.contains(String.valueOf(s))) return false;
+        for (Object s : list(ms.get("not_strings"))) if (x.strings.contains(String.valueOf(s))) return false;
         return true;
     }
 
@@ -289,6 +291,7 @@ public final class MapProbe {
 
     void byRef(String id, int hits) throws Miss {
         if (!references.containsKey(id)) throw new Miss("found by a smali pattern only, and no other car's map has it", false);
+        if (hits == 0) throw new Miss("found by a smali pattern only, and no other car's map has a fitting name", false);
         if (hits == 1) byReference.add(id);
     }
 
@@ -300,12 +303,20 @@ public final class MapProbe {
     }
 
     String byReferenceClass(Map<String, Dex.Cls> classes, String id, Map<String, Object> f) throws Miss {
+        boolean shaped = f.containsKey("name") || f.containsKey("super") || f.containsKey("ctors")
+                || f.containsKey("fields") || f.containsKey("methods") || f.containsKey("strings");
+        if (shaped) {
+            List<String> structural = new ArrayList<String>();
+            for (Dex.Cls c : classes.values()) if (classMatches(c, f)) structural.add(c.name);
+            if (structural.size() == 1) return structural.get(0);
+        }
         List<Map<String, Object>> l = references.get(id);
         if (l == null) throw new Miss("found by a smali pattern only, and no other car's map has it", false);
         Set<String> hits = new LinkedHashSet<String>();
         for (Map<String, Object> e : l) {
             String n = String.valueOf(e.get("class"));
-            if (classes.containsKey(n) && (!f.containsKey("package") || n.startsWith(f.get("package") + "."))) hits.add(n);
+            Dex.Cls c = classes.get(n);
+            if (c != null && classMatches(c, f)) hits.add(n);
         }
         if (hits.size() != 1) throw new Miss("found by a smali pattern only; " + hits.size() + " of the other cars' names fit", false);
         byReference.add(id);
