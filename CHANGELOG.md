@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- **Vehicle readings answer at once, with code 0** (#145). Every `hmgapid vehicle` read
+  took 3 s and came back with code 1, the values right: on these units an accepted
+  `LocalSocket`'s `close()` doesn't close its fd, so the vehicle service never ended its
+  answer, and it leaked an fd per read, command and light status. It now closes the fd
+  itself, and hmgapid takes a whole answer as success even if the connection stays open.
+
 ## 1.1.0-beta.1 (2026-11-08)
 
 ### For mod authors
