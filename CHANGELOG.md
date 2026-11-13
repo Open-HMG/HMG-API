@@ -4,6 +4,11 @@
 
 ### Cars
 
+- **Hyundai Ioniq 6 (US 260903) hook map:** all 351 points, rebuilt from the stock
+  files after an owner's Car Report. CEEV units are now identified as Hyundai Ioniq 6
+  in reports and system checks.
+- **`tools/report-map.py`:** `--make` and `--name` can identify reports from cars absent
+  from HMG-API's model table, and points not mapped by a report are listed as missing.
 - **Hook maps from Car Reports** (made on owners' cars by HMG-API's own mapper, not yet
   checked on a car): Kia Sportage, Telluride, Niro EV and Carnival (US 260507), Hyundai
   Palisade (US 260903). The Niro EV, Carnival and Palisade reports came from an HMG-API

@@ -21,7 +21,7 @@ build (it must match exactly once, or the car isn't mapped):
 - class: `package` (prefix), `name` (exact, when it isn't obfuscated), `super`,
   `ctors` (lists of parameter types), `fields` (`{name?, type, static?}`),
   `methods` (`{name?, params, ret?, static?}`), `strings` (string constants in its code)
-- method: `name?`, `params`, `ret?`, `static?`, `strings?`; ctor: `params`; field: `name?`, `type`, `static?`
+- method: `name?`, `params`, `ret?`, `static?`, `strings?`, `not_strings?`; ctor: `params`; field: `name?`, `type`, `static?`
 
 Types are Java names (`int`, `java.lang.String`, `android.content.Context`);
 `@<point id>` is another class point's class.
@@ -31,6 +31,9 @@ method's code), a catalogue's `patterns` match a regex once in one class's smali
 (`"in"`: a class name or `@<class point>`), and a point takes a named group:
 `{"pattern", "class_group", "package"}` for a class, `{"pattern", "group", ...}` for
 a method or field (the group is its name; the rest of `find` must still fit).
+A pattern-based class may also list its ordinary shape constraints. The on-car mapper,
+which can't run a smali regex, can then identify a unique new class by that shape before
+it falls back to names borrowed from other cars' maps.
 
 `files` are the stock files the names come from: the app's odex, plus any library
 it declares (`uses-library`) whose classes have points, an odex or a jar holding a

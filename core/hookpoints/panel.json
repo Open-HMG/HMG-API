@@ -167,7 +167,10 @@
         "group": "gate_m",
         "params": [],
         "ret": "boolean",
-        "static": true
+        "static": true,
+        "not_strings": [
+          "ro.product.model"
+        ]
       },
       "about": "Mobis' test switch for slot 22 (always off on a car; HMG-API answers true only inside page_for_id and build_views)"
     }
