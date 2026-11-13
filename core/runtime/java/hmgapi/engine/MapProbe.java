@@ -273,9 +273,8 @@ public final class MapProbe {
         }
         if ("method".equals(kind)) {
             List<Dex.Member> hits = new ArrayList<Dex.Member>();
-            for (Dex.Member x : c.methods) {
-                if (methodOk(x, f) && (!smali || referenced(id, "method", x.name))) hits.add(x);
-            }
+            for (Dex.Member x : c.methods) if (methodOk(x, f)) hits.add(x);
+            if (smali) hits = bestReferences(id, "method", hits);
             if (smali) byRef(id, hits.size());
             if (hits.size() != 1) throw new Miss(hits.size() + " methods match in " + owner, false);
             Dex.Member h = hits.get(0);
@@ -300,6 +299,29 @@ public final class MapProbe {
         List<Map<String, Object>> l = references.get(id);
         if (l != null) for (Map<String, Object> e : l) if (name.equals(e.get(key))) return true;
         return false;
+    }
+
+    /**
+     * For a smali-only member, prefer the fitting name used by the most other
+     * maps. Obfuscated names can be reused for unrelated members in another
+     * build, so treating every name ever seen as equally good creates false
+     * ambiguities. A tied consensus stays ambiguous.
+     */
+    List<Dex.Member> bestReferences(String id, String key, List<Dex.Member> candidates) {
+        List<Map<String, Object>> l = references.get(id);
+        List<Dex.Member> hits = new ArrayList<Dex.Member>();
+        if (l == null) return hits;
+        int best = 0;
+        for (Dex.Member x : candidates) {
+            int count = 0;
+            for (Map<String, Object> e : l) if (x.name.equals(e.get(key))) count++;
+            if (count > best) {
+                hits.clear();
+                best = count;
+            }
+            if (count != 0 && count == best) hits.add(x);
+        }
+        return hits;
     }
 
     String byReferenceClass(Map<String, Dex.Cls> classes, String id, Map<String, Object> f) throws Miss {
