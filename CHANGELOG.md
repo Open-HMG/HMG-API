@@ -14,6 +14,11 @@
 
 ### Fixes
 
+- **The right split-screen panel keeps the Mobis font with hooks on** (#174). HMG-API
+  made its panel page's views as soon as the panel app started, even with no mod page;
+  that loaded the process's fonts before the Mobis font's fallback was in place, so
+  Korean text in the whole panel showed in NanumGothic (seen on an Avante CN7 KOR
+  260902). The views are now made only when the panel first shows HMG-API's page.
 - **Vehicle readings answer at once, with code 0** (#145). Every `hmgapid vehicle` read
   took 3 s and came back with code 1, the values right: on these units an accepted
   `LocalSocket`'s `close()` doesn't close its fd, so the vehicle service never ended its
