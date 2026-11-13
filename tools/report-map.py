@@ -72,7 +72,7 @@ def main():
     }
     missing = {k: v for k, v in mc.get('missing', {}).items()}
     missing.update(mc.get('not_found', {}))
-    # Catalogue points newer than the HMG-API that made the reports: list them, don't guess.
+    # catalogue points newer than the HMG-API that made the reports: listed, not guessed
     cat = os.path.join(REPO, 'core', 'hookpoints')
     for f in sorted(os.listdir(cat)):
         if f.endswith('.json'):
