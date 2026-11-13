@@ -1,6 +1,15 @@
 # Changelog
 
-## Unreleased
+## 1.1.0-rc.1 (2026-11-13)
+
+The release candidate: feature freeze. 1.1.0 will be this code unless a blocker turns up.
+
+- **Wireless CarPlay + Android Auto 2.2.0-rc.1** and **ADB 1.0.1-rc.1** come with it
+  (NEMESIS in the app menu 1.1.0 as before). Wireless: Android Auto roundabouts the right
+  way round (wireless #19, #20), "Recalculating…" on a reroute (wireless #21), CarPlay
+  survives a short Wi-Fi stall (wireless #25, #26), Android Auto's maneuvers in the log
+  (wireless #22, #27). ADB: port 5555 opened on the hotspot for adb over it, on cars whose
+  stock firewall drops it (adb #3).
 
 ### Cars
 
@@ -19,6 +28,14 @@
   `LocalSocket`'s `close()` doesn't close its fd, so the vehicle service never ended its
   answer, and it leaked an fd per read, command and light status. It now closes the fd
   itself, and hmgapid takes a whole answer as success even if the connection stays open.
+- **After a firmware update, installing HMG-API again works, and so does uninstalling it**
+  (#166). An update puts the system files back to stock and removes HMG-API's own, but
+  `/data/hmgapi` stays. The uninstall failed (NEMESIS: "Operation failed"), and could have
+  put the old firmware's `app_process` back. Now the install finds the update, drops its
+  backups of the old firmware (`engine firmware-reset`) and starts from the new firmware's
+  files; the uninstall leaves those as they are. The app says what happened instead of
+  "Can't reach hmgapid". Units on 1.0.2 or 1.1.0-beta.1 get out of it by installing this
+  release over the old one.
 
 ## 1.1.0-beta.1 (2026-11-08)
 
