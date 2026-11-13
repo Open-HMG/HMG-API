@@ -26,6 +26,17 @@ import hmgapi.hook.Points;
 final class CarCallbacks {
     /** outside temperature in tenths (Fahrenheit, and Celsius when the car's is valid); MIN_VALUE until climate control has said */
     volatile int outsideF10 = Integer.MIN_VALUE, outsideC10 = Integer.MIN_VALUE;
+    volatile boolean saidNoAmbient;
+
+    /**
+     * Climate control reports -40 (the same in F and C: the raw zero of the CAN signal)
+     * before it has a real outside temperature, e.g. just after the car wakes; an Ioniq 5
+     * showed -40 one morning through outside_temp. Such a status isn't a reading: the
+     * last real value stays, or the reading stays unknown ("-").
+     */
+    static boolean realAmbient(float t) {
+        return Math.abs(t + 40f) > 0.05f;
+    }
     /** body control's heating status: steering wheel heat, rear defogger (raw); MIN_VALUE: not heard yet */
     volatile int wheelHeat = Integer.MIN_VALUE, defogger = Integer.MIN_VALUE;
 
@@ -174,9 +185,15 @@ final class CarCallbacks {
                             float f = (Float) Points.call(null, "framework.datc_status.ambient_f", st);
                             float cc = (Float) Points.call(null, "framework.datc_status.ambient_c", st);
                             int stateC = (Integer) Points.call(null, "framework.datc_status.ambient_state_c", st);
+                            if (!realAmbient(f)) {
+                                // keep the last real value (or none): see realAmbient
+                                if (!saidNoAmbient) System.out.println("vehicle: climate status: outside temperature " + f + " F, no value yet (ignored)");
+                                saidNoAmbient = true;
+                                return;
+                            }
                             boolean first = outsideF10 == Integer.MIN_VALUE;
                             outsideF10 = Math.round(f * 10);
-                            outsideC10 = stateC == 255 ? Integer.MIN_VALUE : Math.round(cc * 10);   // 255: Celsius not valid (a US car)
+                            outsideC10 = stateC == 255 || !realAmbient(cc) ? Integer.MIN_VALUE : Math.round(cc * 10);   // 255: Celsius not valid (a US car)
                             if (first) System.out.println("vehicle: climate status, first outside temperature: " + f + " F, " + cc + " C (state " + stateC + ")");
                         }
                     };
