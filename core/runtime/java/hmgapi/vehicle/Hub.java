@@ -83,12 +83,28 @@ public final class Hub {
             } catch (Throwable t) {
                 System.out.println("vehicle: " + t);
             } finally {
-                try {
-                    s.close();
-                } catch (Exception x) {
-                    // gone already
-                }
+                close(s);
             }
+        }
+    }
+
+    /**
+     * Closes an accepted socket's fd. On these units (KitKat) LocalServerSocket.accept() never
+     * marks the socket's fd as its own, so LocalSocket.close() only drops it: the fd stayed
+     * open, hmgapid never saw the end of an answer (every read took its 3 s timeout, #145),
+     * and each connection leaked an fd.
+     */
+    static void close(LocalSocket s) {
+        java.io.FileDescriptor fd = s.getFileDescriptor();
+        try {
+            if (fd != null && fd.valid()) libcore.io.Libcore.os.close(fd);
+        } catch (Throwable t) {
+            System.out.println("vehicle: close: " + t);
+        }
+        try {
+            s.close();
+        } catch (Exception x) {
+            // gone already
         }
     }
 

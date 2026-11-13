@@ -1464,8 +1464,9 @@ static int op_vehicle(int fd, const char *mod, int argc, char **argv)
 {
     static char want[8192], req[1024], buf[4096];
     struct sun a;
-    int alen = sockaddr_of(&a, VEHICLE_SOCK), i;
+    int alen = sockaddr_of(&a, VEHICLE_SOCK), i, got;
     sl s, n;
+    char last = 0;
     struct { sl sec, usec; } tv = { 3, 0 };
     path3(req, sizeof req, "read", "", "");
     if (mod && read_small(ROOTDIR "/state/vehicle.txt", want, sizeof want) < 0) want[0] = 0;
@@ -1492,8 +1493,16 @@ static int op_vehicle(int fd, const char *mod, int argc, char **argv)
     x_setsockopt((int)s, 1 /* SOL_SOCKET */, 20 /* SO_RCVTIMEO */, &tv, sizeof tv);
     if (x_connect(s, &a, alen) < 0) { x_close(s); say(fd, "the vehicle service isn't running (yet)\n"); return 69; }
     if (wall((int)s, req, slen(req))) { x_close(s); return 1; }
-    while ((n = x_read((int)s, buf, sizeof buf)) > 0) if (frame(fd, 'O', buf, (u32)n)) break;
+    got = 0;
+    while ((n = x_read((int)s, buf, sizeof buf)) > 0) {
+        last = buf[n - 1];
+        got = 1;
+        if (frame(fd, 'O', buf, (u32)n)) break;
+    }
     x_close(s);
+    /* the answer is whole lines in one write: a timeout after a whole answer isn't a failure
+       (#145: the service's close didn't reach us, so every read ended on SO_RCVTIMEO) */
+    if (n < 0 && got && last == '\n') return 0;
     return n < 0 ? 1 : 0;
 }
 
