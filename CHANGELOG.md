@@ -14,6 +14,11 @@
 
 ### Fixes
 
+- **`outside_temp` no longer reads -40 before climate control has a value.** Right
+  after the car wakes, climate control can report -40 (the raw zero of its signal, the
+  same in °F and °C), and `outside_temp`/`outside_temp_f` passed it on as a reading (seen
+  on an Ioniq 5 through Battery Watchdog). Such a status is now ignored: the last real
+  value stays, or the reading stays `-` until there is one.
 - **Vehicle readings answer at once, with code 0** (#145). Every `hmgapid vehicle` read
   took 3 s and came back with code 1, the values right: on these units an accepted
   `LocalSocket`'s `close()` doesn't close its fd, so the vehicle service never ended its
