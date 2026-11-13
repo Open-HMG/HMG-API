@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Cars
+
+- **Hook maps from Car Reports** (made on owners' cars by HMG-API's own mapper, not yet
+  checked on a car): Kia Sportage, Telluride, Niro EV and Carnival (US 260507), Hyundai
+  Palisade (US 260903). The Niro EV, Carnival and Palisade reports came from an HMG-API
+  older than 1.1.0, so the 8 newest hook points (four for wireless CarPlay, four for the
+  12 V battery) are listed missing until a newer Car Report.
+- **`tools/report-map.py`:** `--make` and `--name` for a report from a car HMG-API had no
+  name for, and catalogue points newer than the report are listed missing (with why).
+
 ### Fixes
 
 - **Vehicle readings answer at once, with code 0** (#145). Every `hmgapid vehicle` read
