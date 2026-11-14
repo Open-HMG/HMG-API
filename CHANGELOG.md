@@ -20,6 +20,15 @@
   answer, and it leaked an fd per read, command and light status. It now closes the fd
   itself, and hmgapid takes a whole answer as success even if the connection stays open.
 
+### For mod authors
+
+- **Bluetooth Low Energy scanner and GATT central** (`"ble": {"central": true}` in
+  `mod.json`, `hmgapi.client.Ble` in `hmgapi-client.jar`): scan for BLE peripherals,
+  connect (up to four at once, shared across mods), negotiate ATT MTU and read, write or
+  subscribe to 16-bit and 128-bit GATT characteristics without root, alongside Classic
+  Bluetooth phone calls and audio. Shown in the plan, and disconnected at once when a
+  mod is turned off. See "Bluetooth Low Energy" in `docs/mod-reference.md`.
+
 ## 1.1.0-beta.1 (2026-11-08)
 
 ### For mod authors
