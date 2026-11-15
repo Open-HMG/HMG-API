@@ -40,6 +40,13 @@
   and points at the car's own switch (Settings > General > Install Infotainment System
   Updates Automatically). Nothing else changes: HMG-API doesn't touch that switch without
   its hooks.
+- **Removing or updating a mod never deletes what a symlink in its folder points at.** The
+  engine's delete went into a linked folder (one a mod's script made, to a USB stick or
+  another place under `/data`) and emptied it. A link is now removed as the link it is.
+- **`guide_lines off` waits for the owner's OK like `on`.** A mod's first use of a car
+  command waits for the owner, except when it gives back what it took (release, stop,
+  restore, off). For the rear camera's guide lines, `off` isn't giving back: it turns
+  the owner's lines off, and `restore` is the undo. It ran without asking.
 - **Cars mapped from Car Reports have their make and name.** The Sportage, Telluride,
   Niro EV, Carnival, Palisade and the Ioniq 5's `NEEV23SE` had a hook map but no line in
   the engine's model table, so a mod whose `"system"` names a make or a name refused
