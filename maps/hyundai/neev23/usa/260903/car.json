@@ -5,6 +5,7 @@
   "region": "usa",
   "firmware": "260903",
   "products": [
+    "NEEV.USA.",
     "NEEV23.USA."
   ],
   "status": "probed",

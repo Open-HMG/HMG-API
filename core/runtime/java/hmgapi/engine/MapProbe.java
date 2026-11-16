@@ -45,6 +45,8 @@ public final class MapProbe {
     /** catalogue app -> {"package", "files"} (car.json "app_files") */
     public final Map<String, Object> appFiles = new TreeMap<String, Object>();
     final Map<String, List<Map<String, Object>>> references = new LinkedHashMap<String, List<Map<String, Object>>>();
+    /** Keep each build's members together when identifying an obfuscated class. */
+    final List<Map<String, Object>> referenceMaps = new ArrayList<Map<String, Object>>();
 
     static final class Miss extends Exception {
         final boolean later;   // needs another point first
@@ -82,11 +84,13 @@ public final class MapProbe {
             for (File j : js) {
                 if (!j.getName().endsWith(".json") || j.getName().equals("car.json")) continue;
                 try {
-                    for (Map.Entry<String, Object> e : Json.object(Engine.read(j)).entrySet()) {
+                    Map<String, Object> entries = Json.object(Engine.read(j));
+                    for (Map.Entry<String, Object> e : entries.entrySet()) {
                         List<Map<String, Object>> l = references.get(e.getKey());
                         if (l == null) references.put(e.getKey(), l = new ArrayList<Map<String, Object>>());
                         l.add((Map<String, Object>) e.getValue());
                     }
+                    referenceMaps.add(entries);
                 } catch (Exception ignored) {
                     // a broken map gives no references
                 }
@@ -299,17 +303,65 @@ public final class MapProbe {
         return false;
     }
 
+    @SuppressWarnings("unchecked")
     String byReferenceClass(Map<String, Dex.Cls> classes, String id, Map<String, Object> f) throws Miss {
-        List<Map<String, Object>> l = references.get(id);
-        if (l == null) throw new Miss("found by a smali pattern only, and no other car's map has it", false);
+        if (!references.containsKey(id)) throw new Miss("found by a smali pattern only, and no other car's map has it", false);
         Set<String> hits = new LinkedHashSet<String>();
-        for (Map<String, Object> e : l) {
-            String n = String.valueOf(e.get("class"));
-            if (classes.containsKey(n) && (!f.containsKey("package") || n.startsWith(f.get("package") + "."))) hits.add(n);
+        boolean requireMembers = false;
+        for (Map<String, Object> entries : referenceMaps) {
+            for (Map.Entry<String, Object> en : entries.entrySet()) {
+                if (referenceMember(id, en)) requireMembers = true;
+            }
         }
+        for (Map<String, Object> entries : referenceMaps) {
+            Object raw = entries.get(id);
+            if (!(raw instanceof Map)) continue;
+            Map<String, Object> e = (Map<String, Object>) raw;
+            String n = String.valueOf(e.get("class"));
+            Dex.Cls c = classes.get(n);
+            if (c != null && classMatches(c, f) && referenceMembersMatch(c, id, entries, requireMembers)) hits.add(n);
+        }
+        if (hits.isEmpty()) throw new Miss("found by a smali pattern only; no other car's reference class and members fit", false);
         if (hits.size() != 1) throw new Miss("found by a smali pattern only; " + hits.size() + " of the other cars' names fit", false);
         byReference.add(id);
         return hits.iterator().next();
+    }
+
+    static boolean referenceMember(String id, Map.Entry<String, Object> en) {
+        int dot = en.getKey().lastIndexOf('.');
+        if (dot < 0 || !id.equals(en.getKey().substring(0, dot)) || !(en.getValue() instanceof Map)) return false;
+        Map<?, ?> e = (Map<?, ?>) en.getValue();
+        return e.containsKey("method") || e.containsKey("field") || e.containsKey("ctor");
+    }
+
+    /** A reused class name is not enough: its members must fit one build's map. */
+    @SuppressWarnings("unchecked")
+    boolean referenceMembersMatch(Dex.Cls c, String id, Map<String, Object> entries, boolean requireMembers) throws Miss {
+        boolean hasMembers = false;
+        for (Map.Entry<String, Object> en : entries.entrySet()) {
+            if (!referenceMember(id, en)) continue;
+            hasMembers = true;
+            Map<String, Object> e = (Map<String, Object>) en.getValue();
+            boolean matches = false;
+            if (e.containsKey("method")) {
+                for (Dex.Member m : c.methods) {
+                    if (m.name.equals(e.get("method")) && methodOk(m, e)) matches = true;
+                }
+            } else if (e.containsKey("field")) {
+                for (Dex.Member m : c.fields) {
+                    if (m.name.equals(e.get("field")) && fieldOk(m, e)) matches = true;
+                }
+            } else if (e.containsKey("ctor")) {
+                List<String> params = resolveAll(e.get("ctor"));
+                for (Dex.Member m : c.methods) {
+                    if (m.name.equals("<init>") && m.params.equals(params)) matches = true;
+                }
+            } else continue;
+            if (!matches) return false;
+        }
+        // A partial map may contain only the wrong class name and none of its
+        // members. It cannot override the member evidence in other builds.
+        return hasMembers || !requireMembers;
     }
 
     static String first(List<String> l) {

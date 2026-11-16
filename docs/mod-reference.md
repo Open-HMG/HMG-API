@@ -39,6 +39,7 @@ setting). It never edits your code.
 | firewall rules, routes, network settings | `"network"` (see Network): HMG-API keeps them in place, the stock firewall can't take them away |
 | your app closed while driving | `"not_while_driving": ["<your app's package>"]`: the car's own driving restriction and popup |
 | feature flags, the Wi-Fi client, codecs, keyboard lists | see Files and settings that several mods share |
+| another mod, or never to run next to one | `"requires"`, `"conflicts"` (see Other mods) |
 
 Scripts run in the head unit's own shell: **mksh with Android 4.4's toolbox**. There's
 no `sed`, `tr`, `awk`, `head`, `tail`, `wc`, `cut`, `sort`, `find`, `xargs`, `expr`,
@@ -74,6 +75,34 @@ From a script: `hmgapid whoami`, `hmgapid setting-get`, `hmgapid usb`. `hmgapid`
 knows your app by its uid and your service by its session, and only answers for
 your own mod. Your settings page comes from `settings.json`; the owner changes it in
 the HMG-API app, and hooks see new values at once.
+
+## Other mods
+
+```json
+"requires": ["hello-api ^1.0", {"id": "wireless-carplay-aa", "version": ">=2.2"}],
+"conflicts": ["egmp-aa-ev-standalone"]
+```
+
+Each entry is `"<id>"`, `"<id> <range>"` or `{"id": …, "version": <range>}`; ranges as for
+`"hmgapi"` (`>=2.0`, `^1.2`, `~1.2.3`, `>=2.1 <3`, nothing for any version).
+
+- **`requires`**: your mod loads after those mods, may use their API
+  (`ModContext.use`, their `"api"` packages), and is off while one of them isn't
+  installed and turned on, isn't in your range, or isn't loaded itself. The HMG-API app
+  shows it in red with the reason; `engine plan` says `hooks <id> won't load: requires …`.
+- **`conflicts`**: your mod and that one never run together. Of two mods that can't
+  run together (either one lists the other, with the other's version in its range), the
+  first in load order loads: mods they require come first, then by id. Which of the two
+  lists the other doesn't matter, so two builds of one mod that list each other always
+  settle the same way. The other is shown in yellow ("Conflict"), with which mod to turn
+  off to use it instead. A mod turned on while apps run (`"live"`) doesn't load next to one
+  it conflicts with that those apps loaded, even one turned off since; the next restart
+  settles it by the order.
+- These hold for every mod, with or without `patches.json`. A mod HMG-API's engine
+  applies (`patches.json`, `feature_flags`, `probe`, `wifi`) that is missing a
+  requirement or conflicts with another such mod also stops the apply until it's settled.
+  A mod's apps and services (`"apps"`, `"services"`) stop while a mod it requires is off,
+  but don't follow `conflicts` yet.
 
 ## Vehicle readings
 
@@ -376,6 +405,17 @@ it: `"nemesis_conflicts": ["wireless.projection"]`. The mod's NEMESIS package
 (`tools/mknemesismod.sh`) then refuses to install while that package is there, and the
 other way round. A mod installed through HMG-API gets the same refusal when HMG-API lists
 it in NEMESIS (engine `nemesis-sync`). The engine's own install ignores the field.
+
+A mod that needs another lists it in `"requires"` (`"wireless-carplay-aa >=2.1.0"`, or
+`{"id": "wireless-carplay-aa", "version": ">=2.1.0"}`). Its NEMESIS package then depends on
+that mod's package, from the lowest version the range lets in
+(`hmgapi.wireless-carplay-aa@>=2.1.0`; a pre-release floor like `^2.2.0-rc.1` as its
+package-version, `2.1.99.1`), so NEMESIS won't install it without that mod. An optional
+entry (`"optional": true`, a mod yours runs without) stays out of it.
+NEMESIS checks only that floor: the rest of a range (`^`, `~`, an exact version, an upper
+bound) is HMG-API's own check, and `mknemesismod.sh` prints a note when it leaves part of
+a range out. A `"requires"` entry that isn't a mod id, or a mod both required and
+refused in `"nemesis_conflicts"`, stops the build (`install/nemesis/README.md`).
 
 Your key (`java -cp out/engine-host hmgapi.engine.Signing keygen <file>`) signs every
 version. The mod's id comes with a UUID made from it, and only packages signed
