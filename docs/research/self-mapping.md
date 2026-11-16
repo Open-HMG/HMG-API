@@ -70,9 +70,12 @@ A mod or feature that needs a missing point is off; everything else runs (`Point
 in each stock odex, on the unit. Points described only by a smali regex are taken "by reference"
 from other cars' maps, if this car has the same name with the same shape. `tools/probe-test.py`
 checks that it finds what `map-car.py` finds on every stock tree. `map-car` always writes its
-result to `state/map-probe.json`. With `--write` it saves a whole map, status `probed`, **only
-when HMG-API has no map for the car** (`MapProbe.java:352`). The Settings tab has this as "Map this
-car from its files" and "Check the map on this car".
+result to `state/map-probe.json`. With `--write` it saves a whole map, status `probed`, **when
+HMG-API has no map for the car, or the map it has is `probed`**. It refuses only when a map
+folder matched and that map's `car.json` status isn't `probed` (`MapProbe.java:352`). So it
+overwrites a `probed` map in place, including one HMG-API shipped (6 of the 10 maps on `main`
+are `probed`). The Settings tab has this as "Map this car from its files" and "Check the map on
+this car".
 
 **Verify.** `engine verify-map` (`MapCheck`) loads each mapped app's stock APK in a class loader of
 its own (the app doesn't start) and resolves every entry by reflection: class, method with exact
@@ -94,9 +97,11 @@ starts that didn't last 120 s. `engine recover` rolls back an apply that was cut
 
 ### Two gaps found in passing
 
-- `map-car --write` refuses whenever a map folder matched, **including a `mismatch` one**:
-  `CarMap.load` sets `folder` before it compares md5s. So a car whose framework build differs
-  from its map (same firmware number) can't map itself today.
+- `map-car --write` refuses a matched `mapped` or `verified` map **even when it is `mismatch`**:
+  `CarMap.load` sets `folder` before it compares md5s, and the refusal looks only at `car.json`'s
+  status. So a car whose framework build differs from its `mapped`/`verified` map (same firmware
+  number) can't map itself today. A `probed` map that is `mismatch` does get overwritten, but in
+  `maps/` (next bullet).
 - A `probed` map written by `map-car --write` goes into `/data/hmgapi/maps`, which every install or
   update of HMG-API **replaces as a whole** (`install/common/install.sh:192`). The owner's own map
   is lost at the next update. Anything kept on the unit has to live outside `maps/`.
