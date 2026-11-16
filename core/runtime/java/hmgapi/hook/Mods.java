@@ -130,9 +130,13 @@ final class Mods {
             Map<String, Object> raw = Json.object(read(new File(dir, "mod.json")));
             if (!(raw.get("hooks") instanceof Map)) return;
             for (hmgapi.engine.Version.Dep d : hmgapi.engine.Version.deps(raw.get("requires"))) lateLoad(d.id, app, state, trail);
-            Map<String, Map<String, Object>> all = new java.util.LinkedHashMap<String, Map<String, Object>>(rawOf);
-            all.put(id, raw);
-            hmgapi.engine.HookPlan p = hmgapi.engine.HookPlan.of(all, Points.map == null ? null : Points.map.points.keySet(), Points.map == null ? null : Points.map.missing);
+            Map<String, String> on = new java.util.HashMap<String, String>();   // turned on now, for "requires"
+            for (Map.Entry<String, Object> m : mods.entrySet()) {
+                Map<String, Object> ms = (Map<String, Object>) m.getValue();
+                if (Boolean.TRUE.equals(ms.get("enabled"))) on.put(m.getKey(), ms.get("version") == null ? "0" : String.valueOf(ms.get("version")));
+            }
+            hmgapi.engine.HookPlan p = hmgapi.engine.HookPlan.late(rawOf, id, raw, on,
+                    Points.map == null ? null : Points.map.points.keySet(), Points.map == null ? null : Points.map.missing);
             if (p.refused.containsKey(id)) {
                 HmgApi.i("mods: " + id + " not loaded live: " + p.refused.get(id));
                 return;
@@ -234,23 +238,16 @@ final class Mods {
         File[] dirs = MODS.listFiles();
         if (dirs == null) dirs = new File[0];
         Arrays.sort(dirs);
-        // which mods load, in what order, and hook conflicts (HookPlan: the engine's plan uses the same rules)
-        Map<String, Map<String, Object>> enabled = new java.util.LinkedHashMap<String, Map<String, Object>>();
+        // which mods load, in what order: requires, conflicts, hook points (HookPlan: the engine's plan uses the same rules)
         Map<String, File> dirOf = new java.util.LinkedHashMap<String, File>();
         for (File dir : dirs) {
             if (!dir.isDirectory()) continue;
             String id = dir.getName();
             if (DexCacheCleanup.validModId(id)) installedIds.add(id);
             dirOf.put(id, dir);
-            if ("hmgapi".equals(id) || new File(dir, ".disabled").exists()) continue;
-            try {
-                enabled.put(id, Json.object(read(new File(dir, "mod.json"))));
-            } catch (Exception e) {
-                // reported below, when it's loaded
-                enabled.put(id, new java.util.LinkedHashMap<String, Object>());
-            }
         }
         DexCacheCleanup.reconcile(DEX_CACHE, installedIds);
+        Map<String, Map<String, Object>> enabled = hmgapi.engine.HookPlan.enabled(MODS);   // an unreadable mod.json: reported when it's loaded
         plan = hmgapi.engine.HookPlan.of(enabled, Points.map == null ? null : Points.map.points.keySet(), Points.map == null ? null : Points.map.missing);
         List<String> order = new ArrayList<String>(plan.order);
         for (String id : dirOf.keySet()) if (!order.contains(id)) order.add(id);   // disabled ones, for the list
@@ -269,7 +266,7 @@ final class Mods {
                 continue;
             }
             if (plan.refused.containsKey(id)) {
-                info.state = plan.refused.get(id).startsWith("conflict") ? "conflict" : "error";
+                info.state = hmgapi.engine.HookPlan.state(plan.refused.get(id));
                 info.error = plan.refused.get(id);
                 HmgApi.i("mods: " + id + " not loaded: " + info.error);
                 continue;
