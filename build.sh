@@ -138,14 +138,15 @@ sdk() {
     # the engine on its own (no Android classes): host tests, Signing, ScriptCheck
     javac --release 8 -Xlint:-options -nowarn -d "$OUT/sdk-build/engine" core/runtime/java/hmgapi/engine/*.java
     jarof "$OUT/sdk-build/engine" "$S/lib/hmgapi-engine.jar"
-    # MemRecipeTest: a mod's native recipes on real libraries (<stock> <patched> <recipe> triples)
+    # MemRecipeTest: a mod's native recipes on real libraries (<stock> <patched> <recipe> triples);
+    # SiteFindTest: its relocatable ones (--same, --fuzz)
     mkdir -p "$OUT/sdk-build/engine-test"
-    javac --release 8 -Xlint:-options -nowarn -cp "$OUT/sdk-build/engine" -d "$OUT/sdk-build/engine-test" core/runtime/test/hmgapi/engine/MemRecipeTest.java
+    javac --release 8 -Xlint:-options -nowarn -cp "$OUT/sdk-build/engine" -d "$OUT/sdk-build/engine-test" core/runtime/test/hmgapi/engine/MemRecipeTest.java core/runtime/test/hmgapi/engine/SiteFindTest.java
     jarof "$OUT/sdk-build/engine-test" "$S/test/hmgapi-engine-test.jar"
     cp "$OUT/lpatch-host" "$S/bin/"
     cp tools/lpatch/lpatch.c tools/lpatch/build.sh "$S/src/lpatch/"
     cp tools/build-mod.sh tools/env.sh tools/mkmodpkg.sh tools/mknemesismod.sh tools/nemesis-meta.py tools/nemesis-version.py \
-        tools/check-scripts.sh tools/check-points.py tools/mkrecipe.py tools/mkdelta.py tools/mkmemrecipe.py tools/mkicon.sh tools/mod-draft.py "$S/bin/"
+        tools/check-scripts.sh tools/check-points.py tools/mkrecipe.py tools/mkdelta.py tools/mkmemrecipe.py tools/sitefind.py tools/mkicon.sh tools/mod-draft.py "$S/bin/"
     cp tools/requirements.txt core/runtime/unit-commands.txt "$S/"
     cp -r install/nemesis/mod "$S/nemesis/mod"
     cp install/nemesis/bin/open.sh "$S/nemesis/bin/"

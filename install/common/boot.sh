@@ -28,6 +28,9 @@ if [ -s $D/state/binds.txt ]; then $H binds > $D/binds.log 2>&1 & fi
 if [ -f $D/public/HmgApi.apk ]; then sh $D/app-pending.sh </dev/null >/dev/null 2>&1 & fi
 if [ -f $D/hook-check.sh ]; then sh $D/hook-check.sh </dev/null >/dev/null 2>&1 & fi
 if [ -x $ROOT/system/xbin/nemesis ]; then (sleep 120; $H engine nemesis-sync) </dev/null >$D/nemesis-sync.log 2>&1 & fi
+# mods' relocatable native recipes, for this unit's libraries: a library that changed since (a
+# firmware update, another package's build of it) gets its sites found once, kept by its md5
+if grep -qs '"native_sites"' $D/mods/*/mod.json; then (sleep 60; $H engine sites) </dev/null >$D/sites.log 2>&1 & fi
 if [ -f $D/state/journal.json ]; then
     # Restart only after a recover that finished (it takes the journal away). One that
     # failed part-way has "rolled back" in its log too and keeps the journal: restarting

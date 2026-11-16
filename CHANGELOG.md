@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **Mods' native recipes can find their own sites** (`hooks.native_sites`, next to
+  `hooks.native`). A site is a window of the library found by its md5, optionally with
+  wildcard bytes, inside an exported function or at a symbol plus an offset. It is used
+  only on a unique match. The engine resolves it into an ordinary recipe for the library
+  the unit has, keeps the result by the recipe's and the library's md5, and the usual
+  check of the bytes in memory runs before anything is written. A mod's recipe then keeps
+  working on a new build of the library, with no new release, as long as the code around
+  the patch is the same. Branches whose bytes depend on the build are `jump`, `bw` and `bl`.
+  A plain patch holding such an instruction is refused unless the recipe is pinned to its
+  build. The recipes stay the mods': HMG-API ships the mechanism. `tools/sitefind.py`
+  (also in the mod SDK) turns a fixed recipe into a relocatable one and makes sites. Tested
+  off the car only, on stock CarPlay libraries and NEMESIS's `libautoreceiver_infobank.so`
+  build: the Wireless CarPlay/AA and EGMP Android Auto EV recipes come out the same, and the
+  matcher never matched once in a wrong place under fuzzing.
 - Add a Canadian Ioniq 6 (CEEV) 260206 map with 351 hook points, from a Car Report
   and matching stock Bluetooth settings files. Its projection helper is `iO`, not
   the `iP` used by the other maps. All 351 points passed verification on the car.
