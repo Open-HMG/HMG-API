@@ -18,6 +18,10 @@ the parts that change the car's own apps stay off, and the app says which.
 | Kia Carnival | USA | 260507 | made on an owner's car by HMG-API's own mapper (343 of 351 hook points: the 8 newest need a Car Report from 1.1.0 or newer); waiting for a check on a car |
 | Hyundai Palisade | USA | 260903 | made on an owner's car by HMG-API's own mapper (343 of 351 hook points: the 8 newest need a Car Report from 1.1.0 or newer); waiting for a check on a car |
 | Hyundai Ioniq 6 | Canada | 260206 | ✅ checked on a car (351 of 351 hook points), from a Car Report and stock Bluetooth settings files |
+| Hyundai Elantra (and Hybrid), Sonata (and Hybrid), Santa Fe (and Hybrid, Plug-in Hybrid), Kona, Kona Electric, Ioniq (Electric, Hybrid, Plug-in Hybrid), Venue, Veloster N, Palisade 2020-22 | USA | 260507 | 351 of 351 hook points found in stock files; waiting for a check on a car |
+| Kia K5, Sorento (and Hybrid, Plug-in Hybrid), Stinger, Soul, Seltos 2021, Niro 2020-22 (EV, Hybrid, Plug-in Hybrid), Cadenza, Telluride 2020-21 | USA | 260507 | 351 of 351 hook points found in stock files; waiting for a check on a car |
+| Kia K5 (and Hybrid), Sorento, Stinger, Seltos, Soul, Niro, Mohave The Master, K7, Morning, Ray | Korea | 260902 | 351 of 351 hook points found in stock files (the K5 Hybrid's files from a Car Report are the same); waiting for a check on a car |
+| Hyundai Ioniq 5 | Korea | 260902 | 351 of 351 hook points found in stock files; waiting for a check on a car |
 
 **Your car isn't listed, or says "waiting"?** Install HMG-API and make a
 [Car Report](Car-Report): HMG-API maps your car from its own software on the spot,
@@ -28,6 +32,9 @@ and the report is everything needed to add it. You can also try that map yoursel
 has an older version, update it first (the manufacturer's update site or the dealer).
 
 **Not supported:** head units without navigation ("Display Audio") are a different
-system. No Korean car is listed yet: their head units have the Wi-Fi chip, but it stays
-off on cars without the Wi-Fi hotspot feature. New regions are on hold for now (USA
-and Canada only); reports are still welcome.
+system.
+
+**Wi-Fi:** the older Hyundai and Kia software (the Elantra and K5 rows above) and the
+Korean software have no Wi-Fi hotspot feature, so mods that need the hotspot (wireless
+CarPlay and Android Auto) can't use it there yet. The hook map is still what the other
+mods need.

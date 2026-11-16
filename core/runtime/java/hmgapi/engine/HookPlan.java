@@ -62,7 +62,12 @@ public final class HookPlan {
     }
 
     public static HookPlan of(Map<String, Map<String, Object>> mods, Set<String> known, Map<String, String> missing) {
-        return plan(mods, null, known, missing);
+        return plan(mods, null, known, missing, null);
+    }
+
+    /** observeOnly: points mapped on this unit only (CarMap.localOnly), which only observe hooks may use */
+    public static HookPlan of(Map<String, Map<String, Object>> mods, Set<String> known, Map<String, String> missing, Set<String> observeOnly) {
+        return plan(mods, null, known, missing, observeOnly);
     }
 
     /**
@@ -99,12 +104,17 @@ public final class HookPlan {
      */
     public static HookPlan late(Map<String, Map<String, Object>> loaded, String id, Map<String, Object> mod,
             Map<String, String> on, Set<String> known, Map<String, String> missing) {
+        return late(loaded, id, mod, on, known, missing, null);
+    }
+
+    public static HookPlan late(Map<String, Map<String, Object>> loaded, String id, Map<String, Object> mod,
+            Map<String, String> on, Set<String> known, Map<String, String> missing, Set<String> observeOnly) {
         Map<String, String> present = new LinkedHashMap<String, String>(on);
         for (Map.Entry<String, Map<String, Object>> m : loaded.entrySet()) present.put(m.getKey(), version(m.getValue()));
         present.put(id, version(mod));
         Map<String, Map<String, Object>> all = new LinkedHashMap<String, Map<String, Object>>(loaded);
         all.put(id, mod);
-        HookPlan before = plan(loaded, present, known, missing), p = plan(all, present, known, missing);
+        HookPlan before = plan(loaded, present, known, missing, observeOnly), p = plan(all, present, known, missing, observeOnly);
         if (p.refused.containsKey(id)) return p;
         for (String other : loaded.keySet()) {
             if (p.refused.containsKey(other) && !before.refused.containsKey(other)) {
@@ -123,7 +133,8 @@ public final class HookPlan {
 
     /** present: id -> version of the mods "requires" may name (null: the mods themselves) */
     @SuppressWarnings("unchecked")
-    static HookPlan plan(Map<String, Map<String, Object>> mods, Map<String, String> present, Set<String> known, Map<String, String> missing) {
+    static HookPlan plan(Map<String, Map<String, Object>> mods, Map<String, String> present, Set<String> known, Map<String, String> missing,
+            Set<String> observeOnly) {
         if (present == null) {
             present = new LinkedHashMap<String, String>();
             for (Map.Entry<String, Map<String, Object>> m : mods.entrySet()) present.put(m.getKey(), version(m.getValue()));
@@ -141,7 +152,7 @@ public final class HookPlan {
             if (decl != null && !(decl instanceof Map)) {
                 why = "\"hooks\": \"points\" must be an object: {\"<point id>\": \"observe|change|replace\"}";
             }
-            if (why == null && decl != null) why = p.pointProblem(id, (Map<String, Object>) decl, known, missing);
+            if (why == null && decl != null) why = p.pointProblem(id, (Map<String, Object>) decl, known, missing, observeOnly);
             if (why == null) why = p.requiresProblem(id, mod, present);
             if (why == null) why = p.conflict(id, mods);
             if (why != null) {
@@ -176,7 +187,7 @@ public final class HookPlan {
     }
 
     /** a declared point this mod can't hook here, or replaces after a loaded mod: why, or null */
-    String pointProblem(String id, Map<String, Object> decl, Set<String> known, Map<String, String> missing) {
+    String pointProblem(String id, Map<String, Object> decl, Set<String> known, Map<String, String> missing, Set<String> observeOnly) {
         for (Map.Entry<String, Object> e : decl.entrySet()) {
             String mode = String.valueOf(e.getValue());
             if (!OBSERVE.equals(mode) && !CHANGE.equals(mode) && !REPLACE.equals(mode)) {
@@ -187,6 +198,10 @@ public final class HookPlan {
                         ? "hook point " + e.getKey() + " isn't mapped on this car (" + missing.get(e.getKey())
                                 + "): its hooks are off here, its other parts still apply"
                         : "hook point " + e.getKey() + " isn't one HMG-API has (a new one can be added to HMG-API)";
+            }
+            if (observeOnly != null && observeOnly.contains(e.getKey()) && !OBSERVE.equals(mode)) {
+                return "hook point " + e.getKey() + " is mapped on this car only, which is enough for observe hooks: a " + mode
+                        + " hook needs it in HMG-API's map, or the owner's \"Try unchecked maps\"";
             }
             if (REPLACE.equals(mode)) {
                 Map<String, String> on = points.get(e.getKey());
