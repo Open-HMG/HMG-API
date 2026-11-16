@@ -375,8 +375,9 @@ mod's own build step: an executable `build.sh` in the mod folder (`chmod +x`, an
 ones run it only in `mkmodpkg.sh`, on the package's folder):
 
 - `<out dir>` is an absolute path, and already holds the mod's `*.json`, `hooks.jar` and
-  the APK. Whatever the script writes there goes into the package; it can also replace
-  those files (a `hooks.jar` built its own way).
+  the APK, nothing else from the folder. Whatever the script writes there goes into the
+  package, over the folder's own file at the same path: a `hooks.jar` built its own way,
+  a script edited at build time. It can't take one of the folder's files out.
 - It runs from the directory `build-mod.sh` was run in (the repository root in the
   workflow), so it finds its own folder with `$(dirname "$0")`.
 - It gets `HMGAPI_SDK`, `HMGAPI_CP` (HMG-API's runtime, compile only), `HMGAPI_CLIENT`
@@ -388,7 +389,15 @@ ones run it only in `mkmodpkg.sh`, on the package's folder):
 
 `mkmodpkg.sh` packages the mod folder with the build on top: from `HMGAPI_MOD_BUILD`
 (as the workflow does, so the package is what the tests saw), or it runs `build-mod.sh`
-itself. For example, a service jar with `hmgapi-client.jar` inside, from `tools/relay/src`:
+itself.
+
+A `build.sh` written for older SDKs: their `mkmodpkg.sh` ran it on the package's folder, a
+copy of the whole mod folder (`scripts/` and all), and `build-mod.sh` didn't run it. Now it
+gets `build-mod.sh`'s out dir, which has no copy of the folder's other files. One that only
+adds files (hmgapi-adbd's `files/hmgapi-adbd`) works as it is. One that changed a file of
+the folder in place (a script, an asset) now finds nothing there to change: have it read
+the folder's file and write the changed one to the same path in `<out dir>` instead, for
+example `mkdir -p "$1/scripts" && sed 's/x/y/' "$(dirname "$0")/scripts/a.sh" > "$1/scripts/a.sh"`. For example, a service jar with `hmgapi-client.jar` inside, from `tools/relay/src`:
 
 ```
 #!/bin/sh

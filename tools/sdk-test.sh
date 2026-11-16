@@ -158,7 +158,9 @@ check "... points but no floor: fails" 1 $r
 R=$T/r; mkdir -p $R && cd $R
 F=relay-folder
 mkdir -p $F/tools/relay/src/example/relay && cp -r $M/hello/src $F/
-printf '{"id": "built-step", "version": "1.0.0", "hmgapi": ">=1.0.0", "hooks": {"jar": "hooks.jar", "entry": "example.hello.Hello"},\n "services": [{"name": "relay", "jar": "relay.jar", "class": "example.relay.Relay", "user": "system"}]}\n' > $F/mod.json
+# an "id" nested before the top-level one: the top-level one is the id
+printf '{"notes": {"id": "not-me"}, "id": "built-step", "version": "1.0.0", "hmgapi": ">=1.0.0", "hooks": {"jar": "hooks.jar", "entry": "example.hello.Hello"},\n "services": [{"name": "relay", "jar": "relay.jar", "class": "example.relay.Relay", "user": "system"}, {"name": "s", "script": "scripts/s.sh", "user": "root"}]}\n' > $F/mod.json
+mkdir -p $F/scripts && printf '#!/system/bin/sh\necho MODE=source\n' > $F/scripts/s.sh
 printf 'package example.relay;\npublic class Relay { public static void main(String[] a) { System.out.println(hmgapi.client.HmgApi.class.getName()); } }\n' \
     > $F/tools/relay/src/example/relay/Relay.java
 cat > $F/build.sh <<'SH'
@@ -171,6 +173,8 @@ W=$(mktemp -d); trap 'rm -rf "$W"' EXIT
 javac --release 8 -Xlint:-options -nowarn -cp "$ANDROID_JAR:$HMGAPI_CLIENT" -d "$W" $(find "$(dirname "$0")/tools/relay/src" -name '*.java')
 "$D8" --release --min-api 19 --lib "$ANDROID_JAR" --output "$O/relay.jar" $(find "$W" -name '*.class')
 echo "relay.jar: sdk=$HMGAPI_SDK out=$O"
+# one of the folder's files, changed at build time: written to the same path in the out dir
+mkdir -p "$O/scripts" && sed 's/MODE=source/MODE=built/' "$(dirname "$0")/scripts/s.sh" > "$O/scripts/s.sh"
 SH
 chmod 755 $F/build.sh
 printf '#!/bin/sh\n[ -f "$HMGAPI_MOD_BUILD/relay.jar" ] && [ -f "$HMGAPI_MOD_BUILD/hooks.jar" ] && echo "ok    built-step: relay.jar and hooks.jar"\n' > $F/test.sh
@@ -184,8 +188,9 @@ check "... hmgapi-client inside relay.jar" yes "$(grep -q 'Lhmgapi/client/HmgApi
 has "... build.sh got the out dir as an absolute path, and HMGAPI_SDK" "relay.jar: sdk=$T/sdk out=$R/out/b" "$o"
 o=$(HMGAPI_MOD_BUILD=$R/out/b sh $S/mkmodpkg.sh $F $T/author.key 2>&1) || echo "$o"
 check "mkmodpkg.sh: named by the id" yes "$([ -f out/packages/built-step-1.0.0.zip ] && echo yes)"
-check "... with what build.sh built, without build.sh, src or tools" "hooks.jar|mod.json|relay.jar|" \
+check "... with what build.sh built, without build.sh, src or tools" "hooks.jar|mod.json|relay.jar|scripts/s.sh|" \
     "$(unzip -Z1 out/packages/built-step-1.0.0.zip | grep -v '^META-HMGAPI/' | sort | tr '\n' '|')"
+check "... build.sh's copy of a folder file over the folder's" "echo MODE=built" "$(unzip -p out/packages/built-step-1.0.0.zip scripts/s.sh | grep MODE)"
 cp out/packages/built-step-1.0.0.zip $T/built-step.zip
 o=$(sh $S/mkmodpkg.sh $F $T/author.key 2>&1) || echo "$o"
 check "... building it itself (no HMGAPI_MOD_BUILD) gives the same files" "$(pkg $T/built-step.zip)" "$(pkg $R/out/packages/built-step-1.0.0.zip)"

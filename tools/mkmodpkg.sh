@@ -22,8 +22,11 @@ else
     PKGS=$PWD/out/packages
     mkdir -p "$CP" && javac --release 8 -Xlint:-options -nowarn -d "$CP" core/runtime/java/hmgapi/engine/*.java 2>/dev/null
 fi
-ID=$(sed -n 's/.*"id": *"\([^"]*\)".*/\1/p' "$M/mod.json" | head -1)
-VER=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$M/mod.json" | head -1)
+# mod.json's top-level "id" and "version" (not one nested in "requires" or "apps")
+field() { python3 -c 'import json,sys; j=json.load(open(sys.argv[1])); v=j.get(sys.argv[2]) if isinstance(j, dict) else None; print(v if isinstance(v, str) else "")' "$1" "$2"; }
+ID=$(field "$M/mod.json" id) || { echo "mkmodpkg.sh: $M/mod.json isn't valid JSON"; exit 1; }
+VER=$(field "$M/mod.json" version)
+[ -n "$ID" ] && [ -n "$VER" ] || { echo "mkmodpkg.sh: $M/mod.json needs an \"id\" and a \"version\""; exit 1; }
 W=$(mktemp -d); trap 'rm -rf "$W"' EXIT
 mkdir -p "$W/$ID"
 APPSRC=no; [ -f "$M/app/AndroidManifest.xml" ] && APPSRC=yes   # app/ is the mod's APK source: the package gets the built APK
@@ -35,7 +38,7 @@ if [ -d "$M/src" ] || [ $APPSRC = yes ] || [ -x "$M/build.sh" ]; then
     elif [ -n "$HMGAPI_MOD_BUILD" ]; then B=$HMGAPI_MOD_BUILD
     else B=$W/build; sh "$HERE/build-mod.sh" "$M" "$B" "$W/work" >/dev/null || exit 1
     fi
-    [ "$(sed -n 's/.*"id": *"\([^"]*\)".*/\1/p' "$B/mod.json" 2>/dev/null | head -1)" = "$ID" ] \
+    [ -f "$B/mod.json" ] && [ "$(field "$B/mod.json" id 2>/dev/null)" = "$ID" ] \
         || { echo "mkmodpkg.sh: $B isn't $ID as built (build-mod.sh's out dir for $M, with its mod.json)"; exit 1; }
     cp -R "$B"/. "$W/$ID/"   # what build-mod.sh built, the mod's build.sh's files too
 fi
