@@ -13,7 +13,8 @@
     "method": "gl",
     "params": [],
     "ret": "int",
-    "static": false
+    "static": false,
+    "sig": "4425414b67eb43ee"
   },
   "themesettings.split_items": {
     "class": "com.android.themesettings.splitscreensettings.e"

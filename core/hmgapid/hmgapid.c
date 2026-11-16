@@ -637,7 +637,7 @@ static int op_engine(int fd, int argc, char **argv)
           || seq(sub, "usb-scan") || seq(sub, "update-hmgapi") || seq(sub, "apps") || seq(sub, "probe")
           || seq(sub, "map-car") || seq(sub, "report") || seq(sub, "nemesis-sync"))) {
         say(fd, "usage: engine plan | apply [--trial] [--force] | keep | restore | status | recover | install <zip> | remove <id>"
-                " | nemesis-sync | map | map-car [--write] | verify-map | report [--usb]\n");
+                " | nemesis-sync | map | map-car [--local | --write | --forget] | verify-map | report [--usb]\n");
         return 2;
     }
     a[n++] = APP_PROCESS;
@@ -1642,8 +1642,8 @@ static int op_allow(int fd, int argc, char **argv)
     unsigned long long st[16];
     if (seq(argv[1], "commands_reset") && argc == 3 && seq(argv[2], "on")) return forget_answers(fd);
     if (!seq(argv[1], "startup_notice") && !seq(argv[1], "block_ambient_light") && !seq(argv[1], "trust_commands")
-        && !seq(argv[1], "ota_updates") && !seq(argv[1], "testing_maps") && !answer_name(argv[1])) {
-        say(fd, "unknown switch (startup_notice, block_ambient_light, trust_commands, ota_updates, testing_maps, cmd.<mod>.<command>, "
+        && !seq(argv[1], "ota_updates") && !seq(argv[1], "testing_maps") && !seq(argv[1], "no_local_points") && !answer_name(argv[1])) {
+        say(fd, "unknown switch (startup_notice, block_ambient_light, trust_commands, ota_updates, testing_maps, no_local_points, cmd.<mod>.<command>, "
                 "nocmd.<mod>.<command>, commands_reset)\n");
         return 2;
     }

@@ -60,8 +60,10 @@ def main():
             got = json.loads(r.stdout)
             pts, miss, byref = got['points'], got['missing'], got['by_reference']
             diff = 0
-            # smali-only points with no other car's map to borrow names from: missing, as expected
-            noref = {pid for pid, why in miss.items() if pid in want and ('no other car' in why or why.startswith('needs '))}
+            # smali-only points with no other car's map to borrow names from, or whose code several
+            # methods share: missing, as expected
+            noref = {pid for pid, why in miss.items() if pid in want and ('no other car' in why or why.startswith('needs ')
+                                                                           or "needs this car's map" in why)}
             for pid in sorted(set(want) | set(pts)):
                 if pid in noref:
                     continue
