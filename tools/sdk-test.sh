@@ -123,6 +123,19 @@ printf '{"id": "conf", "version": "1.0.0", "nemesis_conflicts": ["hmgapi"]}\n' >
 set +e; o=$(cd $T/c && sh $S/mknemesismod.sh out/packages/conf-1.0.0.zip 2>&1); r=$?; set -e
 check "... refusing hmgapi itself: refused" 1 "$([ $r -ne 0 ] && echo 1)"
 has "... says why" "both needs and refuses hmgapi" "$o"
+# "requires": hmgapi.<id>@>=<the range's lowest version>, as this repo's tools/mknemesismod.sh does
+printf '{"id": "conf", "version": "1.0.0", "requires": ["base ^2.2.0-rc.1", "lib"]}\n' > $T/c/conf/mod.json
+(cd $T/c && sh $S/mkmodpkg.sh conf $T/author.key > /dev/null && sh $S/mknemesismod.sh out/packages/conf-1.0.0.zip > /dev/null 2>&1)
+check "requires go in depends as hmgapi.<id>@>=<lowest>" "depends=hmgapi@>=1.0,hmgapi.base@>=2.1.99.1,hmgapi.lib" \
+    "$(unzip -p $T/c/out/dist/conf-1.0.0-nemesis-package.zip NEMESIS.data | grep '^depends=' | tr -d '"')"
+(cd $REPO && tools/mknemesismod.sh $T/c/out/packages/conf-1.0.0.zip $T/c/core > /dev/null 2>&1)
+check "... the same NEMESIS.data as HMG-API's tools" "$(unzip -p $T/c/core/conf-1.0.0-nemesis-package.zip NEMESIS.data | md5sum)" \
+    "$(unzip -p $T/c/out/dist/conf-1.0.0-nemesis-package.zip NEMESIS.data | md5sum)"
+printf '{"id": "conf", "version": "1.0.0", "requires": ["Bad id"]}\n' > $T/c/conf/mod.json
+(cd $T/c && sh $S/mkmodpkg.sh conf $T/author.key > /dev/null)
+set +e; o=$(cd $T/c && sh $S/mknemesismod.sh out/packages/conf-1.0.0.zip 2>&1); r=$?; set -e
+check "... a bad id in requires: refused" 1 "$([ $r -ne 0 ] && echo 1)"
+has "... says why" "isn't a mod id" "$o"
 
 # ---- check-scripts.sh and check-points.py
 o=$(sh $S/check-scripts.sh hello side-panel 2>&1) && r=0 || r=$?

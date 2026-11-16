@@ -71,20 +71,7 @@ public final class Engine {
     final String lpatch = env("HMGAPI_LPATCH", "/system/bin/lpatch");
     /** How the enabled mods' hooks fit together (the same rules the zygote's loader uses). */
     HookPlan hookPlan() {
-        Map<String, Map<String, Object>> enabled = new LinkedHashMap<String, Map<String, Object>>();
-        File[] ds = new File(data, "mods").listFiles();
-        if (ds != null) {
-            java.util.Arrays.sort(ds);
-            for (File d : ds) {
-                File mj = new File(d, "mod.json");
-                if (!d.isDirectory() || new File(d, ".disabled").exists() || !mj.isFile()) continue;
-                try {
-                    enabled.put(d.getName(), Json.object(read(mj)));
-                } catch (Exception ignored) {
-                    // reported by the mod loader
-                }
-            }
-        }
+        Map<String, Map<String, Object>> enabled = HookPlan.enabled(new File(data, "mods"));   // as the mod loader reads them
         CarMap map = CarMap.load(root, facts, hmgapi);
         if (host && "1".equals(env("HMGAPI_TEST_ANY_CAR", ""))) return HookPlan.of(enabled, null);   // desktop tests: no map
         if (!map.runnable) return HookPlan.of(enabled, java.util.Collections.<String>emptySet(), offMissing(map));
