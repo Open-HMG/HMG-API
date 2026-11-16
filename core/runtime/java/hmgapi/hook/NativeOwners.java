@@ -9,16 +9,13 @@ import hmgapi.engine.MemRecipe;
 
 /**
  * Which native recipes are on which library in this process, and whose they are
- * (NativePatch puts them on; no Android here, so CoreRecipesTest runs it off the car).
+ * (NativePatch puts them on; no Android here, so NativeOwnersTest runs it off the car).
  * Each recipe owns its verify regions; one overlapping a recipe already on the library
  * isn't applied, and the log names both. Of one owner's recipes for a library, the
  * first that fits (its stock bytes) is used.
  */
 final class NativeOwners {
     private NativeOwners() {}
-
-    /** the owner of HMG-API's own recipes (CoreRecipes) */
-    static final String CORE = "HMG-API";
 
     interface Log {
         void info(String msg);

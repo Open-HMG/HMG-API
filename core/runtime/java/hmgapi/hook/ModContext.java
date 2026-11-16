@@ -142,8 +142,9 @@ public final class ModContext {
     /**
      * Whether one of this mod's recipes for lib (nativePatch) is in place in this
      * process: applied, already there, or built into this build of the library. False
-     * until the library is loaded, so ask when you use the patch, not in appLoaded. For
-     * HMG-API's own Android Auto recipe, ask ProjectionHooks.rawReady().
+     * until the library is loaded, so ask when you use the patch, not in appLoaded; and
+     * false when another mod's recipe on the same bytes went on first (the log says so).
+     * Raw Android Auto sends check it for libautoreceiver_infobank.so (ProjectionHooks.rawReady).
      */
     public boolean nativePatched(String lib) {
         return NativePatch.patched(id, lib);

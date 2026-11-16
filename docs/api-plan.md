@@ -46,7 +46,7 @@ other mods yet.
 | Ambient Sound | APK, worker service, tile with day/night icons, ambient light (lease) | |
 | Steering Arcade | APK, tile, readings: steering, pedal, brake | |
 | Launchpad | APK, daemon service, readings, TUNE hold, conditioning | |
-| EGMP AA EV | native patches, USB folder, readings, conditioning (auto-start), sensor 23, fuel and connector types, navigation messages (apps and hook code), the raw sensor-batch sender and its library recipe (builds 48ee793a, dbfe7bd2) | the energy model itself; library recipes for builds core doesn't have yet; outside temperature, range |
+| EGMP AA EV | native patches, USB folder, readings, conditioning (auto-start), sensor 23, fuel and connector types, navigation messages (apps and hook code), the raw sensor-batch sender | its library recipes (native patches stay in mods); the energy model itself; outside temperature, range |
 | Factory82 | watcher as a service, startup notice (behind the owner's switch) | |
 | Rear Dashcam | root helpers as services, USB folder, readings: gear, mute ×4, guide lines, rear camera turns | its display-layer helper stays a root service (raw display registers) |
 | Cold-start Heat | service, seat and wheel heat | outside temperature |
@@ -143,8 +143,9 @@ replaces it. Two mods on the same binding: the owner picks.
 - Android Auto settings: video density (one value; two mods asking differently is a
   conflict), sensors offered to the phone (remove speed, add type 23), fuel and
   connector types, a raw sensor-batch sender (EGMP's energy model). Built on GPM
-  hook points (`VideoSink.nearestVideoConfiguration`, `SensorSource`) and EGMP's
-  three AA library sites as core native recipes.
+  hook points (`VideoSink.nearestVideoConfiguration`, `SensorSource`). EGMP's three
+  AA library sites stay in its own recipes, not core ones: HMG-API never owns a native
+  patch (the maintainers' decision on #44), so a new library build is the mod's update.
 
 ### 7. Driving: park-only apps
 
@@ -213,9 +214,8 @@ Hyundai feature flags with shared use. These come out of the Wireless mod into c
    (connected, disconnected, navigation focus, guidance, navigation messages 0x8006
    and 0x8007 from the Wireless mod's library patch, for apps and hook code); through
    hooks on GPM's `VideoSink.nearestVideoConfiguration` and `SensorSource.init`. Raw
-   sensor batches (`"aa_raw"`, `ProjectionHooks.sendRaw`) and types 22-26 through
-   HMG-API's own library recipe (`core/recipes`, library builds `48ee793a` and
-   `dbfe7bd2` so far). Not yet: CarPlay events, Features.*
+   sensor batches (`"aa_raw"`, `ProjectionHooks.sendRaw`) and types above 21, where the
+   asking mod's own library recipe is in place. Not yet: CarPlay events, Features.*
 5. **Camera, Wi-Fi, iAP2, Bluetooth, config merges.** *Done (off-car): shared
    `feature_flags` (the Wireless mod's two flags moved to it), `"wifi": {"client":
    true}`, `codecs` changes merged by codec name, list settings merged per entry,

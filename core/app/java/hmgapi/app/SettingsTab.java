@@ -154,8 +154,10 @@ final class SettingsTab {
             if (rm != null) fact("Sensors not offered to the phone", rm.join(", ").replace("\"", ""));
             JSONArray add = p.optJSONArray("aa_sensors_add");
             if (add != null) fact("Sensors offered as well", add.join(", "));
-            JSONArray raw = p.optJSONArray("aa_raw_by");
-            if (raw != null) fact("Android Auto library recipe (types 22-26, raw sensor data)", "asked by " + raw.join(", ").replace("\"", ""));
+            JSONObject own = p.optJSONObject("aa_sensors_add_patched");
+            if (own != null) fact("Sensors offered with a mod's own library patch", own.toString().replaceAll("[{}\"]", "").replace(":", ": ").replace("],", "], "));
+            JSONArray raw = p.optJSONArray("aa_raw");
+            if (raw != null) fact("Raw sensor data sent by", raw.join(", ").replace("\"", "") + " (with its own library patch)");
             JSONArray ev = p.optJSONArray("events");
             if (ev != null) fact("Apps told about connections", ev.join(", ").replace("\"", ""));
         } catch (Exception e) {

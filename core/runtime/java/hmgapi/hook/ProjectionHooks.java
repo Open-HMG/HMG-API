@@ -19,13 +19,13 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *   real density (what aa-proxy-rs and AA DPI do), for every video setting
  * - sensors, fuel and connector types: SensorSource.init gets the changed lists
  *   (speed left out: the phone doesn't know the car reports speed and doesn't limit
- *   taps; types added; fuel/EV connector types instead of "unknown"). Types 22-26
- *   are offered only where HMG-API's library recipe (CoreRecipes, aa-raw) is in place:
- *   without it the library can't read the phone's requests for them
- * - raw sensor batches from hook code (sendRaw, rawReady): through
- *   SensorSource.nativeReportDiagnosticsData, which the same recipe turns into a send
- *   of the whole message. The recipe goes on only when a mod asks ("aa_raw", or a type
- *   above 21 in "aa_sensors" "add")
+ *   taps; types added; fuel/EV connector types instead of "unknown"). A type above 21
+ *   is offered only where the mod that asks for it has its own recipe for Android Auto's
+ *   library in place (hooks.native): the stock library can't read the phone's requests
+ *   for those. HMG-API ships no recipe: native patches stay in the mods
+ * - raw sensor batches from a mod's hook code (sendRaw, rawReady; mod.json "aa_raw"):
+ *   through SensorSource.nativeReportDiagnosticsData, which the mod's own recipe turns
+ *   into a send of the whole message
  * - events: the mods that ask hear hmgapi.intent.action.PROJECTION with extras
  *   "event" (aa_connected, aa_disconnected, aa_navigation_focus, aa_guidance,
  *   aa_navigation_message, cp_connected (value 1: wireless), cp_disconnected) and
@@ -82,6 +82,9 @@ public final class ProjectionHooks {
 
     /** raw sensor batches: the session's sensor source and how a message goes out */
     static final AaMessages raw = new AaMessages();
+    /** the mods that declared raw sends ("aa_raw"), and those told why theirs can't go */
+    static final java.util.Set<String> rawMods = java.util.Collections.synchronizedSet(new java.util.HashSet<String>()),
+            rawWarned = java.util.Collections.synchronizedSet(new java.util.HashSet<String>());
     /** hook code that hears navigation messages, with its mod */
     static final List<Object[]> navListeners = new CopyOnWriteArrayList<Object[]>();
 
@@ -115,26 +118,44 @@ public final class ProjectionHooks {
     }
 
     /**
-     * Can sendRaw send now? True while an Android Auto session is up, on a library
-     * build HMG-API has a recipe for (put on because a mod asked: mod.json "projection"
-     * "aa_raw": true), on a car whose map has gpm.sensor_source.report_diagnostics.
+     * Can mod's sendRaw send now? True while the mod is on and declared raw sends
+     * (mod.json "projection": {"aa_raw": true}), one of its own hooks.native recipes for
+     * libautoreceiver_infobank.so is in place in this process (it is what makes the
+     * library send the bytes as a whole message), an Android Auto session is up, and
+     * this car's map has gpm.sensor_source.report_diagnostics.
      */
-    public static boolean rawReady() {
-        return raw.ready();
+    public static boolean rawReady(ModContext mod) {
+        return why(mod) == null && raw.ready();
     }
 
     /**
-     * Sends one sensor batch to the phone: the whole Android Auto message, its type
-     * first (80 03, then the SensorBatch). True when it was handed to Android Auto's
-     * library (which drops it if the sensor channel isn't open yet); false when not
-     * ready (rawReady) and nothing was sent. Any other message type throws
+     * Sends one sensor batch to the phone for mod: the whole Android Auto message, its
+     * type first (80 03, then the SensorBatch). True when it was handed to Android
+     * Auto's library (which drops it if the sensor channel isn't open yet); false when
+     * not ready (rawReady) and nothing was sent. Any other message type throws
      * IllegalArgumentException. Safe from any thread: a send never overlaps the
      * session's end.
      */
-    public static boolean sendRaw(byte[] message) {
-        String why = raw.send(message);
-        if (why != null && !why.isEmpty()) HmgApi.i("projection: raw send failed (logged once a session): " + why);
-        return why == null;
+    public static boolean sendRaw(ModContext mod, byte[] message) {
+        AaMessages.checkBatch(message);
+        String no = why(mod);
+        if (no != null) {
+            if (mod != null && rawWarned.add(mod.id)) mod.error("sendRaw: nothing sent: " + no, null);
+            return false;
+        }
+        String failed = raw.send(message);
+        if (failed != null && !failed.isEmpty()) mod.error("sendRaw failed (logged once a session): " + failed, null);
+        return failed == null;
+    }
+
+    /** why mod can't send raw messages at all (null: it can, while a session is up) */
+    static String why(ModContext mod) {
+        if (mod == null) return "no mod";
+        if (!mod.enabled()) return "the mod is off";
+        if (!rawMods.contains(mod.id)) return "the mod doesn't declare \"projection\": {\"aa_raw\": true}";
+        if (!NativePatch.patched(mod.id, AaMessages.LIB)) return "none of its hooks.native recipes for " + AaMessages.LIB + " is in place";
+        if (raw.sender == null) return "gpm.sensor_source.report_diagnostics isn't mapped on this car";
+        return null;
     }
 
     static void gpm(LoadedApp app) throws Exception {
@@ -145,11 +166,13 @@ public final class ProjectionHooks {
         final boolean noSpeed = has(p.optJSONArray("aa_sensors_remove"), "speed");
         final int[] add = ints(p.optJSONArray("aa_sensors_add"));
         final int[] fuel = ints(p.optJSONArray("aa_fuel_types")), conn = ints(p.optJSONArray("aa_ev_connectors"));
-        // HMG-API's Android Auto library recipe: before the mods' own native patches (they come after this)
-        JSONArray rawBy = p.optJSONArray("aa_raw_by");
-        if (rawBy != null) {
-            HmgApi.i("projection: Android Auto library recipe for " + rawBy.join(", ").replace("\"", ""));
-            NativePatch.core(CoreRecipes.AA_LIB);
+        // types above 21, by the mod that asks: offered only with that mod's own library recipe in place
+        final JSONObject addPatched = p.optJSONObject("aa_sensors_add_patched");
+        // raw sends: through the native call the mods' own recipes repoint
+        JSONArray rawBy = p.optJSONArray("aa_raw");
+        rawMods.clear();
+        for (int i = 0; rawBy != null && i < rawBy.length(); i++) rawMods.add(rawBy.getString(i));
+        if (!rawMods.isEmpty()) {
             if (Points.needAll("Android Auto raw messages", "gpm.sensor_source.report_diagnostics")) {
                 final Method report = Points.method(cl, "gpm.sensor_source.report_diagnostics");
                 raw.sender = new AaMessages.Sender() {
@@ -177,12 +200,19 @@ public final class ProjectionHooks {
             @Override
             protected void beforeHookedMethod(Param m) {
                 int[] sensors = (int[]) m.args[2];
-                List<Integer> dropped = new ArrayList<Integer>();
-                int[] more = AaMessages.offerable(add, recipeOn(), dropped);
-                if (!dropped.isEmpty() && !dropLogged) {
+                int[] more = add;
+                StringBuilder dropNote = new StringBuilder();
+                for (java.util.Iterator<String> it = addPatched == null ? null : addPatched.keys(); it != null && it.hasNext();) {
+                    String mod = it.next();
+                    List<Integer> dropped = new ArrayList<Integer>();
+                    int[] t = AaMessages.offerable(ints(addPatched.optJSONArray(mod)), NativePatch.patched(mod, AaMessages.LIB), dropped);
+                    more = AaMessages.sensors(more, -1, t);
+                    if (!dropped.isEmpty()) dropNote.append(" ").append(mod).append(" ").append(dropped);
+                }
+                if (dropNote.length() > 0 && !dropLogged) {
                     dropLogged = true;
-                    HmgApi.i("projection: sensor types " + dropped + " not offered: Android Auto's library here can't read them"
-                            + " (HMG-API's library recipe adds 22-26, on the builds it has one for)");
+                    HmgApi.i("projection: sensor types not offered (the asking mod's recipe for " + AaMessages.LIB
+                            + " isn't in place, and the stock library can't read them):" + dropNote);
                 }
                 if (sensors != null && (noSpeed || more.length > 0)) m.args[2] = AaMessages.sensors(sensors, noSpeed ? speed : -1, more);
                 if (fuel.length > 0) m.args[4] = fuel;
@@ -196,11 +226,11 @@ public final class ProjectionHooks {
             }
         });
         // the session's sensor source, for sendRaw. Above every mod's hook: after hooks run
-        // last-first, so this one's runs before theirs and a mod's own init hook finds rawReady()
+        // last-first, so this one's runs before theirs and a mod's own init hook finds rawReady(mod)
         MethodHook started = new MethodHook() {
             @Override
             protected void afterHookedMethod(Param m) {
-                if (Boolean.TRUE.equals(m.getResult())) raw.start(m.thisObject, recipeOn());
+                if (Boolean.TRUE.equals(m.getResult())) raw.start(m.thisObject);
             }
         };
         started.priority = 2;
@@ -239,11 +269,6 @@ public final class ProjectionHooks {
                 tell("aa_guidance", (Integer) m.args[0]);   // 1 active, 2 inactive, 3 rerouting
             }
         });
-    }
-
-    /** HMG-API's Android Auto library recipe is in place in this process */
-    static boolean recipeOn() {
-        return NativePatch.patched(NativePatch.CORE, CoreRecipes.AA_LIB);
     }
 
     /**

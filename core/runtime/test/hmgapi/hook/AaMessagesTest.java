@@ -27,12 +27,11 @@ public final class AaMessagesTest {
 
     static void sensors() {
         List<Integer> dropped = new ArrayList<Integer>();
-        int[] add = { 6, 23, 26, 22, 27 };
-        check("no recipe: only types the stock library reads (up to 21)", Arrays.equals(AaMessages.offerable(add, false, dropped), new int[] { 6 })
-                && dropped.equals(Arrays.asList(23, 26, 22, 27)));
+        int[] add = { 6, 23, 26, 21 };
+        check("the mod's recipe not in place: only types the stock library reads (up to 21)", Arrays.equals(AaMessages.offerable(add, false, dropped), new int[] { 6, 21 })
+                && dropped.equals(Arrays.asList(23, 26)));
         dropped.clear();
-        check("recipe in place: 22-26 too, nothing above", Arrays.equals(AaMessages.offerable(add, true, dropped), new int[] { 6, 23, 26, 22 })
-                && dropped.equals(Arrays.asList(27)));
+        check("the mod's recipe in place: its types above 21 too", Arrays.equals(AaMessages.offerable(add, true, dropped), add) && dropped.isEmpty());
         check("the offered list: speed left out, types added once", Arrays.equals(AaMessages.sensors(new int[] { 1, 3, 6, 10 }, 3, new int[] { 6, 23 }), new int[] { 1, 6, 10, 23 }));
     }
 
@@ -56,10 +55,8 @@ public final class AaMessagesTest {
         };
         check("no session: not ready, nothing sent", !m.ready() && "".equals(m.send(BATCH)) && sent.isEmpty());
         Object src = new Object();
-        m.start(src, false);
-        check("session without the recipe: not ready, nothing sent", !m.ready() && "".equals(m.send(BATCH)) && sent.isEmpty());
-        m.start(src, true);
-        check("session with the recipe: ready, sent to the session's sensor source", m.ready() && m.send(BATCH) == null && sent.size() == 1 && sent.get(0) == src);
+        m.start(src);
+        check("session up: ready, sent to the session's sensor source", m.ready() && m.send(BATCH) == null && sent.size() == 1 && sent.get(0) == src);
         boolean threw = false;
         try {
             m.send(new byte[] { (byte) 0x80, 0x06, 0 });
@@ -78,7 +75,7 @@ public final class AaMessagesTest {
         check("session ended: not ready, nothing sent", !m.ready() && "".equals(m.send(BATCH)) && sent.size() == 1);
 
         AaMessages none = new AaMessages();
-        none.start(src, true);
+        none.start(src);
         check("no sender (point not mapped): not ready", !none.ready() && "".equals(none.send(BATCH)));
 
         AaMessages bad = new AaMessages();
@@ -88,10 +85,10 @@ public final class AaMessagesTest {
                 throw new java.lang.reflect.InvocationTargetException(new IllegalStateException("gone"));
             }
         };
-        bad.start(src, true);
+        bad.start(src);
         String first = bad.send(BATCH), second = bad.send(BATCH);
         check("a failing send: the cause once, then quiet", first != null && first.contains("gone") && "".equals(second));
-        bad.start(src, true);
+        bad.start(src);
         check("... and again once the next session starts", bad.send(BATCH) != null && bad.send(BATCH).isEmpty());
     }
 
@@ -108,7 +105,7 @@ public final class AaMessagesTest {
                 sendDone[0] = true;
             }
         };
-        m.start(new Object(), true);
+        m.start(new Object());
         Thread sender = new Thread() {
             @Override
             public void run() {

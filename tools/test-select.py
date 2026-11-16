@@ -40,8 +40,6 @@ RULES = [
     (['core/runtime/java/hmgapi/engine/*', 'core/runtime/test/hmgapi/engine/*'], ENGINE + INSTALL + SDK),
     # hooks and the vehicle service: their own tests, and the SDK (mods compile against them)
     (['core/runtime/java/hmgapi/hook/*', 'core/runtime/test/hmgapi/hook/*'], ['core/runtime/keys-test.sh', 'core/runtime/mod-dex-test.sh', 'core/runtime/aa-raw-test.sh'] + SDK),
-    # HMG-API's own native recipes (hook.CoreRecipes holds them too) and their generator
-    (['core/recipes/*', 'tools/mkaarecipe.py'], ['core/runtime/aa-raw-test.sh']),
     (['core/runtime/java/hmgapi/vehicle/*', 'core/runtime/test/hmgapi/vehicle/*'], ['core/runtime/commands-test.sh'] + SDK),
     (['core/runtime/stubs/*'], SDK),
     (['core/runtime/*-test.sh'], []),   # a test itself: it runs (select() adds every changed test)

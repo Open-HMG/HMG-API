@@ -8,8 +8,10 @@ import java.util.List;
  * can be offered, and the Wireless mod's navigation message lines.
  */
 final class AaMessages {
-    /** the last sensor type the stock library reads; HMG-API's library recipe adds 22-26 (23: EV energy model) */
-    static final int STOCK_LAST_SENSOR = 21, RECIPE_LAST_SENSOR = 26;
+    /** Android Auto's native library: a mod's recipe for it makes raw sends and types above 21 work */
+    static final String LIB = "libautoreceiver_infobank.so";
+    /** the last sensor type the stock library reads */
+    static final int STOCK_LAST_SENSOR = 21;
     /** the one message type sendRaw takes: a sensor batch (SENSOR_MESSAGE_BATCH) */
     static final int SENSOR_BATCH = 0x8003;
     /** Android Auto navigation messages: destinations and charging stops, next turn distance and time */
@@ -20,18 +22,16 @@ final class AaMessages {
     }
 
     private final Object lock = new Object();
-    /** the session's SensorSource (null between sessions) and whether the library recipe is on */
+    /** the session's SensorSource (null between sessions) */
     private Object source;
-    private boolean recipe;
     private boolean failLogged;
     /** how a message goes out (null: raw messages off on this car) */
     volatile Sender sender;
 
     /** an Android Auto session's sensor source is up (SensorSource.init returned true) */
-    void start(Object sensorSource, boolean recipeApplied) {
+    void start(Object sensorSource) {
         synchronized (lock) {
             source = sensorSource;
-            recipe = recipeApplied;
             failLogged = false;
         }
     }
@@ -43,22 +43,28 @@ final class AaMessages {
         }
     }
 
+    /** a session is up and messages have a way out */
     boolean ready() {
         synchronized (lock) {
-            return source != null && recipe && sender != null;
+            return source != null && sender != null;
+        }
+    }
+
+    /** throws unless message is a whole sensor batch: 80 03, then the SensorBatch */
+    static void checkBatch(byte[] message) {
+        if (message == null || message.length < 2 || ((message[0] & 0xff) << 8 | (message[1] & 0xff)) != SENSOR_BATCH) {
+            throw new IllegalArgumentException("sendRaw takes a sensor batch: 80 03, then the SensorBatch");
         }
     }
 
     /**
-     * null: handed to the library. Otherwise not sent: "" (no session, no recipe, or a
-     * failure already logged this session) or the failure to log.
+     * null: handed to the library. Otherwise not sent: "" (no session, or a failure
+     * already logged this session) or the failure to log.
      */
     String send(byte[] message) {
-        if (message == null || message.length < 2 || ((message[0] & 0xff) << 8 | (message[1] & 0xff)) != SENSOR_BATCH) {
-            throw new IllegalArgumentException("sendRaw takes a sensor batch: 80 03, then the SensorBatch");
-        }
+        checkBatch(message);
         synchronized (lock) {
-            if (source == null || !recipe || sender == null) return "";
+            if (source == null || sender == null) return "";
             try {
                 sender.send(source, message);
                 return null;
@@ -72,14 +78,15 @@ final class AaMessages {
     }
 
     /**
-     * The sensor types to add to the offered list: up to 21 always, 22-26 only with
-     * the library recipe in place; the others go to dropped.
+     * Of the sensor types one mod adds, those that can be offered: up to 21 always (the
+     * stock library reads them), above 21 only with that mod's own recipe for the
+     * library in place; the others go to dropped.
      */
     static int[] offerable(int[] add, boolean recipeApplied, List<Integer> dropped) {
         int[] tmp = new int[add.length];
         int n = 0;
         for (int t : add) {
-            if (t <= STOCK_LAST_SENSOR || (recipeApplied && t <= RECIPE_LAST_SENSOR)) tmp[n++] = t;
+            if (t <= STOCK_LAST_SENSOR || recipeApplied) tmp[n++] = t;
             else dropped.add(t);
         }
         int[] out = new int[n];

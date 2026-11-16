@@ -18,15 +18,11 @@ import hmgapi.engine.MemRecipe;
  * Mixing: each recipe owns its verify regions in the library; a recipe overlapping
  * another mod's on the same library isn't applied, and the log names both. The first
  * of a mod's recipes that fits the library (its stock bytes) is the one used, so one
- * mod can carry a recipe per build of a library.
- *
- * HMG-API's own recipes (CoreRecipes) go in the same way, owned by "HMG-API", and are
- * asked for before any mod's, so a mod recipe on the same bytes is the one refused.
+ * mod can carry a recipe per build of a library. HMG-API itself ships no recipe: native
+ * patches stay in the mods. Who owns what: NativeOwners.
  */
 final class NativePatch {
     private NativePatch() {}
-
-    static final String CORE = NativeOwners.CORE;
 
     static final MemRecipe.Memory MEMORY = new MemRecipe.Memory() {
         @Override
@@ -52,36 +48,21 @@ final class NativePatch {
         NativeOwners.Log log = new NativeOwners.Log() {
             @Override
             public void info(String msg) {
-                if (mod != null) mod.log(msg);
-                else HmgApi.i(msg);
+                mod.log(msg);
             }
 
             @Override
             public void error(String msg, Throwable t) {
-                if (mod != null) mod.error(msg, t);
-                else if (t != null) HmgApi.e(msg, t);
-                else HmgApi.i(msg);   // a build HMG-API has no recipe for: not an error
+                mod.error(msg, t);
             }
         };
-        NativeOwners.add(new NativeOwners.Want(mod == null ? CORE : mod.id, lib, recipes, log));
+        NativeOwners.add(new NativeOwners.Want(mod.id, lib, recipes, log));
         tryAll();
     }
 
-    /** HMG-API's own recipes for a library (CoreRecipes), once per process */
-    static synchronized void core(String lib) {
-        if (NativeOwners.asked(CORE, lib)) return;
-        List<MemRecipe> r = new ArrayList<MemRecipe>();
-        for (String text : CoreRecipes.of(lib)) r.add(MemRecipe.parse(text));
-        if (r.isEmpty()) {
-            HmgApi.i("native patch " + lib + ": HMG-API has no recipe for it");
-            return;
-        }
-        request(null, lib, r);
-    }
-
-    /** whether one of owner's recipes for lib is in place in this process (owner: a mod id, or CORE) */
-    static boolean patched(String owner, String lib) {
-        return NativeOwners.patched(owner, lib);
+    /** whether one of a mod's recipes for lib is in place in this process */
+    static boolean patched(String mod, String lib) {
+        return NativeOwners.patched(mod, lib);
     }
 
     /** after every library load in this process, the patches still waiting are tried */
