@@ -236,14 +236,16 @@ public final class ProjectionHooks {
         started.priority = 2;
         Points.hook(cl, "gpm.sensor_source.init", started);
         // the sensor source ends before its native object is freed: no raw send after this.
-        // Cars whose map lacks the point stop at the session's end below, as before
+        // Cars whose map lacks the point stop at the session's end below, as before (so do
+        // cars that mapped it themselves: HMG-API's own hooks use only its map's points)
         MethodHook rawEnd = new MethodHook() {
             @Override
             protected void beforeHookedMethod(Param m) {
                 raw.stop();
             }
         };
-        if (Points.has("gpm.sensor_source.shutdown")) Points.hook(cl, "gpm.sensor_source.shutdown", rawEnd);
+        if (Points.has("gpm.sensor_source.shutdown") && !Points.localOnly("gpm.sensor_source.shutdown"))
+            Points.hook(cl, "gpm.sensor_source.shutdown", rawEnd);
         // a clean end calls destroy; a phone that's just gone (Wi-Fi off, ping timeout) only
         // onDisconnected. One aa_disconnected per session either way
         MethodHook ended = new MethodHook() {
