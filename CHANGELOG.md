@@ -68,6 +68,28 @@
   - `framework.datc_service.vr_climate_status` and `framework.datc_service.is_unit_celsius`, climate control's state.
 
   Mapped on the US Ioniq 5 260507 and listed missing elsewhere. (docs/hook-points.md)
+- **Raw Android Auto sensor data from hook code** (#44). An EV mod no longer carries its
+  own library recipe or calls `SensorSource` by name:
+  - `"projection": {"aa_raw": true}` asks for HMG-API's Android Auto library recipe, put on
+    in GPM's memory only while a mod asks. It covers library builds `48ee793a…` and
+    `dbfe7bd2…`; on any other build nothing is patched;
+  - `ProjectionHooks.sendRaw` sends one sensor batch (`80 03`, then the SensorBatch), and
+    `ProjectionHooks.rawReady` says whether it can: a session is up and the recipe is in
+    place. A send never overlaps the session's end;
+  - sensor types 22-26 in `aa_sensors` `add` are offered only where the recipe applies
+    (the stock library reads up to 21); `add` now takes 1-26;
+  - `ModContext.nativePatched` says whether one of the mod's own `hooks.native` recipes is
+    in place. A mod recipe on the same bytes as HMG-API's is refused while HMG-API's is on:
+    check `rawReady` instead;
+  - `ProjectionHooks.addNavigationListener` gives hook code the 0x8006/0x8007 navigation
+    messages apps get as `aa_navigation_message`.
+
+  HMG-API's own Android Auto settings now need only the GPM points they hook, so a car
+  missing one of the new #46 points keeps them. (docs/mod-reference.md, Phone projection)
+- **An already patched library reads "already patched".** A memory recipe region that is
+  only checked (the same before and after) counted as stock only, so a library that
+  already had the patches, such as a file patched by another package, read as "not this
+  library's stock bytes". It now counts as both.
 
 ## 1.1.0-rc.2 (2026-11-15)
 
