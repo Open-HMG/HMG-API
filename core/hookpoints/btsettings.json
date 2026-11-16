@@ -21,35 +21,35 @@
         "package": "com.android.settings2.bluetooth",
         "methods": [
           {
-            "name": "aQ",
             "params": [
               "android.content.Context"
             ],
             "ret": "void",
-            "static": true
+            "static": true,
+            "strings": [
+              "com.daudio.app.phoneprojection.wireless.WPPSettingsActivity"
+            ]
           },
           {
-            "name": "ih",
-            "params": [],
-            "ret": "boolean",
-            "static": true
-          },
-          {
-            "name": "a",
             "params": [
               "android.content.Context",
               "int"
             ],
             "ret": "void",
-            "static": true
+            "static": true,
+            "strings": [
+              "com.daudio.app.phoneprojection.settings.ui.DeviceConnectionSettings"
+            ]
           },
           {
-            "name": "aj",
             "params": [
               "android.content.Context"
             ],
             "ret": "void",
-            "static": true
+            "static": true,
+            "strings": [
+              "com.daudio.app.phoneprojection.settings.ui.connectivity.PhoneProjectionSettingsActivity"
+            ]
           }
         ]
       },
@@ -60,14 +60,14 @@
       "kind": "method",
       "of": "btsettings.projection_helper",
       "find": {
-        "pattern": "phone_projection_menu",
-        "group": "wireless",
         "params": [
           "android.content.Context"
         ],
         "ret": "void",
         "static": true,
-        "only_caller": true
+        "strings": [
+          "com.daudio.app.phoneprojection.wireless.WPPSettingsActivity"
+        ]
       },
       "about": "opens the wireless projection page (its only caller is the Phone Projection menu)"
     },
@@ -88,14 +88,15 @@
       "kind": "method",
       "of": "btsettings.projection_helper",
       "find": {
-        "pattern": "phone_projection_menu",
-        "group": "dc",
         "params": [
           "android.content.Context",
           "int"
         ],
         "ret": "void",
-        "static": true
+        "static": true,
+        "strings": [
+          "com.daudio.app.phoneprojection.settings.ui.DeviceConnectionSettings"
+        ]
       }
     },
     {
@@ -103,13 +104,14 @@
       "kind": "method",
       "of": "btsettings.projection_helper",
       "find": {
-        "pattern": "phone_projection_menu",
-        "group": "other",
         "params": [
           "android.content.Context"
         ],
         "ret": "void",
-        "static": true
+        "static": true,
+        "strings": [
+          "com.daudio.app.phoneprojection.settings.ui.connectivity.PhoneProjectionSettingsActivity"
+        ]
       }
     }
   ]
