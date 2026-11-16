@@ -139,10 +139,12 @@ sdk() {
     javac --release 8 -Xlint:-options -nowarn -d "$OUT/sdk-build/engine" core/runtime/java/hmgapi/engine/*.java
     jarof "$OUT/sdk-build/engine" "$S/lib/hmgapi-engine.jar"
     # MemRecipeTest: a mod's native recipes on real libraries (<stock> <patched> <recipe> triples);
-    # RecipeCheck: without them, against the recipes of the mods it requires (test/lib.sh plan_test)
+    # RecipeCheck: without them, against the recipes of the mods it requires (test/lib.sh plan_test);
+    # Requires: a mod's "requires" read and matched as the engine does (bin/mod-deps.py)
     mkdir -p "$OUT/sdk-build/engine-test"
     javac --release 8 -Xlint:-options -nowarn -cp "$OUT/sdk-build/engine" -d "$OUT/sdk-build/engine-test" \
-        core/runtime/test/hmgapi/engine/MemRecipeTest.java core/runtime/test/hmgapi/engine/RecipeCheck.java
+        core/runtime/test/hmgapi/engine/MemRecipeTest.java core/runtime/test/hmgapi/engine/RecipeCheck.java \
+        core/runtime/test/hmgapi/engine/Requires.java
     jarof "$OUT/sdk-build/engine-test" "$S/test/hmgapi-engine-test.jar"
     cp "$OUT/lpatch-host" "$S/bin/"
     cp tools/lpatch/lpatch.c tools/lpatch/build.sh "$S/src/lpatch/"
@@ -151,6 +153,7 @@ sdk() {
     cp tools/requirements.txt core/runtime/unit-commands.txt "$S/"
     cp -r install/nemesis/mod "$S/nemesis/mod"
     cp install/nemesis/bin/open.sh "$S/nemesis/bin/"
+    cp tools/sdk/hmgapi-mod tools/sdk/mod-deps.py "$S/bin/"   # the mod's loop, wrapping the tools above
     cp tools/sdk/lib.sh "$S/test/lib.sh"
     cp tools/sdk/plan.py "$S/test/plan.py"
     # the hook maps (public: point names and md5s), for test/lib.sh's plan test
