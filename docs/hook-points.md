@@ -17,20 +17,20 @@ Every point and map lives here, in HMG-API, including the ones only a mod in its
 uses (the wireless mod's, for one): a mod gets new points through an HMG-API release and its
 mod SDK ([mod-repos.md](mod-repos.md), section 4).
 
-360 hook points. **Cars** (`maps/`):
+364 hook points. **Cars** (`maps/`):
 
 | Car | Map | Points |
 |---|---|---|
-| Hyundai Palisade USA 260903 | mapped on cars by HMG-API's own mapper | 343 of 360 |
-| Hyundai Ioniq 5 CAN 260206 | mapped from stock files | 351 of 360 |
-| Hyundai Ioniq 5 USA 260507 | mapped from stock files | 360 of 360 |
-| Hyundai Ioniq 5 USA 260903 | mapped on cars by HMG-API's own mapper | 351 of 360 |
-| Kia EV6 CAN 260206 | mapped from stock files | 351 of 360 |
-| Kia EV6 USA 260507 | checked on a car | 351 of 360 |
-| Kia Carnival USA 260507 | mapped on cars by HMG-API's own mapper | 343 of 360 |
-| Kia Sportage USA 260507 | mapped on cars by HMG-API's own mapper | 351 of 360 |
-| Kia Telluride USA 260507 | mapped on cars by HMG-API's own mapper | 351 of 360 |
-| Kia Niro EV USA 260507 | mapped on cars by HMG-API's own mapper | 343 of 360 |
+| Hyundai Palisade USA 260903 | mapped on cars by HMG-API's own mapper | 343 of 364 |
+| Hyundai Ioniq 5 CAN 260206 | mapped from stock files | 351 of 364 |
+| Hyundai Ioniq 5 USA 260507 | mapped from stock files | 364 of 364 |
+| Hyundai Ioniq 5 USA 260903 | mapped on cars by HMG-API's own mapper | 351 of 364 |
+| Kia EV6 CAN 260206 | mapped from stock files | 351 of 364 |
+| Kia EV6 USA 260507 | checked on a car | 351 of 364 |
+| Kia Carnival USA 260507 | mapped on cars by HMG-API's own mapper | 343 of 364 |
+| Kia Sportage USA 260507 | mapped on cars by HMG-API's own mapper | 351 of 364 |
+| Kia Telluride USA 260507 | mapped on cars by HMG-API's own mapper | 351 of 364 |
+| Kia Niro EV USA 260507 | mapped on cars by HMG-API's own mapper | 343 of 364 |
 
 In the tables, **Cars** is "all" when every car above has the point, otherwise the cars without it.
 
@@ -237,6 +237,8 @@ Android framework and the car's service interfaces (any process).
 | `framework.datc_listener_stub.as_interface` | method | `static asInterface(android.os.IBinder)` → framework.datc_listener |  | all |
 | `framework.datc_listener_stub.status` | field | `static TRANSACTION_onDatcStatus`: int | onDatcStatus(DatcStatus): the climate status, sent on registration and on change | all |
 | `framework.datc_service.register_listener` | method | `registerDATCListener(framework.datc_listener, android.os.IBinder)` → void |  | all |
+| `framework.datc_service.vr_climate_status` | method | `getVRClimateStatus(int)` → float | (DATCFlag) one climate value from the service's cache: 2 driver set temperature, 5 blower, 6 mode, 8 auto, 9 A/C, 12 on/off, 13 unit; -1 an unsupported flag | not on Hyundai Palisade USA 260903, Hyundai Ioniq 5 CAN 260206, Hyundai Ioniq 5 USA 260903, Kia EV6 CAN 260206, Kia EV6 USA 260507, Kia Carnival USA 260507, Kia Sportage USA 260507, Kia Telluride USA 260507, Kia Niro EV USA 260507 |
+| `framework.datc_service.is_unit_celsius` | method | `isUnitCelsius(int)` → boolean | (unit) whether climate control's temperature unit is Celsius | not on Hyundai Palisade USA 260903, Hyundai Ioniq 5 CAN 260206, Hyundai Ioniq 5 USA 260903, Kia EV6 CAN 260206, Kia EV6 USA 260507, Kia Carnival USA 260507, Kia Sportage USA 260507, Kia Telluride USA 260507, Kia Niro EV USA 260507 |
 | `framework.datc_status` | class | `com.hkmc.datc.DatcStatus` |  | all |
 | `framework.datc_status.creator` | field | `static CREATOR`: android.os.Parcelable$Creator |  | all |
 | `framework.datc_status.ambient_f` | method | `getAmbientTempF()` → float | outside temperature, Fahrenheit (what the cluster shows on a US car: 73.0 for 73 F) | all |
@@ -371,6 +373,8 @@ App `com.google.android.projection.sink`.
 | `gpm.video_sink.nearest` | method | `nearestVideoConfiguration(int, int, int, int, int, int)` → void | one video setting: (width, height, density, real density, fps, depth); density is what AA DPI changes | all |
 | `gpm.sensor_source` | class | `com.google.android.projection.protocol.SensorSource` | Android Auto's sensor service | all |
 | `gpm.sensor_source.init` | method | `init(int, long, int[], int, int[], int[])` → boolean | (type, native, sensors offered to the phone, location, fuel types, EV connector types): once per connection | all |
+| `gpm.sensor_source.shutdown` | method | `shutdown()` → void | the sensor service ends, before nativeShutdown frees its native object: a mod sending through it stops here | not on Hyundai Palisade USA 260903, Hyundai Ioniq 5 CAN 260206, Hyundai Ioniq 5 USA 260903, Kia EV6 CAN 260206, Kia EV6 USA 260507, Kia Carnival USA 260507, Kia Sportage USA 260507, Kia Telluride USA 260507, Kia Niro EV USA 260507 |
+| `gpm.sensor_source.report_diagnostics` | method | `nativeReportDiagnosticsData(byte[])` → int | (bytes) the native diagnostics send; nothing calls it in stock GPM. A mod whose memory recipe repoints the library's reportDiagnosticsData sends raw sensor data through it | not on Hyundai Palisade USA 260903, Hyundai Ioniq 5 CAN 260206, Hyundai Ioniq 5 USA 260903, Kia EV6 CAN 260206, Kia EV6 USA 260507, Kia Carnival USA 260507, Kia Sportage USA 260507, Kia Telluride USA 260507, Kia Niro EV USA 260507 |
 | `gpm.sensor_source.speed` | field | `static SENSOR_TYPE_SPEED`: int | the speed sensor (offered: the phone limits taps while moving) | all |
 
 ## homesetting

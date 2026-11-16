@@ -235,6 +235,30 @@
       "about": "(type, native, sensors offered to the phone, location, fuel types, EV connector types): once per connection"
     },
     {
+      "id": "gpm.sensor_source.shutdown",
+      "kind": "method",
+      "of": "gpm.sensor_source",
+      "find": {
+        "name": "shutdown",
+        "params": [],
+        "ret": "void"
+      },
+      "about": "the sensor service ends, before nativeShutdown frees its native object: a mod sending through it stops here"
+    },
+    {
+      "id": "gpm.sensor_source.report_diagnostics",
+      "kind": "method",
+      "of": "gpm.sensor_source",
+      "find": {
+        "name": "nativeReportDiagnosticsData",
+        "params": [
+          "byte[]"
+        ],
+        "ret": "int"
+      },
+      "about": "(bytes) the native diagnostics send; nothing calls it in stock GPM. A mod whose memory recipe repoints the library's reportDiagnosticsData sends raw sensor data through it"
+    },
+    {
       "id": "gpm.sensor_source.speed",
       "kind": "field",
       "of": "gpm.sensor_source",
