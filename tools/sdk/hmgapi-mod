@@ -103,7 +103,15 @@ new)
     [ -n "$author" ] || die "new: give --author <name> (no git user.name here)"
     [ ! -e "$id" ] || die "$id already exists"
     V=$(cat "$HMGAPI_SDK/VERSION")
-    pkg=mod.$(echo "$id" | sed 's/-/_/g')
+    # the package: mod.<id, - as _>, with an m first where the id can't start a Java name
+    # (a digit: 3d-view is mod.m3d_view; a keyword: new is mod.mnew)
+    pkg=mod.$(python3 -c 'import sys
+s = sys.argv[1].replace("-", "_")
+java = ("abstract assert boolean break byte case catch char class const continue default do double else enum extends final "
+        "finally float for goto if implements import instanceof int interface long native new package private protected public "
+        "return short static strictfp super switch synchronized this throw throws transient try void volatile while true false "
+        "null var record yield sealed permits").split()
+print("m" + s if s[0].isdigit() or s in java else s)' "$id")
     # the entry class: the id in CamelCase (my-mod: MyMod), Mod first if it starts with a digit
     cls=$(python3 -c 'import sys; c="".join(p[:1].upper() + p[1:] for p in sys.argv[1].split("-") if p); print(("Mod" if c[0].isdigit() else "") + c)' "$id")
     mkdir -p "$id/src/$(echo "$pkg" | sed 's#\.#/#g')"
@@ -148,7 +156,22 @@ plan_test "$M" $DEPS
 exit $fail
 EOF
     chmod 755 "$id/test.sh"
-    [ -e hmgapi-sdk.json ] || printf '{"version": "%s", "sha256": ""}\n' "$V" > hmgapi-sdk.json
+    # the pin: the release's zip and its SHA-256 from that release's SHA256SUMS, when it can be
+    # fetched (HMGAPI_SDK_SUMS: another URL or file); otherwise left for the author to fill in
+    sum=
+    if [ ! -e hmgapi-sdk.json ]; then
+        sum=$(python3 -c 'import re, sys, urllib.request
+v, src = sys.argv[1:]
+if re.match(r"^[a-z][a-z0-9+.-]*://", src):
+    text = urllib.request.urlopen(urllib.request.Request(src, headers={"User-Agent": "hmgapi-mod new"}), timeout=15).read().decode()
+else:
+    text = open(src).read()
+for line in text.splitlines():
+    w = line.split()
+    if len(w) == 2 and w[1].lstrip("*") == "hmgapi-mod-sdk-%s.zip" % v and re.match(r"^[0-9a-f]{64}$", w[0]):
+        print(w[0])' "$V" "${HMGAPI_SDK_SUMS:-https://github.com/Open-HMG/HMG-API/releases/download/v$V/SHA256SUMS}" 2>/dev/null || true)
+        printf '{"version": "%s", "sha256": "%s"}\n' "$V" "$sum" > hmgapi-sdk.json
+    fi
     if [ ! -e .github/workflows/ci.yml ]; then
         mkdir -p .github/workflows
         printf 'name: ci\non: [push, pull_request]\njobs:\n  mod:\n    uses: Open-HMG/HMG-API/.github/workflows/mod.yml@v%s\n' "$V" > .github/workflows/ci.yml
@@ -156,7 +179,11 @@ EOF
     [ -e .gitignore ] || printf 'out/\n.hmgapi/\n*.key\n' > .gitignore
     echo "$id/: mod.json, src/$(echo "$pkg" | sed 's#\.#/#g')/$cls.java, test.sh"
     echo "$id/mod.json: \"system\" is \"all\" (any head unit): name the cars the mod is for, with their region (\"product\": [\"CVEV.USA.\"])"
-    echo "hmgapi-sdk.json: pins SDK $V; put its sha256 in (SHA256SUMS on HMG-API's v$V release)"
+    if [ -n "$sum" ]; then
+        echo "hmgapi-sdk.json: pins SDK $V (sha256 from the v$V release's SHA256SUMS)"
+    elif grep -q '"sha256": ""' hmgapi-sdk.json; then
+        echo "hmgapi-sdk.json: pins SDK $V; put its sha256 in (SHA256SUMS on HMG-API's v$V release; CI fails without it)"
+    fi
     echo "next: hmgapi-mod build, hmgapi-mod test (docs/mod-reference.md in HMG-API: \"Building a mod outside this repo\")"
     ;;
 build)

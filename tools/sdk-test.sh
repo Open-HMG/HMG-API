@@ -196,7 +196,11 @@ has "... names the point" "gpm.no_such_point: not in this car's map" "$o"
 # ---- bin/hmgapi-mod: a mod repo's loop, from its root, with the SDK alone
 HM="sh $T/sdk/bin/hmgapi-mod"
 mkdir -p $T/repo && cd $T/repo
-o=$($HM new my-mod --name "My mod" --author Tester 2>&1) || echo "$o"
+SUM=$(printf 'ab%.0s' $(seq 32))
+printf 'aa  other.zip\n%s  hmgapi-mod-sdk-%s.zip\n' "$SUM" "$V" > $T/SHA256SUMS
+o=$(HMGAPI_SDK_SUMS=$T/SHA256SUMS $HM new my-mod --name "My mod" --author Tester 2>&1) || echo "$o"
+check "... hmgapi-sdk.json: the SDK's release, its SHA-256 from that release's SHA256SUMS" \
+    "{\"version\": \"$V\", \"sha256\": \"$SUM\"}" "$(cat hmgapi-sdk.json)"
 check "new: the mod, its test, the SDK pin, CI and .gitignore" \
     "./.github/workflows/ci.yml ./.gitignore ./hmgapi-sdk.json ./my-mod/mod.json ./my-mod/src/mod/my_mod/MyMod.java ./my-mod/test.sh" \
     "$(find . -type f | sort | tr '\n' ' ' | sed 's/ $//')"
@@ -207,6 +211,16 @@ set +e; o=$($HM new my-mod --author Tester 2>&1); r=$?; set -e
 check "... an existing folder: refused" "2|hmgapi-mod: my-mod already exists" "$r|$o"
 set +e; o=$($HM new My_Mod --author Tester 2>&1); r=$?; set -e
 check "... not an id: refused" 2 $r
+# ids that can't start a Java name (a digit first, a keyword), and no SHA256SUMS to read
+mkdir -p $T/dg && (cd $T/dg && HMGAPI_SDK_SUMS=$T/none $HM new 3d-view --author Tester > $T/dg.out 2>&1 && $HM new new --author Tester > /dev/null 2>&1)
+entry() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["hooks"]["entry"])' "$1/mod.json"; }
+check "... a digit-first id: package mod.m3d_view, class Mod3dView" "mod.m3d_view.Mod3dView|yes" \
+    "$(entry $T/dg/3d-view)|$([ -f $T/dg/3d-view/src/mod/m3d_view/Mod3dView.java ] && echo yes)"
+check "... builds" yes "$(cd $T/dg && sh $S/build-mod.sh 3d-view $T/dg/b3 > /dev/null 2>&1 && [ -f $T/dg/b3/hooks.jar ] && echo yes)"
+check "... a keyword id (new): mod.mnew.New, builds" "mod.mnew.New|yes" \
+    "$(entry $T/dg/new)|$(cd $T/dg && sh $S/build-mod.sh new $T/dg/bn > /dev/null 2>&1 && [ -f $T/dg/bn/hooks.jar ] && echo yes)"
+check "... no SHA256SUMS to read: the pin's sha256 left empty, and said so" "{\"version\": \"$V\", \"sha256\": \"\"}|yes" \
+    "$(cat $T/dg/hmgapi-sdk.json)|$(grep -q 'put its sha256 in' $T/dg.out && echo yes)"
 o=$($HM build 2>&1) && r=0 || r=$?
 check "build: the one mod here, into out/build/<id>" "0|yes" "$r|$([ -f out/build/my-mod/hooks.jar ] && echo yes)"
 check "... the same hooks.jar as bin/build-mod.sh" "$(sh $S/build-mod.sh my-mod $T/bm >/dev/null 2>&1; md5 $T/bm/hooks.jar)" "$(md5 out/build/my-mod/hooks.jar)"

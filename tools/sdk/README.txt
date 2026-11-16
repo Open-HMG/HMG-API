@@ -33,7 +33,8 @@ the Android SDK (build-tools, a platform android.jar) and set ANDROID_HOME.
 hmgapi-mod, from the mod repository's root (<mod>: the mod's folder, by default the one
 folder there with a mod.json):
   hmgapi-mod new <id> [--name <name>] [--author <name>]   <id>/ (mod.json, an entry class,
-                                test.sh), hmgapi-sdk.json, .github/workflows/ci.yml, .gitignore
+                                test.sh), hmgapi-sdk.json (this SDK's release, its sha256 from
+                                the release's SHA256SUMS if it can be fetched), CI, .gitignore
   hmgapi-mod build [<mod>]      bin/build-mod.sh into out/build/<id>
   hmgapi-mod check [<mod>]      bin/check-points.py and bin/check-scripts.sh
   hmgapi-mod deps [<mod>]       each mod "requires" names (and what those require), from HMG-API's
