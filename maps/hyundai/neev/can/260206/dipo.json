@@ -99,7 +99,8 @@
     "method": "K",
     "params": [],
     "ret": "java.lang.String",
-    "static": false
+    "static": false,
+    "sig": "2edc49e8aa876db7"
   },
   "dipo.iap2.set_notify_on": {
     "method": "a",
@@ -108,7 +109,8 @@
       "boolean"
     ],
     "ret": "boolean",
-    "static": true
+    "static": true,
+    "sig": "094ff907b5dded7c"
   },
   "dipo.iap2_client": {
     "class": "com.daudio.app.dipo.e.a"

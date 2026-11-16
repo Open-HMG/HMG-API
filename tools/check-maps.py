@@ -10,15 +10,20 @@ usage: check-maps.py [--rebuild [--only CAR[,CAR]]]
 - --rebuild: maps with a stock tree on this machine ($HMGAPI_CARS, docs/car-trees.md)
   are made again with map-car.py and must come out identical; trees whose files aren't
   exactly the map's (tools/cars.py list) are skipped
+- a method only a smali pattern finds carries its code signature ("sig", tools/dexsig.py).
+  One without it was mapped before code signatures (often borrowed by name from another
+  map on the car): listed as unconfirmed, not a failure; a Car Report or the stock files
+  confirm it
 Exit 1 on any problem: a new hook point has to be mapped for every car.
 """
-import glob, json, os, subprocess, sys, tempfile
+import glob, json, os, re, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 import cartrees
 problems = []
+unconfirmed = {}
 points = {}
 for f in sorted(glob.glob(os.path.join(REPO, 'core', 'hookpoints', '*.json'))):
     cat = json.load(open(f))
@@ -58,6 +63,11 @@ for cj in maps:
             continue
         elif KEY[p['kind']] not in e:
             problems.append('%s: %s should be a %s' % (rel, pid, p['kind']))
+        elif p['kind'] == 'method' and ('pattern' in p['find'] or 'code' in p['find']):
+            if 'sig' not in e:
+                unconfirmed.setdefault(rel, []).append(pid)
+            elif not re.fullmatch(r'[0-9a-f]{16}', str(e['sig'])):
+                problems.append('%s: %s has a malformed sig %r' % (rel, pid, e['sig']))
     for pid in list(entries) + list(missing):
         if pid not in points:
             problems.append('%s: %s isn\'t in the catalogue' % (rel, pid))
@@ -88,6 +98,9 @@ if '--rebuild' in sys.argv:
                 if a != b:
                     problems.append('%s: %s rebuilt differently from the stock tree' % (folder, os.path.basename(f)))
             print('ok    rebuilt %s from %s' % (folder, tree))
+for rel, ids in sorted(unconfirmed.items()):
+    print('note  %s: %d smali-only method(s) mapped before code signatures, unconfirmed (a Car Report or the stock'
+          ' files confirm them): %s' % (rel, len(ids), ', '.join(sorted(ids))))
 for p in problems:
     print('FAIL  ' + p)
 print('%d hook points, %d car map(s)%s' % (len(points), len(maps), '' if problems else ': all complete'))

@@ -57,6 +57,28 @@ A service's environment: `HMGAPI_MOD`, `HMGAPI_MOD_DIR` (the mod's folder),
 service-start|stop|restart <name>` and read their output with `hmgapid service-log
 <name>`.
 
+### Points mapped on the car itself
+
+A point newer than HMG-API's map for a car is listed as missing there until a maintainer
+adds it. Until then the unit maps it itself, after each HMG-API install or update, or
+from Settings ("Map the points HMG-API's map lacks"). The engine command is `hmgapid
+engine map-car --local`. It does this only for:
+- points found **by name** (not by shape or smali pattern);
+- apps whose stock files are the ones HMG-API's map was made from;
+- each point resolving in the car's own apps (the `verify-map` check) before it's kept.
+
+They're in `/data/hmgapi/state/local-map.json` and go in the Car Report (`mapped_here`).
+
+For a mod:
+- `Points.has()` and `Points.complete()` count these points.
+- Field reads and **observe** hooks use them.
+- A **change** or **replace** hook on one, and any call or constructor through it, needs the
+  point in HMG-API's map, or the owner's "Try unchecked maps". Until then the plan says
+  why and the mod's hooks don't load.
+
+The owner can turn local points off ("Use points mapped on this car"), and
+`map-car --forget` deletes them.
+
 ## Talking to HMG-API from your app or service
 
 Compile against `hmgapi-client.jar` (`./build.sh client`) and bundle it:

@@ -18,7 +18,9 @@ import java.util.TreeMap;
  *
  * Points described by a regex over smali ("pattern", "code") can't be matched from
  * the dex: for those it tries the names the other cars' maps give the same point,
- * and keeps one only if this car has it with the point's shape ("by reference").
+ * and keeps one only if this car has it with the point's shape ("by reference");
+ * a method is the one with the same code as theirs (map "sig", Dex.walk), whatever
+ * its name.
  * Everything else that doesn't match exactly once is missing, with why.
  *
  *   java -cp <engine classes> hmgapi.engine.MapProbe <stock tree> <catalogue dir> [<maps dir>]
@@ -274,21 +276,45 @@ public final class MapProbe {
             throw new Miss("no such constructor in " + owner, false);
         }
         if ("method".equals(kind)) {
-            List<Dex.Member> hits = new ArrayList<Dex.Member>();
-            for (Dex.Member x : c.methods) {
-                if (methodOk(x, f) && (!smali || referenced(id, "method", x.name))) hits.add(x);
+            Dex.Member h = smali ? methodByReference(c, id, f) : null;
+            if (!smali) {
+                List<Dex.Member> hits = new ArrayList<Dex.Member>();
+                for (Dex.Member x : c.methods) if (methodOk(x, f)) hits.add(x);
+                if (hits.size() != 1) throw new Miss(hits.size() + " methods match in " + owner, false);
+                h = hits.get(0);
             }
-            if (smali) byRef(id, hits.size());
-            if (hits.size() != 1) throw new Miss(hits.size() + " methods match in " + owner, false);
-            Dex.Member h = hits.get(0);
             Map<String, Object> e = new LinkedHashMap<String, Object>();
             e.put("method", h.name);
             e.put("params", new ArrayList<Object>(h.params));
             e.put("ret", h.ret);
             e.put("static", h.isStatic);
+            if (smali) e.put("sig", Dex.sigHex(h.sig));
             return e;
         }
         throw new Miss("unknown kind " + kind, false);
+    }
+
+    /**
+     * A method only a smali pattern finds: the one method of the point's shape whose code is the
+     * same as another car's for it (map "sig", tools/dexsig.py). Names move between builds (py on
+     * one is pB on another, and py there is something else), so a name is never enough.
+     */
+    Dex.Member methodByReference(Dex.Cls c, String id, Map<String, Object> f) throws Miss {
+        List<Map<String, Object>> l = references.get(id);
+        if (l == null) throw new Miss("found by a smali pattern only, and no other car's map has it", false);
+        Set<String> sigs = new java.util.HashSet<String>();
+        for (Map<String, Object> e : l) if (e.get("sig") != null) sigs.add(String.valueOf(e.get("sig")));
+        if (sigs.isEmpty()) throw new Miss("found by a smali pattern only, and no other car's map has its code signature", false);
+        List<Dex.Member> same = new ArrayList<Dex.Member>();
+        for (Dex.Member x : c.methods) if (methodOk(x, f) && sigs.contains(Dex.sigHex(x.sig))) same.add(x);
+        // several methods with the same code (getters of different fields, say) can't be told
+        // apart from the dex, by name or otherwise: missing, never a guess
+        if (same.size() == 1) {
+            byReference.add(id);
+            return same.get(0);
+        }
+        throw new Miss("found by a smali pattern only; " + same.size() + " methods in " + c.name
+            + " have the other cars' code for it" + (same.size() > 1 ? " (needs this car's map)" : ""), false);
     }
 
     void byRef(String id, int hits) throws Miss {
@@ -378,13 +404,50 @@ public final class MapProbe {
     }
 
     /**
-     * engine map-car [--write]: maps this car from its own files and keeps the result
-     * (state/map-probe.json, for the Car Report). --write also saves it as this car's
-     * map (status "probed") when HMG-API has none for it; like any unchecked map, its
-     * hooks run after `engine verify-map` passes or with hmgapi.json testing_maps.
+     * engine map-car [--local [--if-needed] | --write | --forget]: maps this car from its own
+     * files and keeps the result (state/map-probe.json, for the Car Report).
+     *   --local   the points HMG-API's map lacks only because it's older than them, found here
+     *             by name, each checked here (MapCheck) before it's written: state/local-map.json
+     *             "points". --if-needed: only if HMG-API's map, its catalogue or the stock files
+     *             changed since (the boot step after an install or update runs it so).
+     *   --write   this car's whole map, for a car HMG-API has no map for, or whose map doesn't
+     *             fit its framework: state/local-map.json "whole", status probed; like any
+     *             unchecked map, its hooks run after `engine verify-map` passes or with
+     *             "Try unchecked maps".
+     *   --forget  deletes state/local-map.json: HMG-API's map alone from the next start.
+     * Kept in state/, not maps/: an HMG-API update replaces maps/ as a whole.
      */
-    static int run(Engine e, boolean write) throws Exception {
+    static int run(Engine e, String[] args) throws Exception {
+        java.util.List<String> a = java.util.Arrays.asList(args);
+        boolean write = a.contains("--write"), local = a.contains("--local"), ifNeeded = a.contains("--if-needed");
+        File lf = new File(e.root + CarMap.LOCAL);
+        if (a.contains("--forget")) {
+            boolean had = lf.isFile();
+            lf.delete();
+            e.out.add(had ? "forgotten: " + CarMap.LOCAL + " (HMG-API's map alone from the next start)" : "nothing to forget");
+            return 0;
+        }
         File maps = new File(e.root + "/data/hmgapi/maps");
+        CarMap shipped = CarMap.load(e.root, e.facts, e.hmgapi, false);
+        String key = null;
+        if (local) {
+            if (shipped.folder == null || "mismatch".equals(shipped.status) || shipped.carJson == null) {
+                e.out.add("no HMG-API map to add points to on this car (" + shipped.reason + "): `hmgapid engine map-car --write` maps the whole car");
+                return ifNeeded ? 0 : 5;
+            }
+            key = shipped.folder + " " + CarMap.md5(new File(maps, "points.txt")) + " " + new TreeMap<String, Object>((Map<String, Object>) shipped.carJson.get("files"));
+            if (ifNeeded && lf.isFile()) {
+                try {
+                    Map<String, Object> was = Json.object(Engine.read(lf));
+                    if (key.equals(was.get("key"))) {
+                        e.out.add("map-car: up to date (" + ((Map<?, ?>) was.get("points")).size() + " point(s) mapped on this car)");
+                        return 0;
+                    }
+                } catch (Exception x) {
+                    // mapped again below
+                }
+            }
+        }
         MapProbe p = new MapProbe(e.root + "/system", e.root + "/data/hmgapi/stock", maps);
         p.run(new File(maps, "catalogue"));
         Map<String, Object> r = p.result();
@@ -399,10 +462,10 @@ public final class MapProbe {
             if (m.getValue().startsWith("no stock ")) continue;   // apps this car doesn't have
             if (shown++ < 20) e.out.add("  not found: " + m.getKey() + " (" + m.getValue() + ")");
         }
+        if (local) return writeLocal(e, p, shipped, key, lf, new File(maps, "catalogue"));
         if (!write) return 0;
-        CarMap now = CarMap.load(e.root, e.facts, e.hmgapi);
-        if (now.folder != null && !"probed".equals(String.valueOf(now.carJson.get("status")))) {
-            e.out.add("not written: HMG-API has a map for this car (" + now.folder + ")");
+        if (shipped.folder != null && !"mismatch".equals(shipped.status)) {
+            e.out.add("not written: HMG-API has a map for this car (" + shipped.folder + "): `hmgapid engine map-car --local` adds the points it lacks");
             return 0;
         }
         String model = e.facts.get("model"), region = e.facts.get("region"), fw = e.facts.get("firmware");
@@ -411,35 +474,116 @@ public final class MapProbe {
             return 5;
         }
         String make = e.facts.get("make") != null ? e.facts.get("make") : "unknown";
-        File d = new File(maps, make.toLowerCase() + "/" + model.toLowerCase() + "/" + region.toLowerCase() + "/" + fw);
-        d.mkdirs();
-        Map<String, Map<String, Object>> byApp = new TreeMap<String, Map<String, Object>>();
-        for (String app : p.appFiles.keySet()) byApp.put(app, new TreeMap<String, Object>());
-        for (Map.Entry<String, Map<String, Object>> en : p.points.entrySet()) {
-            byApp.get(CarMap.appOfId(en.getKey())).put(en.getKey(), en.getValue());
-        }
-        for (Map.Entry<String, Map<String, Object>> en : byApp.entrySet()) {
-            Engine.write(new File(d, en.getKey() + ".json"), Json.write(en.getValue()));
-        }
         Map<String, Object> car = new LinkedHashMap<String, Object>();
+        car.put("whole", true);
         car.put("make", make.toLowerCase());
         car.put("model", model.toLowerCase());
         car.put("name", e.facts.get("name") != null ? e.facts.get("name") : model);
         car.put("region", region.toLowerCase());
         car.put("firmware", fw);
+        car.put("product", e.facts.get("product"));
         List<Object> products = new ArrayList<Object>();
         products.add(model + "." + region + ".");
         car.put("products", products);
         car.put("status", "probed");
         car.put("verified", null);
         car.put("files", new TreeMap<String, Object>(p.files));
-        car.put("apps", new ArrayList<Object>(byApp.keySet()));
+        Set<String> apps = new java.util.TreeSet<String>();
+        for (String id : p.points.keySet()) apps.add(CarMap.appOfId(id));
+        car.put("apps", new ArrayList<Object>(apps));
         car.put("app_files", p.appFiles);
         car.put("missing", new TreeMap<String, Object>(p.missing));
         car.put("by_reference", new ArrayList<Object>(p.byReference));
-        Engine.write(new File(d, "car.json"), Json.write(car));
-        e.out.add("written: " + CarMap.rel(maps, d) + " (status probed): run `hmgapid engine verify-map`, then restart, for its hooks");
+        car.put("points", new TreeMap<String, Object>(p.points));
+        car.put("date", new java.util.Date().toString());
+        Engine.write(lf, Json.write(car));
+        e.out.add("written: " + CarMap.LOCAL + " (this car's own map, status probed" + (shipped.folder != null ? ", instead of " + shipped.folder
+                + ", which doesn't fit its framework" : "") + "): run `hmgapid engine verify-map`, then restart, for its hooks");
         return 0;
+    }
+
+    /** the points HMG-API's map lacks only because it's older, found by name, checked here: state/local-map.json "points" */
+    @SuppressWarnings("unchecked")
+    static int writeLocal(Engine e, MapProbe p, CarMap shipped, String key, File lf, File catalogueDir) throws Exception {
+        Map<String, Map<String, Object>> cat = catalogue(catalogueDir);
+        Map<String, Object> shippedFiles = (Map<String, Object>) shipped.carJson.get("files");
+        Map<String, Object> appFiles = (Map<String, Object>) shipped.carJson.get("app_files");
+        Map<String, Object> candidates = new TreeMap<String, Object>(), files = new TreeMap<String, Object>();
+        Map<String, Object> skipped = new TreeMap<String, Object>();
+        CarMap t = new CarMap();   // HMG-API's map plus the candidates, for MapCheck (a member needs its class)
+        t.carJson = shipped.carJson;
+        t.points.putAll(shipped.points);
+        t.appOf.putAll(shipped.appOf);
+        for (Map.Entry<String, String> m : shipped.missing.entrySet()) {
+            String id = m.getKey(), app = CarMap.appOfId(id);
+            if (!CarMap.olderMap(m.getValue())) continue;   // the mapper looked for it and didn't find it: a maintainer's call
+            String why = null;
+            if (!p.points.containsKey(id)) why = "not found on this car (" + p.missing.get(id) + ")";
+            else if (p.byReference.contains(id) || !byName(cat, id)) why = "not a by-name point: a maintainer maps it";
+            Object af = appFiles == null ? null : appFiles.get(app);
+            Object fs = af instanceof Map ? ((Map<String, Object>) af).get("files") : null;
+            if (why == null && !(fs instanceof List)) why = "HMG-API's map has no stock files for its app";
+            if (why == null) {
+                for (Object f : (List<Object>) fs) {
+                    String path = String.valueOf(f);
+                    Object want = shippedFiles == null ? null : shippedFiles.get(path), seen = p.files.get(path);
+                    if (seen == null || !seen.equals(want)) why = path + " isn't the build HMG-API's map was made from";
+                    else files.put(path, seen);
+                }
+            }
+            if (why != null) {
+                skipped.put(id, why);
+                continue;
+            }
+            candidates.put(id, p.points.get(id));
+            t.points.put(id, p.points.get(id));
+            t.appOf.put(id, app);
+        }
+        Map<String, String> failed = MapCheck.resolve(e, t, candidates.keySet());
+        for (String id : failed.keySet()) candidates.remove(id);
+        Map<String, Object> out = new LinkedHashMap<String, Object>();
+        out.put("whole", false);
+        out.put("key", key);
+        out.put("base", shipped.folder);
+        out.put("files", files);
+        out.put("points", candidates);
+        out.put("failed", new TreeMap<String, Object>(failed));
+        out.put("skipped", skipped);
+        out.put("date", new java.util.Date().toString());
+        Engine.write(lf, Json.write(out));
+        e.out.add("local: " + candidates.size() + " point(s) HMG-API's map " + shipped.folder + " lacks, mapped and checked on this car ("
+                + CarMap.LOCAL + "); " + failed.size() + " didn't resolve, " + skipped.size() + " left to a maintainer");
+        for (Map.Entry<String, String> f : failed.entrySet()) e.out.add("  didn't resolve: " + f.getKey() + " (" + f.getValue() + ")");
+        if (!candidates.isEmpty()) e.out.add("they're used from the next start: readings and mods' observe hooks (the rest needs HMG-API's map, or \"Try unchecked maps\")");
+        return 0;
+    }
+
+    /** the catalogue's points by id */
+    @SuppressWarnings("unchecked")
+    static Map<String, Map<String, Object>> catalogue(File dir) throws Exception {
+        Map<String, Map<String, Object>> out = new LinkedHashMap<String, Map<String, Object>>();
+        File[] cats = dir.listFiles();
+        if (cats == null) return out;
+        for (File f : cats) {
+            if (!f.getName().endsWith(".json")) continue;
+            Map<String, Object> cat = Json.object(Engine.read(f));
+            Object pts = cat.get("points");
+            if (pts instanceof List) for (Object pt : (List<Object>) pts) out.put(String.valueOf(((Map<String, Object>) pt).get("id")), (Map<String, Object>) pt);
+        }
+        return out;
+    }
+
+    /** found by name: its class by name, the member by name (a constructor by its parameters), no smali pattern */
+    @SuppressWarnings("unchecked")
+    static boolean byName(Map<String, Map<String, Object>> cat, String id) {
+        Map<String, Object> pt = cat.get(id);
+        if (pt == null) return false;
+        Map<String, Object> f = (Map<String, Object>) pt.get("find");
+        if (f == null || f.containsKey("pattern") || f.containsKey("code")) return false;
+        String kind = String.valueOf(pt.get("kind"));
+        if ("class".equals(kind)) return f.containsKey("name");
+        if (!"ctor".equals(kind) && !f.containsKey("name")) return false;
+        return pt.get("of") != null && byName(cat, String.valueOf(pt.get("of")));
     }
 
     public static void main(String[] a) throws Exception {
