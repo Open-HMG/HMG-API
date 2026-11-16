@@ -19,7 +19,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *   real density (what aa-proxy-rs and AA DPI do), for every video setting
  * - sensors, fuel and connector types: SensorSource.init gets the changed lists
  *   (speed left out: the phone doesn't know the car reports speed and doesn't limit
- *   taps; types added; fuel/EV connector types instead of "unknown"). Types 22 and 23
+ *   taps; types added; fuel/EV connector types instead of "unknown"). Types 22-26
  *   are offered only where HMG-API's library recipe (CoreRecipes, aa-raw) is in place:
  *   without it the library can't read the phone's requests for them
  * - raw sensor batches from hook code (sendRaw, rawReady): through
@@ -182,7 +182,7 @@ public final class ProjectionHooks {
                 if (!dropped.isEmpty() && !dropLogged) {
                     dropLogged = true;
                     HmgApi.i("projection: sensor types " + dropped + " not offered: Android Auto's library here can't read them"
-                            + " (HMG-API's library recipe adds 22 and 23, on the builds it has one for)");
+                            + " (HMG-API's library recipe adds 22-26, on the builds it has one for)");
                 }
                 if (sensors != null && (noSpeed || more.length > 0)) m.args[2] = AaMessages.sensors(sensors, noSpeed ? speed : -1, more);
                 if (fuel.length > 0) m.args[4] = fuel;

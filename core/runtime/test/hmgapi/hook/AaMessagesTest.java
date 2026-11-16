@@ -27,12 +27,12 @@ public final class AaMessagesTest {
 
     static void sensors() {
         List<Integer> dropped = new ArrayList<Integer>();
-        int[] add = { 6, 23, 22, 30 };
+        int[] add = { 6, 23, 26, 22, 27 };
         check("no recipe: only types the stock library reads (up to 21)", Arrays.equals(AaMessages.offerable(add, false, dropped), new int[] { 6 })
-                && dropped.equals(Arrays.asList(23, 22, 30)));
+                && dropped.equals(Arrays.asList(23, 26, 22, 27)));
         dropped.clear();
-        check("recipe in place: 22 and 23 too, nothing above", Arrays.equals(AaMessages.offerable(add, true, dropped), new int[] { 6, 23, 22 })
-                && dropped.equals(Arrays.asList(30)));
+        check("recipe in place: 22-26 too, nothing above", Arrays.equals(AaMessages.offerable(add, true, dropped), new int[] { 6, 23, 26, 22 })
+                && dropped.equals(Arrays.asList(27)));
         check("the offered list: speed left out, types added once", Arrays.equals(AaMessages.sensors(new int[] { 1, 3, 6, 10 }, 3, new int[] { 6, 23 }), new int[] { 1, 6, 10, 23 }));
     }
 

@@ -155,7 +155,7 @@ final class SettingsTab {
             JSONArray add = p.optJSONArray("aa_sensors_add");
             if (add != null) fact("Sensors offered as well", add.join(", "));
             JSONArray raw = p.optJSONArray("aa_raw_by");
-            if (raw != null) fact("Android Auto library recipe (types 22-23, raw sensor data)", "asked by " + raw.join(", ").replace("\"", ""));
+            if (raw != null) fact("Android Auto library recipe (types 22-26, raw sensor data)", "asked by " + raw.join(", ").replace("\"", ""));
             JSONArray ev = p.optJSONArray("events");
             if (ev != null) fact("Apps told about connections", ev.join(", ").replace("\"", ""));
         } catch (Exception e) {

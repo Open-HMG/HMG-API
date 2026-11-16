@@ -10,9 +10,12 @@ import java.util.List;
 
 /**
  * HMG-API's own native recipes: core/recipes/<lib>/*.recipe are the ones in CoreRecipes,
- * byte for byte, and each parses. Arguments after the folder: <lib name> <library file>
- * pairs (real libraries from a car tree): one of that library's recipes applies to it,
- * then finds it already applied.
+ * byte for byte, and each parses. HMG-API's recipe and a mod's on the same bytes
+ * (NativeOwners, as NativePatch runs it): HMG-API's goes on, the mod's is refused and
+ * logged, nativePatched is false for the mod and rawReady true. Arguments after the
+ * folder: <lib name> <library file> pairs (real libraries from a car tree): one of that
+ * library's recipes applies to it, then finds it already applied, and the same with
+ * HMG-API's real recipe and a mod's copy of it.
  */
 public final class CoreRecipesTest {
     static int fail;
@@ -64,6 +67,7 @@ public final class CoreRecipesTest {
             check(lib.getName() + ": no recipe in CoreRecipes without its file", embedded.isEmpty());
         }
         check("core/recipes has recipes", n > 0);
+        synthetic();
         for (int i = 1; i + 1 < a.length; i += 2) real(a[i], a[i + 1]);
         System.exit(fail);
     }
@@ -89,7 +93,74 @@ public final class CoreRecipesTest {
             bytes &= Arrays.equals(Arrays.copyOfRange(m.b, off, off + used.patchBytes.get(i).length), used.patchBytes.get(i));
         }
         check(lib + " " + md5 + ": " + (used == null ? "no recipe applies" : used.id + " applies, its bytes in place"), bytes);
-        if (used != null) check(used.id + ": a second time, already patched", used.apply(m, base, textEnd, md5).status == MemRecipe.Result.ALREADY);
+        if (used == null) return;
+        check(used.id + ": a second time, already patched", used.apply(m, base, textEnd, md5).status == MemRecipe.Result.ALREADY);
+        // a mod carrying the same recipe (egmp-aa-ev's ev-sensor-<build>: same windows and bytes)
+        List<MemRecipe> core = new ArrayList<MemRecipe>(), mod = new ArrayList<MemRecipe>();
+        for (String text : CoreRecipes.of(lib)) {
+            core.add(MemRecipe.parse(text));
+            mod.add(MemRecipe.parse(text.replace("id aa-raw-", "id ev-sensor-")));
+        }
+        coexist(used.id + " and a mod's copy", new Mem(base, Arrays.copyOf(file, textEnd)), textEnd, md5, lib, core, mod);
+    }
+
+    /** what a mod's log or HMG-API's would get */
+    static final class Captured implements NativeOwners.Log {
+        final StringBuilder out = new StringBuilder();
+
+        public void info(String msg) {
+            out.append("I ").append(msg).append('\n');
+        }
+
+        public void error(String msg, Throwable t) {
+            out.append("E ").append(msg).append('\n');
+        }
+    }
+
+    /**
+     * HMG-API's recipe, then a mod's on the same bytes asked for after it (what NativePatch
+     * does in GPM: ProjectionHooks asks before the mods' appLoaded), on the library in m.
+     * Prints both logs; returns the mod's.
+     */
+    static String coexist(String what, Mem m, int textEnd, String md5, String lib, List<MemRecipe> core, List<MemRecipe> mod) {
+        NativeOwners.clear();
+        Captured coreLog = new Captured(), modLog = new Captured();
+        NativeOwners.Want c = new NativeOwners.Want(NativeOwners.CORE, lib, core, coreLog);
+        NativeOwners.Want e = new NativeOwners.Want("egmp-aa-ev", lib, mod, modLog);
+        NativeOwners.add(c);
+        NativeOwners.add(e);
+        for (NativeOwners.Want w : NativeOwners.waiting()) NativeOwners.apply(w, "/system/lib/" + lib, m.base, textEnd, md5, m);
+        System.out.print("      HMG-API: " + coreLog.out + "      egmp-aa-ev: " + modLog.out);
+        AaMessages raw = new AaMessages();
+        raw.sender = new AaMessages.Sender() {
+            public void send(Object source, byte[] message) {}
+        };
+        raw.start(new Object(), NativeOwners.patched(NativeOwners.CORE, lib));   // as ProjectionHooks: rawReady()
+        check(what + ": HMG-API's applied, the mod's refused as a conflict",
+                coreLog.out.toString().contains(": applied") && modLog.out.toString().startsWith("E native patch " + lib + " not applied")
+                        && modLog.out.toString().contains("conflict with HMG-API's " + core.get(0).id.substring(0, 7)));
+        check(what + ": nativePatched false for the mod, rawReady true",
+                !NativeOwners.patched("egmp-aa-ev", lib) && NativeOwners.patched(NativeOwners.CORE, lib) && raw.ready());
+        return modLog.out.toString();
+    }
+
+    static void synthetic() {
+        byte[] lib = new byte[0x4000];
+        for (int i = 0; i < lib.length; i++) lib[i] = (byte) (i * 13 + 5);
+        byte[] after = lib.clone();
+        after[0x210] = 0x19;
+        String text = "verify 0x208 16 " + MemRecipe.md5(Arrays.copyOfRange(lib, 0x208, 0x218)) + " "
+                + MemRecipe.md5(Arrays.copyOfRange(after, 0x208, 0x218)) + "\npatch 0x210 19\n";
+        List<MemRecipe> core = Arrays.asList(MemRecipe.parse("id aa-raw-test0000\n" + text));
+        List<MemRecipe> mod = Arrays.asList(MemRecipe.parse("id ev-sensor-test0000\n" + text));
+        coexist("synthetic", new Mem(0x40000000L, lib.clone()), lib.length, "x", "libt.so", core, mod);
+        NativeOwners.clear();
+        Captured alone = new Captured();
+        NativeOwners.Want w = new NativeOwners.Want("egmp-aa-ev", "libt.so", mod, alone);
+        NativeOwners.add(w);
+        NativeOwners.apply(w, "/system/lib/libt.so", 0x40000000L, lib.length, "x", new Mem(0x40000000L, lib.clone()));
+        check("synthetic: without HMG-API's, the mod's own applies (nativePatched true)", NativeOwners.patched("egmp-aa-ev", "libt.so"));
+        NativeOwners.clear();
     }
 
     static int i32(byte[] b, int o) {

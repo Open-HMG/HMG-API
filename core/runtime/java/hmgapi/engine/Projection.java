@@ -11,7 +11,7 @@ import java.util.Map;
  *
  *   "projection": {"aa_density": 200,                       Android Auto's DPI (60-480; stock 240 on wide screens)
  *                  "aa_sensors": {"remove": ["speed"],       not offered to the phone (speed: no tap limit)
- *                                 "add": [23]},             sensor types offered as well (1-23)
+ *                                 "add": [23]},             sensor types offered as well (1-26)
  *                  "aa_fuel_types": [10], "aa_ev_connectors": [4, 1],
  *                  "aa_raw": true,                          hook code sends raw sensor batches (ProjectionHooks.sendRaw)
  *                  "events": true}                          the mod's apps hear hmgapi.intent.action.PROJECTION
@@ -19,7 +19,7 @@ import java.util.Map;
  * Density: one value; two mods asking differently is a conflict (the first by id
  * wins, the owner picks with hmgapi.json overrides.projection {"aa_density": "<mod>"}).
  * Sensors, fuel types and connectors: what all mods ask, together.
- * "aa_raw" and sensor types 22-23 need HMG-API's Android Auto library recipe
+ * "aa_raw" and sensor types 22-26 need HMG-API's Android Auto library recipe
  * (hook.CoreRecipes): state.json "aa_raw_by" lists the mods that need it, and GPM's
  * process puts it on only then. Builds without a recipe don't get either.
  */
@@ -28,7 +28,7 @@ public final class Projection {
 
     public static final List<String> REMOVABLE = java.util.Arrays.asList("speed");
     /** the last sensor type the stock Android Auto library reads, and the last with HMG-API's recipe */
-    public static final int STOCK_LAST_SENSOR = 21, RECIPE_LAST_SENSOR = 23;
+    public static final int STOCK_LAST_SENSOR = 21, RECIPE_LAST_SENSOR = 26;
 
     static final class Ask {
         String mod;

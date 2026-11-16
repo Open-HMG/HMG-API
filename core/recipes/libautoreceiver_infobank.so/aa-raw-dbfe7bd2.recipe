@@ -1,0 +1,19 @@
+# HMG-API core: Android Auto library, sensor types 22-26 and raw messages (ProjectionHooks.sendRaw).
+# For the stock build dbfe7bd2e36152a50f97fed612cf6326; its verify windows mismatch on any other build.
+# Not made from the library here: the last three windows are egmp-aa-ev's ev-sensor-dbfe7bd2 (its
+# tool, on the stock library; same bytes written). The first window's stock bytes are 48ee793a's at
+# 0x144eba (both of egmp's hashes match them), so its hash with cmp r0,#25 is computed from those.
+# args: --sites 0x144e82,0xb14e6,0xb18ac --queue 0xaf50a --id aa-raw-dbfe7bd2
+id aa-raw-dbfe7bd2
+file /system/lib/libautoreceiver_infobank.so
+# SensorType_IsValid: sensor types 1..26 parse (23: vehicle energy model)
+verify 0x144e7a 16 d179b521606a301804a82ff9efc29d21 466df3902c6e57c21505b7f3d3a570c5
+# handleSensorRequest default: SUCCESS for a registered type outside 1..21, not -9
+verify 0xb14de 16 4ee1fb69c03e45fe5be279c930a03e8b b8d3f4d5d2e83446567b647bc5f24325
+# reportDiagnosticsData: tail-branch into queueOutgoing (raw messages)
+verify 0xb18a4 16 ea1d1404c682693c6627048da47fe929 171c212d7bdab78056f5c2cc2347d283
+# queueOutgoing: the branch target, checked, unchanged
+verify 0xaf50a 24 be6e61fdadfcb30fac20b527f1ebea35 be6e61fdadfcb30fac20b527f1ebea35
+patch 0x144e82 1928
+patch 0xb14e6 4ff00007
+patch 0xb18ac fdf72dbe

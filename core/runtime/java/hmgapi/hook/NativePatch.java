@@ -4,7 +4,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,52 +26,7 @@ import hmgapi.engine.MemRecipe;
 final class NativePatch {
     private NativePatch() {}
 
-    /** the owner of HMG-API's own recipes */
-    static final String CORE = "HMG-API";
-
-    static final class Want {
-        /** null: HMG-API's own */
-        final ModContext mod;
-        final String owner, lib;
-        final List<MemRecipe> recipes;
-        boolean done;
-        /** one of its recipes is in place (applied, already there, or the library has it) */
-        volatile boolean applied;
-
-        Want(ModContext mod, String lib, List<MemRecipe> recipes) {
-            this.mod = mod;
-            this.owner = mod == null ? CORE : mod.id;
-            this.lib = lib;
-            this.recipes = recipes;
-        }
-
-        void log(String msg) {
-            if (mod != null) mod.log(msg);
-            else HmgApi.i(msg);
-        }
-
-        void error(String msg, Throwable t) {
-            if (mod != null) mod.error(msg, t);
-            else if (t != null) HmgApi.e(msg, t);
-            else HmgApi.i(msg);
-        }
-    }
-
-    static final class Owned {
-        final String mod, recipe;
-        final List<long[]> regions;
-
-        Owned(String mod, String recipe, List<long[]> regions) {
-            this.mod = mod;
-            this.recipe = recipe;
-            this.regions = regions;
-        }
-    }
-
-    static final List<Want> wants = new ArrayList<Want>();
-    /** library path -> recipes applied to it in this process */
-    static final Map<String, List<Owned>> owned = new HashMap<String, List<Owned>>();
-    static boolean hooked;
+    static final String CORE = NativeOwners.CORE;
 
     static final MemRecipe.Memory MEMORY = new MemRecipe.Memory() {
         @Override
@@ -91,16 +45,31 @@ final class NativePatch {
         }
     };
 
-    static synchronized void request(ModContext mod, String lib, List<MemRecipe> recipes) {
+    static boolean hooked;
+
+    static synchronized void request(final ModContext mod, String lib, List<MemRecipe> recipes) {
         hookLoads();
-        Want w = new Want(mod, lib, recipes);
-        wants.add(w);
+        NativeOwners.Log log = new NativeOwners.Log() {
+            @Override
+            public void info(String msg) {
+                if (mod != null) mod.log(msg);
+                else HmgApi.i(msg);
+            }
+
+            @Override
+            public void error(String msg, Throwable t) {
+                if (mod != null) mod.error(msg, t);
+                else if (t != null) HmgApi.e(msg, t);
+                else HmgApi.i(msg);   // a build HMG-API has no recipe for: not an error
+            }
+        };
+        NativeOwners.add(new NativeOwners.Want(mod == null ? CORE : mod.id, lib, recipes, log));
         tryAll();
     }
 
     /** HMG-API's own recipes for a library (CoreRecipes), once per process */
     static synchronized void core(String lib) {
-        for (Want w : wants) if (w.mod == null && w.lib.equals(lib)) return;
+        if (NativeOwners.asked(CORE, lib)) return;
         List<MemRecipe> r = new ArrayList<MemRecipe>();
         for (String text : CoreRecipes.of(lib)) r.add(MemRecipe.parse(text));
         if (r.isEmpty()) {
@@ -111,9 +80,8 @@ final class NativePatch {
     }
 
     /** whether one of owner's recipes for lib is in place in this process (owner: a mod id, or CORE) */
-    static synchronized boolean patched(String owner, String lib) {
-        for (Want w : wants) if (w.applied && w.owner.equals(owner) && w.lib.equals(lib)) return true;
-        return false;
+    static boolean patched(String owner, String lib) {
+        return NativeOwners.patched(owner, lib);
     }
 
     /** after every library load in this process, the patches still waiting are tried */
@@ -133,8 +101,7 @@ final class NativePatch {
 
     static synchronized void tryAll() {
         Map<String, long[]> maps = null;
-        for (Want w : wants) {
-            if (w.done) continue;
+        for (NativeOwners.Want w : NativeOwners.waiting()) {
             if (maps == null) maps = maps();
             long[] m = null;
             String path = null;
@@ -145,50 +112,8 @@ final class NativePatch {
                 }
             }
             if (m == null) continue;
-            w.done = true;
-            apply(w, path, m[0], m[1]);
+            NativeOwners.apply(w, path, m[0], m[1], ModContext.md5(path), MEMORY);
         }
-    }
-
-    private static void apply(Want w, String path, long base, long textEnd) {
-        String md5 = ModContext.md5(path);
-        List<Owned> here = owned.get(path);
-        if (here == null) owned.put(path, here = new ArrayList<Owned>());
-        StringBuilder tried = new StringBuilder();
-        for (MemRecipe r : w.recipes) {
-            Owned clash = overlap(here, r.regions());
-            if (clash != null) {
-                tried.append("; ").append(r.id).append(": conflict with ").append(clash.mod).append("'s ").append(clash.recipe);
-                continue;
-            }
-            MemRecipe.Result res;
-            try {
-                res = r.apply(MEMORY, base, textEnd, md5);
-            } catch (Throwable t) {
-                w.error("native patch " + r.id + " on " + w.lib, t);
-                return;
-            }
-            if (res.ok()) {
-                here.add(new Owned(w.owner, r.id, r.regions()));
-                w.applied = true;
-                w.log("native patch " + w.lib + ": " + res.message);
-                return;
-            }
-            tried.append("; ").append(res.message);
-            if (res.status == MemRecipe.Result.FAILED) break;   // something was written: no other recipe on top
-        }
-        w.error("native patch " + w.lib + " not applied" + tried, null);
-    }
-
-    static Owned overlap(List<Owned> here, List<long[]> regions) {
-        for (Owned o : here) {
-            for (long[] a : o.regions) {
-                for (long[] b : regions) {
-                    if (a[0] < b[1] && b[0] < a[1]) return o;
-                }
-            }
-        }
-        return null;
     }
 
     /** loaded libraries: path -> {address of file offset 0 (its code mapping), the code mapping's length} */

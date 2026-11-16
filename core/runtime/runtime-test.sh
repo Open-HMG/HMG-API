@@ -193,7 +193,7 @@ has "... and the owner is told how to pick" 'conflict: tube asks Android Auto de
 has "sensors, fuel and connectors: together" '"aa_sensors_remove":["speed"],"aa_sensors_add":[23],"aa_fuel_types":[10],"aa_ev_connectors":[1,5,4]' "$st"
 has "events: the asking mod's apps" '"events":["dev.example.tube"]' "$st"
 has "only speed can be left out" "tube: projection aa_sensors remove: gps (only [speed])" "$out"
-has "sensor types: what the library can read (1-23)" "dpi: projection aa_sensors add: 30 isn't 1-23" "$out"
+has "sensor types: what the library can read (1-26)" "dpi: projection aa_sensors add: 30 isn't 1-26" "$out"
 has "aa_raw: true or false" "dpi: projection aa_raw: true or false" "$out"
 has "type 23 asks for HMG-API's library recipe" '"aa_raw_by":["tube"]' "$st"
 mkdir -p "$D/settings"; printf '{"overrides": {"projection": {"aa_density": "tube"}}}\n' > "$D/settings/hmgapi.json"

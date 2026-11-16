@@ -8,8 +8,8 @@ import java.util.List;
  * can be offered, and the Wireless mod's navigation message lines.
  */
 final class AaMessages {
-    /** the last sensor type the stock library reads; HMG-API's library recipe adds 22 and 23 */
-    static final int STOCK_LAST_SENSOR = 21, RECIPE_LAST_SENSOR = 23;
+    /** the last sensor type the stock library reads; HMG-API's library recipe adds 22-26 (23: EV energy model) */
+    static final int STOCK_LAST_SENSOR = 21, RECIPE_LAST_SENSOR = 26;
     /** the one message type sendRaw takes: a sensor batch (SENSOR_MESSAGE_BATCH) */
     static final int SENSOR_BATCH = 0x8003;
     /** Android Auto navigation messages: destinations and charging stops, next turn distance and time */
@@ -72,7 +72,7 @@ final class AaMessages {
     }
 
     /**
-     * The sensor types to add to the offered list: up to 21 always, 22 and 23 only with
+     * The sensor types to add to the offered list: up to 21 always, 22-26 only with
      * the library recipe in place; the others go to dropped.
      */
     static int[] offerable(int[] add, boolean recipeApplied, List<Integer> dropped) {

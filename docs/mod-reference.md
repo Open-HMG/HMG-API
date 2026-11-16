@@ -222,9 +222,9 @@ A car without a button ignores bindings to it. The key names are the car's own
   (`overrides.projection {"aa_density": "<mod>"}`).
 - `aa_sensors`: `remove: ["speed"]` doesn't offer the phone the speed sensor (no
   tap/scroll limit while moving; for every mod, the plan says so); `add` offers more
-  sensor types (1-23). The stock library reads types up to 21. 22 and 23 (23: EV
-  energy model) need HMG-API's Android Auto library recipe (below): asking for one
-  puts the recipe on, and the type is offered only where the recipe applied.
+  sensor types (1-26). The stock library reads types up to 21. 22-26 (23: EV energy
+  model) need HMG-API's Android Auto library recipe (below): asking for one puts the
+  recipe on, and the type is offered only where the recipe applied.
 - `aa_fuel_types`, `aa_ev_connectors`: instead of GPM's "unknown".
 - `aa_raw`: your hook code sends raw sensor batches (`ProjectionHooks.sendRaw`,
   below). Puts HMG-API's library recipe on.
@@ -239,14 +239,22 @@ Settings apply through hooks when GPM starts, and every mod's asks are combined.
 
 **HMG-API's Android Auto library recipe.** HMG-API has a recipe for some builds of
 `libautoreceiver_infobank.so` (`core/recipes`), put on in GPM's memory only (the file
-stays stock), and only while a mod asks for it (`aa_raw`, or type 22 or 23). It lets
-the library read sensor types 1-23, answers SUCCESS to the phone for a registered type
-above 21, and turns `SensorSource.nativeReportDiagnosticsData` into a send of the whole
-message. Builds covered: `48ee793a…` (US 260507: Ioniq 5 and EV6). On any other build
-nothing is patched: types 22-23 aren't offered and `rawReady()` stays false; the log says
-`native patch libautoreceiver_infobank.so not applied`. A recipe for another build is
-made with `tools/mkaarecipe.py`. Don't patch these sites in your own `hooks.native`
-recipe: HMG-API's goes on first, and a recipe overlapping it isn't applied.
+stays stock), and only while a mod asks for it (`aa_raw`, or a type from 22 to 26). It
+lets the library read sensor types 1-26, answers SUCCESS to the phone for a registered
+type above 21, and turns `SensorSource.nativeReportDiagnosticsData` into a send of the
+whole message. Library builds covered: `48ee793a…` and `dbfe7bd2…` (the md5 of
+`/system/lib/libautoreceiver_infobank.so`). Not covered: every other build, the Canadian
+`a0bea1c4…` among them. There nothing is patched: types 22-26 aren't offered and
+`rawReady()` stays false; the log says `native patch libautoreceiver_infobank.so not
+applied`. A recipe for another build is made with `tools/mkaarecipe.py`.
+
+Don't patch these sites in your own `hooks.native` recipe. HMG-API's goes on first in
+GPM's process, so while any mod asks for it, a recipe of yours that overlaps it isn't
+applied: the log says `native patch libautoreceiver_infobank.so not applied; <your
+recipe>: conflict with HMG-API's aa-raw-…`, and `mod.nativePatched(lib)` is false for
+you. The library is patched all the same (HMG-API's bytes): check `rawReady()`, not your
+own recipe. A mod moving over from its own recipe (egmp-aa-ev) asks for `aa_raw` and
+drops the recipe for the builds HMG-API covers.
 
 **From hook code** (GPM's process, `hmgapi.hook.ProjectionHooks`):
 
