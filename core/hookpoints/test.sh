@@ -6,6 +6,7 @@
 cd "$(dirname "$0")/../.."
 python3 tools/report-map-test.py || exit 1
 echo "ok    Car Reports preserve missing points and explicit car identities"
+python3 tools/maplib.py check || exit 1
 python3 tools/check-maps.py --rebuild || exit 1
 python3 tools/mkhookdoc.py --check || exit 1
 [ -n "$(python3 tools/cars.py ids)" ] || { echo "skip  coverage and the on-car mapper (no stock trees, docs/car-trees.md)"; exit 0; }

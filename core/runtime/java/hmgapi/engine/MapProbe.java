@@ -276,7 +276,7 @@ public final class MapProbe {
             throw new Miss("no such constructor in " + owner, false);
         }
         if ("method".equals(kind)) {
-            Dex.Member h = smali ? methodByReference(c, id, f) : null;
+            Dex.Member h = smali ? methodByReference(classes, c, id, f) : null;
             if (!smali) {
                 List<Dex.Member> hits = new ArrayList<Dex.Member>();
                 for (Dex.Member x : c.methods) if (methodOk(x, f)) hits.add(x);
@@ -289,6 +289,7 @@ public final class MapProbe {
             e.put("ret", h.ret);
             e.put("static", h.isStatic);
             if (smali) e.put("sig", Dex.sigHex(h.sig));
+            memberOwner.put(id, String.valueOf(owner));
             return e;
         }
         throw new Miss("unknown kind " + kind, false);
@@ -299,7 +300,7 @@ public final class MapProbe {
      * same as another car's for it (map "sig", tools/dexsig.py). Names move between builds (py on
      * one is pB on another, and py there is something else), so a name is never enough.
      */
-    Dex.Member methodByReference(Dex.Cls c, String id, Map<String, Object> f) throws Miss {
+    Dex.Member methodByReference(Map<String, Dex.Cls> classes, Dex.Cls c, String id, Map<String, Object> f) throws Miss {
         List<Map<String, Object>> l = references.get(id);
         if (l == null) throw new Miss("found by a smali pattern only, and no other car's map has it", false);
         Set<String> sigs = new java.util.HashSet<String>();
@@ -307,14 +308,76 @@ public final class MapProbe {
         if (sigs.isEmpty()) throw new Miss("found by a smali pattern only, and no other car's map has its code signature", false);
         List<Dex.Member> same = new ArrayList<Dex.Member>();
         for (Dex.Member x : c.methods) if (methodOk(x, f) && sigs.contains(Dex.sigHex(x.sig))) same.add(x);
-        // several methods with the same code (getters of different fields, say) can't be told
-        // apart from the dex, by name or otherwise: missing, never a guess
+        // several methods with the same code (getters of different fields, say): the catalogue's
+        // call site, when it has one, tells them apart; otherwise missing, never a guess
+        if (same.size() > 1 && f.get("site") instanceof Map) same = bySite(classes, c, same, (Map<String, Object>) f.get("site"));
         if (same.size() == 1) {
             byReference.add(id);
             return same.get(0);
         }
         throw new Miss("found by a smali pattern only; " + same.size() + " methods in " + c.name
             + " have the other cars' code for it" + (same.size() > 1 ? " (needs this car's map)" : ""), false);
+    }
+
+    /** methods by id: the class they're in (for a "site" hint's then_calls) */
+    final Map<String, String> memberOwner = new java.util.HashMap<String, String>();
+
+    /**
+     * A catalogue "site" hint (MapProbe only; map-car.py has the smali pattern): what calls the
+     * method, in a form the dex still shows after odex quickening.
+     *   "virtual": true        the pattern calls it with invoke-virtual: a vtable method
+     *   "in": class or @point  a method of that class calls it with invoke-static ...
+     *   "next": [families]     ... followed by these instructions (Dex.family) ...
+     *   "then_calls": @point   ... the first invoke-static among them calling that method point
+     */
+    @SuppressWarnings("unchecked")
+    List<Dex.Member> bySite(Map<String, Dex.Cls> classes, Dex.Cls c, List<Dex.Member> same, Map<String, Object> site) throws Miss {
+        List<Dex.Member> out = new ArrayList<Dex.Member>(same);
+        if (Boolean.TRUE.equals(site.get("virtual"))) {
+            for (java.util.Iterator<Dex.Member> it = out.iterator(); it.hasNext(); ) if (!it.next().isVirtual) it.remove();
+        }
+        if (site.get("in") == null || out.size() <= 1) return out;
+        Dex.Cls in = classes.get(resolve(String.valueOf(site.get("in"))));
+        if (in == null) throw new Miss("no class " + site.get("in") + " for the call site", false);
+        List<Object> next = site.get("next") instanceof List ? (List<Object>) site.get("next") : new ArrayList<Object>();
+        String then = null;
+        if (site.get("then_calls") != null) {
+            String pid = String.valueOf(site.get("then_calls")).replaceFirst("^@", "");
+            Object e = found.get(pid);
+            if (!(e instanceof Map) || memberOwner.get(pid) == null) throw new Miss("needs " + pid + " first", true);
+            Map<String, Object> me = (Map<String, Object>) e;
+            StringBuilder t = new StringBuilder(memberOwner.get(pid)).append('.').append(me.get("method")).append('(');
+            int k = 0;
+            for (Object p : (List<Object>) me.get("params")) t.append(k++ > 0 ? "," : "").append(p);
+            then = t.append(')').append(me.get("ret")).toString();
+        }
+        Set<String> called = new java.util.HashSet<String>();
+        try {
+            for (Dex.Member m : in.methods) {
+                for (Dex.Site st : Dex.sites(in, m, Math.max(next.size(), 8))) {
+                    if (!"invoke-static".equals(st.op) || st.target == null) continue;
+                    boolean ok = st.next.size() >= next.size();
+                    for (int k = 0; ok && k < next.size(); k++) ok = st.next.get(k).equals(String.valueOf(next.get(k)));
+                    if (ok && then != null) {
+                        String first = null;
+                        for (int k = 0; k < next.size() && first == null; k++) if ("invoke-static".equals(st.next.get(k))) first = st.nextTargets.get(k);
+                        ok = then.equals(first);
+                    }
+                    if (ok) called.add(st.target);
+                }
+            }
+        } catch (Miss x) {
+            throw x;
+        } catch (Exception x) {
+            throw new Miss("can't read the code of " + in.name + ": " + x, false);
+        }
+        for (java.util.Iterator<Dex.Member> it = out.iterator(); it.hasNext(); ) {
+            Dex.Member x = it.next();
+            StringBuilder t = new StringBuilder(c.name).append('.').append(x.name).append('(');
+            for (int k = 0; k < x.params.size(); k++) t.append(k > 0 ? "," : "").append(x.params.get(k));
+            if (!called.contains(t.append(')').append(x.ret).toString())) it.remove();
+        }
+        return out;
     }
 
     void byRef(String id, int hits) throws Miss {
