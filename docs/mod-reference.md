@@ -373,6 +373,17 @@ it: `"nemesis_conflicts": ["wireless.projection"]`. The mod's NEMESIS package
 other way round. A mod installed through HMG-API gets the same refusal when HMG-API lists
 it in NEMESIS (engine `nemesis-sync`). The engine's own install ignores the field.
 
+A mod that needs another lists it in `"requires"` (`"wireless-carplay-aa >=2.1.0"`, or
+`{"id": "wireless-carplay-aa", "version": ">=2.1.0"}`). Its NEMESIS package then depends on
+that mod's package, from the lowest version the range lets in
+(`hmgapi.wireless-carplay-aa@>=2.1.0`; a pre-release floor like `^2.2.0-rc.1` as its
+package-version, `2.1.99.1`), so NEMESIS won't install it without that mod. An optional
+entry (`"optional": true`, a mod yours runs without) stays out of it.
+NEMESIS checks only that floor: the rest of a range (`^`, `~`, an exact version, an upper
+bound) is HMG-API's own check, and `mknemesismod.sh` prints a note when it leaves part of
+a range out. A `"requires"` entry that isn't a mod id, or a mod both required and
+refused in `"nemesis_conflicts"`, stops the build (`install/nemesis/README.md`).
+
 Your key (`java -cp out/engine-host hmgapi.engine.Signing keygen <file>`) signs every
 version. The mod's id comes with a UUID made from it, and only packages signed
 with the same key update it. Owners install from a USB stick (`HMGAPI/updates/`)

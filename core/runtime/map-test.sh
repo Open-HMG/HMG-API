@@ -6,6 +6,8 @@ set -e
 cd "$(dirname "$0")/../.."
 CP=$(mktemp -d); T=$(mktemp -d); trap 'rm -rf "$T" "$CP"' EXIT
 sh tools/engine-classes.sh "$CP" 2>/dev/null
+javac --release 8 -cp "$CP" -d "$CP" core/runtime/test/hmgapi/engine/MapProbeTest.java
+java -cp "$CP" hmgapi.engine.MapProbeTest "$T/probe"
 R=$T/root
 fail=0
 check() { if [ "$2" = "$3" ]; then echo "ok    $1"; else echo "FAIL  $1: wanted [$2], got [$3]"; fail=1; fi; }
