@@ -127,6 +127,12 @@ check "optional requires missing or out of range: no problem" 0 $rc
 has "... the plan says what it runs without" "optional modh runs without nothere (adds: more): isn't installed and turned on" "$out"
 has "... and which version it works with" "optional modh runs without moda: moda 1.0.0 is installed, it works with moda >=5" "$out"
 rm -r $R/data/hmgapi/mods/modh
+mod modi 1.0.0 ', "requires": [{"id": "modj", "optional": true}]' ''
+mod modj 1.0.0 ', "requires": [{"id": "modi", "optional": true}]' ''
+eng plan
+check "two mods that optionally require each other: no problem" 0 $rc
+hasnt "... no requires loop" "requires loop" "$out"
+rm -r $R/data/hmgapi/mods/modi $R/data/hmgapi/mods/modj
 
 # ---- a file changed outside HMG-API
 cp $R/system/build.prop $T/bp.keep; echo "x=1" >> $R/system/build.prop
