@@ -382,6 +382,25 @@ A `test.sh` sources `$HMGAPI_SDK/test/lib.sh` for `check`, `has`, `eng` (the eng
 your machine, on a fake head unit in `$R`) and `tree`. `mods/examples/hello/test.sh` is
 the template. The README in the SDK lists the rest.
 
+`plan_test` (in the same `lib.sh`) runs your mod through `engine plan` on a fake head unit
+for each car its `"system"` names that HMG-API has a hook map for (the SDK carries the
+maps): no problems in the plan, the `"system"` takes the unit, HMG-API uses the car's
+map, every point in `hooks.points` is mapped there, your hooks load, which points you
+share with other mods, and your native recipes (`hooks.native`) stay clear of the
+recipes of the mods you require for the same library build. Give it your mod's folder
+and the folder of each mod in `"requires"` (each with its `mod.json` and the files it
+names, such as recipes; no build needed):
+
+```
+. "$HMGAPI_SDK/test/lib.sh"
+plan_test "$(dirname "$0")" ../other-mod/other-mod
+exit $fail
+```
+
+A unit there has stand-ins, not the car's files, so file changes (`patches.json`) are
+left to the stock-file tests below. `PLAN_POINTS` adds points your code reads by name
+(through `Points`) to the mapped check; `HMGAPI_MAPS` uses another HMG-API's `maps/`.
+
 A test that needs a car's stock files gets them from `car_tree` (and `car_prop`), and
 skips without them; never a path of your own. `tools/cars.py test --mods <your repo>`
 in an HMG-API checkout then runs your tests on every stock tree you have
