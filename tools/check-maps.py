@@ -22,6 +22,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 import cartrees
+import maplib
 problems = []
 unconfirmed = {}
 points = {}
@@ -37,7 +38,7 @@ for p in points.values():
         if o is None or o['kind'] != 'class':
             problems.append('%s: "of" %s isn\'t a class point' % (p['id'], p.get('of')))
 KEY = {'class': 'class', 'method': 'method', 'ctor': 'ctor', 'field': 'field'}
-maps = sorted(glob.glob(os.path.join(REPO, 'maps', '*', '*', '*', '*', 'car.json')))
+maps = [os.path.join(f, 'car.json') for f in maplib.folders()]
 for cj in maps:
     d = os.path.dirname(cj)
     rel = os.path.relpath(d, os.path.join(REPO, 'maps'))
@@ -49,9 +50,10 @@ for cj in maps:
         problems.append('%s: status %r (mapped, probed or verified)' % (rel, car.get('status')))
     if car.get('status') == 'verified' and not car.get('verified'):
         problems.append('%s: verified, but no verified record (who, when, report)' % rel)
-    entries = {}
-    for app in car.get('apps', []):
-        entries.update(json.load(open(os.path.join(d, app + '.json'))))
+    entries = maplib.entries(d)
+    for pid in car.get('names', {}):
+        if pid not in points:
+            problems.append('%s: names has %s, which isn\'t in the catalogue' % (rel, pid))
     missing = car.get('missing', {})
     for pid, p in points.items():
         e = entries.get(pid)
@@ -90,13 +92,15 @@ if '--rebuild' in sys.argv:
             if r.returncode:
                 problems.append('%s: map-car.py failed: %s' % (folder, r.stderr.strip()[-200:]))
                 continue
-            for f in glob.glob(os.path.join(t, folder, '*.json')):
-                a, b = json.load(open(f)), json.load(open(os.path.join(REPO, 'maps', folder, os.path.basename(f))))
-                if os.path.basename(f) == 'car.json':
-                    a = {k: v for k, v in a.items() if k not in ('status', 'verified')}
-                    b = {k: v for k, v in b.items() if k not in ('status', 'verified')}
-                if a != b:
-                    problems.append('%s: %s rebuilt differently from the stock tree' % (folder, os.path.basename(f)))
+            ca, aa = maplib.load(os.path.join(t, folder), t)
+            cb, ab = maplib.load(os.path.join(REPO, 'maps', folder))
+            ca = {k: v for k, v in ca.items() if k not in ('status', 'verified')}
+            cb = {k: v for k, v in cb.items() if k not in ('status', 'verified')}
+            if ca != cb:
+                problems.append('%s: car.json rebuilt differently from the stock tree' % folder)
+            for app in sorted(set(aa) | set(ab)):
+                if aa.get(app) != ab.get(app):
+                    problems.append('%s: %s rebuilt differently from the stock tree' % (folder, app))
             print('ok    rebuilt %s from %s' % (folder, tree))
 for rel, ids in sorted(unconfirmed.items()):
     print('note  %s: %d smali-only method(s) mapped before code signatures, unconfirmed (a Car Report or the stock'

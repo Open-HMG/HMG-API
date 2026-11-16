@@ -117,6 +117,22 @@
       ]
     }
   },
+  "names": {
+    "panel.test_gate.on": {
+      "method": "pB",
+      "params": [],
+      "ret": "boolean",
+      "static": true,
+      "sig": "c65792efa099ac9e"
+    },
+    "themesettings.split_item.type": {
+      "method": "gk",
+      "params": [],
+      "ret": "int",
+      "static": false,
+      "sig": "4425414b67eb43ee"
+    }
+  },
   "missing": {
     "framework.bcm_listener_stub.drive_mode": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
     "framework.datc_service.is_unit_celsius": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",

@@ -1,6 +1,8 @@
 # Research: one base map, per-build differences
 
-Status: proposal. Nothing here changes what HMG-API does yet. It builds on two merged changes:
+Status: section 1 (the base map) is built: `tools/maplib.py`, `maps/base/`. Maintainers' answers (#236):
+one base map, yes; verify per build and per car; teach the on-car mapper the shared-code methods (the
+catalogue's `"site"`). Sections 2 and 3 are still proposals. It builds on two merged changes:
 - #232, which lets a unit map the points its shipped map lacks;
 - #233, which makes the on-car mapper take another car's method name only when the code matches.
 

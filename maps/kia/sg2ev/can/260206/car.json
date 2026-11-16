@@ -157,5 +157,12 @@
     "panel.test_gate.on",
     "panel.test_page",
     "themesettings.split_item.type"
+  ],
+  "unconfirmed": [
+    "dipo.iap2.bt_address",
+    "dipo.iap2.set_notify_on",
+    "panel.home.build_views",
+    "panel.test_gate.on",
+    "themesettings.split_item.type"
   ]
 }
