@@ -5,6 +5,17 @@ yet: the prototypes are a class the engine doesn't call (`SiteFind`), a class no
 (`SelfTest`), a host tool (`tools/sitefind.py`) and their tests. **No car and no adb were
 used for any of it.**
 
+Since then, two ideas have been built in their own PRs:
+- **idea 4**, recipes that find their sites: Open-HMG/HMG-API#230 (`hooks.native_sites`);
+- **idea 1**, local self-mapping: Open-HMG/HMG-API#232 (`map-car --local`, `state/local-map.json`).
+
+The `SiteFind` and `tools/sitefind.py` there replace this branch's prototypes.
+
+**HMG-API never owns patches.** Native recipes stay in the mods that need them. HMG-API ships
+only the mechanisms (`MemRecipe`, `NativePatch`, and from #230 `SiteFind`/`SiteRecipes`) and
+the tools to make recipes (`mkrecipe.py`, `mkmemrecipe.py`, `sitefind.py`). Everything below
+about recipes means a mod's recipes, run by HMG-API's mechanism.
+
 ## The problem
 
 Two things cost maintainer time for every new car, firmware and hook point:
@@ -422,6 +433,34 @@ one, and the resolved recipe goes through `MemRecipe`'s verify like any other.
 | writes | `state/local-map.json` | the same | the report | a cached recipe | the same |
 | off switch | `local_points` | the same, and the step | (it only reports) | the mod | the mod |
 | rollback | delete the file; boot guard | the same | none needed | app restart; boot guard | the same |
+
+## Known stock hashes per file (an idea from Discord)
+
+**The idea.** Ship the md5 of every stock APK and `.so` per firmware. A file whose hash isn't
+known for the car's firmware has been changed, likely by another NEMESIS package, and HMG-API
+can say so before a mod relies on it.
+
+**Whole-file hashes flag packages that coexist fine today.** NEMESIS's projection.tbt package
+replaces `libautoreceiver_infobank.so` with its own build (md5 c08410a8). That build is the
+stock 48ee793a with the turn-by-turn change in three windows. The Wireless mod's
+`aa-tbt-48ee793a` recipe was made from that same pair, and egmp-aa-ev's recipe applies to it
+unchanged: its verify windows are outside those three. So a whole-file check would call
+c08410a8 "not stock" and stop mods that work on it. It's also true that the Wireless mod's
+own tbt recipe doesn't fit c08410a8: it finds its change already there and writes nothing.
+
+**Recommendation.**
+- **Flag an unknown hash, but don't act on it.** Show it in the Car Report and the app ("this
+  library isn't a stock build HMG-API knows").
+- **Turn a mod off only when its own verify windows fail.** `MemRecipe`, `SiteFind` and the
+  engine's stock checks already do that, per recipe and per file change. A mod whose windows
+  are untouched keeps working on a library another package changed elsewhere, and one whose
+  windows were changed writes nothing.
+- **Use the hashes for:**
+  - the Car Report (which package's build a car has);
+  - `tools/cars.py list` ("exact"/"different" already work this way for maps);
+  - choosing a fixed recipe, as `native` md5 lines do today.
+
+  Not as a gate.
 
 ## Coordination
 
