@@ -17,6 +17,8 @@ import argparse, collections, glob, json, os, re, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
+sys.path.insert(0, HERE)
+import maplib  # noqa: E402
 
 
 def mapping(value, label):
@@ -141,13 +143,13 @@ def main():
         car['missing'] = dict(sorted(missing.items()))
     if mc.get('by_reference'):
         car['by_reference'] = sorted(mc['by_reference'])
-    for app, entries in by_app.items():
-        with open(os.path.join(d, app + '.json'), 'w') as f:
-            json.dump(dict(sorted(entries.items())), f, indent=2)
-            f.write('\n')
-    with open(os.path.join(d, 'car.json'), 'w') as f:
-        json.dump(car, f, indent=2)
-        f.write('\n')
+    base = maplib.base(a.maps)
+    if base:   # the repo: base + this build's differences (tools/maplib.py)
+        maplib.write_compact(d, car, {app: dict(sorted(e.items())) for app, e in by_app.items()}, base)
+    else:
+        for app, entries in by_app.items():
+            maplib.dump(dict(sorted(entries.items())), os.path.join(d, app + '.json'))
+        maplib.dump(car, os.path.join(d, 'car.json'))
     print('%s: %d points, %d missing, from %d report(s)' % (os.path.relpath(d, REPO), len(mc['points']), len(missing), len(reps)))
 
 

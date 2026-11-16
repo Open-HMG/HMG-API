@@ -42,14 +42,14 @@ public final class MapProbeMethodTest {
     }
 
     static void found(String label, MapProbe p, Dex.Cls c, String want) throws Exception {
-        String got = p.methodByReference(c, "test.gate.on", FIND).name;
+        String got = p.methodByReference(java.util.Collections.singletonMap(c.name, c), c, "test.gate.on", FIND).name;
         if (!want.equals(got)) throw new AssertionError(label + ": wanted " + want + ", got " + got);
         checks++;
     }
 
     static void missing(String label, MapProbe p, Dex.Cls c, String reason) throws Exception {
         try {
-            String got = p.methodByReference(c, "test.gate.on", FIND).name;
+            String got = p.methodByReference(java.util.Collections.singletonMap(c.name, c), c, "test.gate.on", FIND).name;
             throw new AssertionError(label + ": took " + got);
         } catch (MapProbe.Miss miss) {
             if (!miss.getMessage().contains(reason)) throw new AssertionError(label + ": " + miss.getMessage());
@@ -85,6 +85,18 @@ public final class MapProbeMethodTest {
         c.methods.get(1).ret = "int";
         found("shape first, then code", p, c, "py");
 
+        // the same code twice, but the pattern calls it with invoke-virtual: the private one is out
+        Map<String, Object> virtualFind = Json.object("{\"pattern\":\"gate\",\"group\":\"m\",\"params\":[],\"ret\":\"boolean\",\"static\":true,\"site\":{\"virtual\":true}}");
+        Dex.Cls vc = new Dex.Cls();
+        vc.name = "sample.v";
+        Dex.Member priv = method("L", 0x1111L), pub = method("K", 0x1111L);
+        pub.isVirtual = true;
+        vc.methods.add(priv);
+        vc.methods.add(pub);
+        String got = p.methodByReference(java.util.Collections.singletonMap(vc.name, vc), vc, "test.gate.on", virtualFind).name;
+        if (!"K".equals(got)) throw new AssertionError("site virtual: wanted K, got " + got);
+        checks++;
+
         // maps without signatures give no evidence
         File old = new File(root, "old-maps");
         reference(old, "us", "py", null);
@@ -104,7 +116,65 @@ public final class MapProbeMethodTest {
         units[4] = 0x0014;   // another field offset
         if (want.equals(Dex.sigHex(sign(units)))) throw new AssertionError("Dex.walk: a quickened operand didn't change the signature");
         checks++;
-        System.out.println("ok    by-reference methods by their code (" + checks + " checks)");
+        sites();
+        System.out.println("ok    by-reference methods by their code and call sites (" + checks + " checks)");
+    }
+
+    static void put4(byte[] b, int o, int v) {
+        for (int i = 0; i < 4; i++) b[o + i] = (byte) (v >> (8 * i));
+    }
+
+    static void put2(byte[] b, int o, int v) {
+        b[o] = (byte) v;
+        b[o + 1] = (byte) (v >> 8);
+    }
+
+    /**
+     * Dex.sitesAt on a hand-made dex: strings, types, one proto ()Z, methods A.f and A.g, and a
+     * code item that calls A.f with invoke-static, then a quickened invoke-virtual:
+     *   invoke-static {}, LA;->f()Z / move-result v0 / if-eqz v0 / iget-object-quick v0, p0, [obj+8] / goto
+     *   invoke-virtual-quick {p0}, vtable@3 / move-result-object v0 / return-object v0
+     */
+    static void sites() {
+        String[] str = { "LA;", "Z", "f", "g", "Z" };
+        byte[] b = new byte[0x200];
+        b[0] = 'd'; b[1] = 'e'; b[2] = 'x'; b[3] = '\n';
+        int strIds = 0x70, typeIds = strIds + str.length * 4, protoIds = typeIds + 8, methodIds = protoIds + 12, data = methodIds + 16;
+        put4(b, 0x38, str.length); put4(b, 0x3c, strIds);
+        put4(b, 0x40, 2); put4(b, 0x44, typeIds);
+        put4(b, 0x48, 1); put4(b, 0x4c, protoIds);
+        put4(b, 0x58, 2); put4(b, 0x5c, methodIds);
+        int at = data;
+        for (int i = 0; i < str.length; i++) {
+            put4(b, strIds + i * 4, at);
+            b[at++] = (byte) str[i].length();
+            for (char ch : str[i].toCharArray()) b[at++] = (byte) ch;
+            b[at++] = 0;
+        }
+        put4(b, typeIds, 0);       // LA;
+        put4(b, typeIds + 4, 1);   // Z
+        put4(b, protoIds, 4); put4(b, protoIds + 4, 1); put4(b, protoIds + 8, 0);   // ()Z
+        put2(b, methodIds, 0); put2(b, methodIds + 2, 0); put4(b, methodIds + 4, 2);     // A.f()Z
+        put2(b, methodIds + 8, 0); put2(b, methodIds + 10, 0); put4(b, methodIds + 12, 3); // A.g()Z
+        int[] units = { 0x0071, 0x0000, 0x0000, 0x000a, 0x0038, 0x0004, 0x00f4, 0x0008, 0x0028,
+                        0x10f8, 0x0003, 0x0000, 0x000c, 0x0011 };
+        int item = (at + 3) & ~3;
+        put4(b, item + 12, units.length);
+        for (int i = 0; i < units.length; i++) put2(b, item + 16 + i * 2, units[i]);
+        Dex d = new Dex(b);
+        d.strings = new String[str.length];
+        d.types = new String[2];
+        java.util.List<Dex.Site> ss = d.sitesAt(item, 4);
+        if (ss.size() != 2) throw new AssertionError("sites: wanted 2 calls, got " + ss.size());
+        Dex.Site st = ss.get(0);
+        if (!"invoke-static".equals(st.op) || !"A.f()boolean".equals(st.target)) throw new AssertionError("static call: " + st.op + " " + st.target);
+        if (!st.next.equals(Arrays.asList("move-result", "if-eqz", "iget-object", "goto")))
+            throw new AssertionError("families after the call (iget-object-quick is an iget-object): " + st.next);
+        checks += 2;
+        Dex.Site q = ss.get(1);
+        if (!"invoke-virtual".equals(q.op) || q.target != null) throw new AssertionError("quickened call: " + q.op + " " + q.target);
+        if (!q.next.equals(Arrays.asList("move-result-object", "return-object"))) throw new AssertionError("after the quickened call: " + q.next);
+        checks += 2;
     }
 
     /** a code item (16-byte header, then the units) after a bare dex header */
