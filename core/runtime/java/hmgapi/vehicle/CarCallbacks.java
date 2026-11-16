@@ -221,8 +221,9 @@ final class CarCallbacks {
 
     /**
      * The cluster's battery info (8 ints), a packet under 2 s old or asked for now (waiting up
-     * to waitMs); null when there's none, it isn't 8 values, or it's a wake-up packet (usable
-     * energy 0xffff, its range 0).
+     * to waitMs); null when there's none, it isn't 8 values, or it's a wake-up packet: usable
+     * energy 0xffff (its range 0), or all zeros (the first packet at a start, before the BMS
+     * has said anything: seen on a US Ioniq 5 260507, which would read range 0 and 0 C).
      */
     int[] batteryInfo(long waitMs) {
         int[] last = battery;
@@ -247,7 +248,10 @@ final class CarCallbacks {
     }
 
     static int[] good(int[] b) {
-        return b == null || b.length != 8 || b[2] == 0xffff ? null : b;
+        if (b == null || b.length != 8 || b[2] == 0xffff) return null;
+        // all zeros: no state of charge, energy or range yet (a real empty pack still has a SOC
+        // reading and a temperature; the car doesn't run at 0)
+        return b[0] == 0 && b[2] == 0 && b[6] == 0 ? null : b;
     }
 
     /** the light's status from LightRelay: hex of r, g, b (2 bytes each), brightness, dimmed, drive mode */
