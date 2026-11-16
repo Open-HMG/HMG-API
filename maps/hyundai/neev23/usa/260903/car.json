@@ -131,5 +131,16 @@
     "panel.test_gate.on",
     "panel.test_page",
     "themesettings.split_item.type"
-  ]
+  ],
+  "missing": {
+    "framework.bcm_listener_stub.drive_mode": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.hev_flag.battery_comp_power": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.hev_flag.climate_power": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.hev_flag.dc_minutes": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.hev_flag.energy_capacity": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.hev_flag.energy_map": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.hev_flag.other_ecu_power": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.hev_flag.target_soc_ac": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.hev_flag.target_soc_dc": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)"
+  }
 }

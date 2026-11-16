@@ -58,6 +58,17 @@ public final class Vehicle {
         add(m, "hv.conditioning_failure", "raw", 5000, "battery conditioning failure popup flag (BMS), as the car sends it; meaning of values not known yet");
         add(m, "conditioning.state", "text", 1000, "HMG-API's conditioning request: off, requested, waiting, active, stopping, ended (by the car), timed_out");
         add(m, "charging", "raw", 5000, "charging status");
+        add(m, "hv.energy", "Wh", 5000, "usable energy left in the high-voltage battery (HEV ENERGYMAP_1000MS, 2 Wh steps)");
+        add(m, "hv.capacity_nominal", "Wh", 600000, "the battery's nominal energy (HEV BMS_EVENERGYCAPA, 2 Wh steps); doesn't follow wear");
+        add(m, "range", "km", 5000, "range as the cluster shows it (cluster battery info, VCU_DTE_BASE)");
+        add(m, "charge.target_ac", "%", 30000, "AC charging target (HEV TARGET_SOC_SLOW, 0.5 steps)");
+        add(m, "charge.target_dc", "%", 30000, "DC fast charging target (HEV TARGET_SOC_QUICK, 0.5 steps)");
+        add(m, "charge.minutes_dc", "min", 30000, "the car's estimate of a DC fast charge to the DC target (HEV NOT_CHAR_QUICK_REM_TIME_EV)");
+        add(m, "aux.climate_power", "W", 2000, "climate control's power draw now (HEV DATC_CLMTPWRCNSMPTN_W, 20 W steps)");
+        add(m, "aux.other_ecu_power", "W", 2000, "electronics' and accessories' power draw now (HEV PWR_OTHER_ECU, 10 W steps)");
+        add(m, "aux.battery_conditioning_power", "W", 2000, "the compressor's power draw for the battery now (HEV DATC_BATTERYCOMPPWRCON_W, 20 W steps)");
+        add(m, "aux.power", "W", 2000, "the three aux.* draws added up (the battery heater has no named HEV flag, so it isn't in it)");
+        add(m, "drive_mode", "raw", 1000, "drive mode, pushed by body control: 0 default, 1 normal, 2 sport, 3 eco, 4 snow; - until it has said");
         add(m, "odometer", "km", 60000, "odometer");
         for (String seat : new String[] { "driver", "passenger", "rear_left", "rear_right" }) {
             add(m, "seat_heat." + seat, "0-3", 1000, seat + " seat heat level (0 off; a two-level seat, the EV6's rear: 0-2)");

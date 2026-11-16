@@ -95,6 +95,14 @@ the HMG-API app, and hooks see new values at once.
 | `hv.conditioning_failure` | raw | the BMS's conditioning failure popup flag (HEV `BMS_BATTCONDFAILPOPUP`); meaning of the values not known yet |
 | `conditioning.state` | text | HMG-API's conditioning request: `off`, `requested` (the indicator can't be read), `waiting`, `active`, `stopping`, `ended` (by the car), `timed_out` |
 | `odometer` | km | HEV service, `ODOMETER` |
+| `hv.energy` | Wh | usable energy left in the battery (HEV `ENERGYMAP_1000MS`, 2 Wh steps; the BMS's own figure, so it follows wear) |
+| `hv.capacity_nominal` | Wh | the battery's nominal energy (HEV `BMS_EVENERGYCAPA`, 77400 on a 77.4 kWh Ioniq 5); doesn't follow wear |
+| `range` | km | range as the cluster shows it (cluster battery info `VCU_DTE_BASE`, asked for at most every 2 s) |
+| `charge.target_ac`, `charge.target_dc` | %, 0.5 steps | the AC and DC charge limits in the EV settings (HEV `TARGET_SOC_SLOW`, `TARGET_SOC_QUICK`) |
+| `charge.minutes_dc` | min | the car's estimate of a DC fast charge to the DC limit, as on the EV screen (HEV `NOT_CHAR_QUICK_REM_TIME_EV`) |
+| `aux.climate_power`, `aux.other_ecu_power`, `aux.battery_conditioning_power` | W | power drawn now by climate control (20 W steps), the electronics and accessories (10 W steps), and the compressor for the battery (20 W steps): HEV `DATC_CLMTPWRCNSMPTN_W`, `PWR_OTHER_ECU`, `DATC_BATTERYCOMPPWRCON_W` |
+| `aux.power` | W | those three added up; `-` if one can't be read. The battery heater has no named HEV flag on these cars, so it isn't in it |
+| `drive_mode` | raw | body control's drive mode, pushed by the car (0 default, 1 normal, 2 sport, 3 eco, 4 snow); `-` until it has said. HMG-API never asks for it: asking can show the drive mode pop-up |
 | `seat_heat.<seat>` (driver, passenger, rear_left, rear_right), `seat_vent.<seat>` (driver, passenger: the rear seats have none) | level 0-3 | body control's seat climate step (one value per seat: off, ventilation 1-3 or heat 1-3) |
 | `wheel_heat`, `defogger` | raw | body control's heating status: steering wheel heat (0 off), rear defogger (1 on, 0 off); pushed by the car, `-` until it has said |
 | `seat_state.<seat>` | raw | that step: 2 off, 3-5 ventilation, 6-8 heat |
