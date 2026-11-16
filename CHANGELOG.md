@@ -16,6 +16,18 @@
   off the car only, on stock CarPlay libraries and NEMESIS's `libautoreceiver_infobank.so`
   build: the Wireless CarPlay/AA and EGMP Android Auto EV recipes come out the same, and the
   matcher never matched once in a wrong place under fuzzing.
+
+## 1.1.0-rc.3 (2026-11-16)
+
+The third release candidate: hook maps for many more cars (one map per system build), the
+Wi-Fi hotspot for cars without one, and a mapper that can map a car with no map from its own
+files. It comes with Wireless CarPlay + Android Auto 2.2.0-rc.4 and ADB 1.0.1-rc.1, and
+NEMESIS in the app menu.
+
+- **`check-points.py`: a floor that is the SDK's own version uses its own points.** A mod
+  and the core release it needs can now be built before that release is tagged (wireless
+  2.2.0-rc.4's `">=1.1.0-rc.3"` on the rc.3 SDK); before, it fetched the floor's points
+  from a release that wasn't there yet.
 - **`"wifi": {"hotspot": true}`: HMG-API turns on the Wi-Fi hotspot feature** for mods
   that need the Wi-Fi chip. Without the stock hotspot feature the unit never powers its
   chip, so it was never seen and HMG-API said "no Wi-Fi chip" (Korean units, and US cars

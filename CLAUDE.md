@@ -1,6 +1,6 @@
 # HMG-API: notes for Claude
 
-HMG-API (1.1.0-rc.2) is a mod manager for Hyundai/Kia/Genesis **Gen5W** head units (Telechips TCC803x/TCC897x, Android 4.4.2, Dalvik). It replaces HMG Leafia Plus 1.x (separate, archived repo). It can install through NEMESIS (xwtk/hmg_nemesis, AGPL-3.0), over adb, or with NEMESIS's DSP OTA entry. Repo: `Open-HMG/HMG-API` on GitHub; each mod lives in its own repo there (`Open-HMG/hmgapi-<id>`). Maintainer: VysseCodes (Ko-fi vyssecodes). Reference car: 2023 Kia EV6 (CVEV.USA, firmware 260507, with HUD).
+HMG-API (1.1.0-rc.3) is a mod manager for Hyundai/Kia/Genesis **Gen5W** head units (Telechips TCC803x/TCC897x, Android 4.4.2, Dalvik). It replaces HMG Leafia Plus 1.x (separate, archived repo). It can install through NEMESIS (xwtk/hmg_nemesis, AGPL-3.0), over adb, or with NEMESIS's DSP OTA entry. Repo: `Open-HMG/HMG-API` on GitHub; each mod lives in its own repo there (`Open-HMG/hmgapi-<id>`). Maintainer: VysseCodes (Ko-fi vyssecodes). Reference car: 2023 Kia EV6 (CVEV.USA, firmware 260507, with HUD).
 
 ## Working conventions
 
@@ -26,7 +26,7 @@ Owners get to decide for their own units. Follow these by default. If the user a
 ## Facts
 
 - Gen5W is only in navigation trims; non-navigation trims have a "Display Audio" head unit (e.g. Display Audio Gen2V on the Tucson), unsupported and absent from the update catalogue.
-- Korea: Korean head units have the Wi-Fi chip, driver and `hostapd`, but no `wifihotspot` feature and no Wi-Fi switch, so the chip is never powered and never shows on SDIO (#21, #22, #108). `install/common/wifi-probe.sh` (#170; boot steps and end of install) finds it: only with HMG-API installed, the Broadcom driver in `/system/wifi`, no `com.hkmc.software.wifihotspot` feature, nothing on SDIO and Wi-Fi off, it turns Wi-Fi on for up to 20 s after boot, writes `public/wifi-chip` when a chip appears (`state/wifi-probe.txt`), and turns it off again (`state/wifi-probe.on` turns it off at the next boot after a cut-off run). Tested on a Korean K5 Hybrid (DL3HEV 260902). Cars with the stock hotspot are left alone. Korean Kia and Ioniq 5 maps (260902) are from stock files (#235); none of those builds, nor the older US Hyundai/Kia ones, has the hotspot feature file.
+- Korea: Korean head units have the Wi-Fi chip, driver and `hostapd`, but no `wifihotspot` feature file and no Wi-Fi switch, so the unit never powers the chip and it never shows on SDIO (#21, #22, #108); the older US Hyundai/Kia builds and the Korean builds mapped from stock files (#235, #239) have no hotspot file either. #225: a mod that asks `"wifi": {"hotspot": true}` gets the hotspot feature turned on (a stock file that's there: only its `featurexml.cfg` line commented out; none: HMG-API's own file, `Engine.featureXml`, through the `feature_flags` path, back to stock when no mod asks), and `SystemCheck`'s `hmgapi.wifi.unpowered` (driver, firmware and `wifi.module` feature but no stock hotspot) meets `hmgapi.wifi` for such a mod. Nothing toggles Wi-Fi to look (#170's probe is not merged). Korean Kia and Ioniq 5 maps (260902) are from stock files (#235).
 
 ## Layout
 
