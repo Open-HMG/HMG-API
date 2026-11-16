@@ -1,0 +1,5 @@
+{
+  "btsettings.projection_helper": {
+    "class": "com.android.settings2.bluetooth.iP"
+  }
+}
