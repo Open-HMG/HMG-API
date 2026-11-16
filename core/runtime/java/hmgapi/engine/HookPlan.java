@@ -36,6 +36,9 @@ import java.util.TreeSet;
  *     loads, whichever of them lists the other, so when both list each other the
  *     outcome is the same;
  *   - it and a mod before it that loads both replace the same point.
+ * An optional "requires" entry ({"id": ..., "optional": true}) orders the mod after
+ * that one when it's there, and is never a reason not to load: missing, off, out of
+ * range or not loaded, the mod loads without it (notes says so).
  */
 public final class HookPlan {
     public static final String OBSERVE = "observe", CHANGE = "change", REPLACE = "replace";
@@ -46,6 +49,8 @@ public final class HookPlan {
     public final Map<String, String> refused = new LinkedHashMap<String, String>();
     /** point -> (mod -> mode), loaded mods only */
     public final Map<String, Map<String, String>> points = new TreeMap<String, Map<String, String>>();
+    /** mod -> the optional mods it loads without here, and why ("<id> (adds …): <why>") */
+    public final Map<String, List<String>> without = new LinkedHashMap<String, List<String>>();
 
     /**
      * mods: id -> mod.json (enabled mods only). known: the point ids this car's map
@@ -143,6 +148,7 @@ public final class HookPlan {
                 p.refused.put(id, why);
                 continue;
             }
+            p.optionals(id, mod, present);
             if (decl == null) continue;
             for (Map.Entry<String, Object> e : ((Map<String, Object>) decl).entrySet()) {
                 Map<String, String> on = p.points.get(e.getKey());
@@ -156,7 +162,7 @@ public final class HookPlan {
             more = false;
             for (String id : p.order) {
                 if (p.refused.containsKey(id)) continue;
-                for (Version.Dep d : Version.deps(mods.get(id).get("requires"))) {
+                for (Version.Dep d : Version.needs(mods.get(id).get("requires"))) {
                     if (p.refused.containsKey(d.id)) {
                         p.refused.put(id, "requires " + d.id + ", which isn't loaded (" + p.refused.get(d.id) + ")");
                         for (Map<String, String> on : p.points.values()) on.remove(id);
@@ -197,13 +203,41 @@ public final class HookPlan {
 
     /** a mod this one requires isn't there, in range, or loaded: why, or null */
     String requiresProblem(String id, Map<String, Object> mod, Map<String, String> present) {
-        for (Version.Dep d : Version.deps(mod.get("requires"))) {
+        for (Version.Dep d : Version.needs(mod.get("requires"))) {
             String v = present.get(d.id);
             if (v == null) return "requires " + d + ", which isn't installed and turned on";
             if (!in(v, d.range, false)) return "requires " + d + ", but " + d.id + " " + v + " is installed";
             if (refused.containsKey(d.id)) return "requires " + d.id + ", which isn't loaded (" + refused.get(d.id) + ")";
         }
         return null;
+    }
+
+    /** the optional mods a loading mod goes without here (not there, out of range, or not loaded) */
+    void optionals(String id, Map<String, Object> mod, Map<String, String> present) {
+        for (Version.Dep d : Version.deps(mod.get("requires"))) {
+            if (!d.optional) continue;
+            String v = present.get(d.id), why = null;
+            if (v == null) why = "isn't installed and turned on";
+            else if (!in(v, d.range, false)) why = d.id + " " + v + " is installed, it works with " + d;
+            else if (refused.containsKey(d.id)) why = "isn't loaded (" + refused.get(d.id) + ")";
+            if (why == null) continue;
+            List<String> w = without.get(id);
+            if (w == null) without.put(id, w = new ArrayList<String>());
+            w.add(d.id + (d.adds == null ? "" : " (adds: " + d.adds + ")") + ": " + why);
+        }
+    }
+
+    /**
+     * ModContext.modOn: is mod id on here? It must be loaded in this process (loaded:
+     * the mods that are) and, once the public state has been read (stateMods: its
+     * "mods", null before), turned on there.
+     */
+    @SuppressWarnings("unchecked")
+    public static boolean on(String id, Set<String> loaded, Map<String, Object> stateMods) {
+        if (!loaded.contains(id)) return false;
+        if (stateMods == null) return true;
+        Object s = stateMods.get(id);
+        return s instanceof Map && Boolean.TRUE.equals(((Map<String, Object>) s).get("enabled"));
     }
 
     /** a mod before this one that loads and can't run with it ("conflicts", either way): why, or null */
@@ -268,6 +302,10 @@ public final class HookPlan {
     public List<String> report() {
         List<String> out = new ArrayList<String>();
         for (Map.Entry<String, String> r : refused.entrySet()) out.add("hooks    " + r.getKey() + " won't load: " + r.getValue());
+        for (Map.Entry<String, List<String>> w : without.entrySet()) {
+            if (refused.containsKey(w.getKey())) continue;
+            for (String o : w.getValue()) out.add("optional " + w.getKey() + " runs without " + o);
+        }
         for (Map.Entry<String, Map<String, String>> e : points.entrySet()) {
             if (e.getValue().size() < 2) continue;
             StringBuilder b = new StringBuilder();

@@ -651,6 +651,10 @@ public final class Engine {
         }
         for (Version.Dep r : m.requires) {
             Mod dep = byId.get(r.id);
+            if (r.optional) {   // after it when it's there and in range; never a problem
+                if (dep != null && Version.satisfies(dep.version, r.range)) visit(dep, byId, seen, out, path);
+                continue;
+            }
             if (dep == null) problems.add(m.id + ": requires " + r + ", which isn't installed and enabled");
             else if (!Version.satisfies(dep.version, r.range)) {
                 problems.add(m.id + ": requires " + r + ", but " + dep.id + " " + dep.version + " is installed");

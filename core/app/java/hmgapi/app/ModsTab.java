@@ -30,6 +30,8 @@ final class ModsTab {
         String id, name, version = "", description = "", authors = "", license = "", state, error;
         boolean enabled, hasCode;
         List<String> services = new ArrayList<String>();
+        /** optional "requires" entries: {id, what it adds (or "")} */
+        List<String[]> optional = new ArrayList<String[]>();
 
         int color() {
             if (!enabled) return Ui.OFF;
@@ -95,6 +97,11 @@ final class ModsTab {
                         JSONArray au = j.optJSONArray("authors");
                         for (int i = 0; au != null && i < au.length(); i++) m.authors += (i > 0 ? ", " : "") + au.optString(i);
                         m.hasCode = j.has("hooks");
+                        JSONArray rq = j.optJSONArray("requires");
+                        for (int i = 0; rq != null && i < rq.length(); i++) {
+                            JSONObject r = rq.optJSONObject(i);
+                            if (r != null && r.optBoolean("optional")) m.optional.add(new String[] {r.optString("id"), r.optString("adds", "")});
+                        }
                         JSONArray sv = j.optJSONArray("services");
                         for (int i = 0; sv != null && i < sv.length(); i++) m.services.add(sv.getJSONObject(i).optString("name"));
                     } catch (Exception e) {
@@ -208,6 +215,13 @@ final class ModsTab {
             Ui.pill(detail, m.label(), m.color());
         }
         if (!m.description.isEmpty()) Ui.text(detail, m.description, 16, false, Ui.GREY);
+        for (String[] o : m.optional) {   // mods it does more with: what each adds, and whether it's here
+            Mod other = null;
+            for (Mod x : mods) if (x.id.equals(o[0])) other = x;
+            String state = other == null ? "not installed" : other.enabled ? "on" : "off";
+            Ui.text(detail, "Works with " + (other == null ? o[0] : other.name) + " (" + state + ")"
+                    + (o[1].isEmpty() ? "" : ": " + o[1]), 16, false, other != null && other.enabled ? Ui.TEXT : Ui.GREY);
+        }
 
         Ui.line(detail);
         Ui.text(detail, "Settings", 21, true, Ui.GREEN);

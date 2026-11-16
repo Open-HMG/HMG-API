@@ -110,4 +110,11 @@ ln -s $T/victim/top $R/data/hmgapi/mods/demo/filelink
 eng remove demo; check "remove a mod with symlinks in its folder" 0 $rc
 check "... the mod's folder is gone" no "$([ -e $R/data/hmgapi/mods/demo ] && echo yes || echo no)"
 check "... what the links pointed at is all still there" "keep keep" "$(cat $T/victim/sub/file $T/victim/top 2>/dev/null | tr '\n' ' ' | sed 's/ $//')"
+
+# optional "requires": a note, not an "install it first"
+mk 1.0.0; printf '{"id": "demo", "version": "1.0.0", "hmgapi": ">=1.0.0", "requires": [{"id": "wire", "version": ">=2", "optional": true, "adds": "preconditioning"}, "base"]}\n' > $T/m/mod.json
+sig sign $T/m $T/author.key > /dev/null; pkg $T/m $T/opt.zip
+eng install $T/opt.zip; check "a mod with an optional requirement installs" 0 $rc
+has "... an optional one missing: it runs without it" "demo works with wire >=2 (it adds: preconditioning), which isn't installed: it runs without it" "$out"
+has "... a plain one missing: install it first" "demo requires base, which isn't installed: install it before applying" "$out"
 exit $fail

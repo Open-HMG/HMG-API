@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### For mod authors
+
+- **Optional requirements.** A `"requires"` entry in object form can say
+  `"optional": true` (and `"adds"`: what it brings): the mod loads after that one when
+  it's there, may use its API, and runs without it otherwise, never turned off for it.
+  `engine plan` says what a mod runs without, and the HMG-API app lists the mods it
+  works with on its page, with what each adds and whether it's on. HMG-API 1.1.0-rc.2
+  and older read such an entry as a plain requirement.
+- **`ModContext.modOn(id)`**: whether another mod is installed, turned on and loaded in
+  this process, following the owner's switches, so hook code no longer reads
+  `/data/hmgapi/public/state.json` itself.
+
 ### Fixes
 
 - **A mod's `"conflicts"` hold for mods that only hook.** The list was checked only for

@@ -98,6 +98,21 @@ Each entry is `"<id>"`, `"<id> <range>"` or `{"id": …, "version": <range>}`; r
   off to use it instead. A mod turned on while apps run (`"live"`) doesn't load next to one
   it conflicts with that those apps loaded, even one turned off since; the next restart
   settles it by the order.
+- **Optional** (`requires` object form, `"optional": true`): a mod yours does more with,
+  but runs without:
+  `{"id": "wireless-carplay-aa", "version": ">=2.2", "optional": true, "adds": "battery preconditioning on the way to a charger"}`.
+  When it's there, on and in range, yours loads after it and may use its API as for a
+  plain `requires`. When it isn't (or it's out of range, or not loaded), yours loads
+  anyway; `engine plan` says `optional <id> runs without <other> (adds: …): <why>`, and
+  the HMG-API app lists it on your mod's page as "Works with <name> (on | off | not
+  installed): <adds>". It never turns your mod off or stops an apply. HMG-API
+  1.1.0-rc.2 and older read it as a plain `requires`: set your `"hmgapi"` floor above
+  that if your mod must run without it there.
+- **Is another mod on?** In hook code, `mod.modOn("<id>")` (`ModContext`): installed,
+  turned on and loaded in this process. It follows the owner's switches while apps run,
+  so ask when you need it rather than once. In `zygoteInit` only the mods loaded before
+  yours count (those you require, optional ones too): ask from `appLoaded` on for any
+  other. Use it with an optional requirement to do the extra part only when it's there.
 - These hold for every mod, with or without `patches.json`. A mod HMG-API's engine
   applies (`patches.json`, `feature_flags`, `probe`, `wifi`) that is missing a
   requirement or conflicts with another such mod also stops the apply until it's settled.

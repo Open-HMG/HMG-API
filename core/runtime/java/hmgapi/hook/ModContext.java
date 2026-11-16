@@ -19,7 +19,7 @@ public final class ModContext {
     volatile JSONObject settings;
     /** off: its hooks pass straight through (the owner turned it off, or a mod it requires) */
     volatile boolean enabled = true;
-    /** mods this one declared in "requires": the only ones whose API it may use */
+    /** mods this one declared in "requires" (optional ones too): the only ones whose API it may use */
     final java.util.Set<String> requires = new java.util.HashSet<String>();
     /** objects mods hand to the mods that require them: mod id -> name -> object */
     static final Map<String, Map<String, Object>> published = new java.util.concurrent.ConcurrentHashMap<String, Map<String, Object>>();
@@ -145,6 +145,17 @@ public final class ModContext {
     }
 
     /**
+     * Is another mod on here: installed, turned on, and loaded in this process (at start,
+     * or live)? So a mod can do more when another one is there (an optional "requires"
+     * entry) or stand back for it, without reading HMG-API's files. It follows the owner's
+     * switches while the app runs, so ask when you need it. In zygoteInit only the mods
+     * loaded before this one count: the ones it requires, optional ones included.
+     */
+    public boolean modOn(String modId) {
+        return hmgapi.engine.HookPlan.on(modId, Mods.loadedIds, Live.stateMods);
+    }
+
+    /**
      * Hands an object to the mods that require this one (they get it with use()).
      * Its type should come from this mod's exported API packages (mod.json "api").
      */
@@ -154,7 +165,10 @@ public final class ModContext {
         m.put(name, api);
     }
 
-    /** An object another mod published; that mod must be in this one's "requires". Null if it hasn't published it. */
+    /**
+     * An object another mod published; that mod must be in this one's "requires" (an
+     * optional entry counts). Null if it hasn't published it, or isn't loaded here.
+     */
     public Object use(String modId, String name) {
         if (!requires.contains(modId)) throw new IllegalStateException(id + " uses " + modId + "'s API but doesn't require it in mod.json");
         Map<String, Object> m = published.get(modId);

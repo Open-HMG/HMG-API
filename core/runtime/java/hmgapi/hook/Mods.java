@@ -153,11 +153,15 @@ final class Mods {
             entry.zygoteInit(ctx);
             entry.appLoaded(ctx, app);
             withHooks.add(new Loaded(ctx, entry));
+            loadedIds.add(id);
             HmgApi.i("mods: " + id + " loaded live in " + app.processName);
         } catch (Throwable t) {
             HmgApi.e("mods: " + id + " live load in " + app.processName, t);
         }
     }
+
+    /** the mods loaded in this process (at boot in the zygote, or live here), for ModContext.modOn */
+    static final java.util.Set<String> loadedIds = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<String, Boolean>());
 
     /** loaded mods' mod.json, for hook plans of mods loaded later */
     static final Map<String, Map<String, Object>> rawOf = new java.util.concurrent.ConcurrentHashMap<String, Map<String, Object>>();
@@ -349,6 +353,7 @@ final class Mods {
             withHooks.add(new Loaded(ctx, entry));
             info.hooks = true;
         }
+        loadedIds.add(id);
         HmgApi.i("mods: loaded " + id + " " + version);
     }
 

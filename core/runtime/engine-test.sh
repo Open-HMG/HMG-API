@@ -121,6 +121,12 @@ mod modg 1.0.0 ', "requires": [{"id": "modb", "version": "^2.0"}]' ''
 eng plan
 check "object-form requires met" 0 $rc
 rm -r $R/data/hmgapi/mods/modg
+mod modh 1.0.0 ', "requires": [{"id": "nothere", "optional": true, "adds": "more"}, {"id": "moda", "version": ">=5", "optional": true}]' ''
+eng plan
+check "optional requires missing or out of range: no problem" 0 $rc
+has "... the plan says what it runs without" "optional modh runs without nothere (adds: more): isn't installed and turned on" "$out"
+has "... and which version it works with" "optional modh runs without moda: moda 1.0.0 is installed, it works with moda >=5" "$out"
+rm -r $R/data/hmgapi/mods/modh
 
 # ---- a file changed outside HMG-API
 cp $R/system/build.prop $T/bp.keep; echo "x=1" >> $R/system/build.prop
