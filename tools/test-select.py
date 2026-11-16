@@ -45,7 +45,8 @@ RULES = [
     (['core/runtime/*-test.sh'], []),   # a test itself: it runs (select() adds every changed test)
     (['core/hookpoints/*'], SDK),   # the SDK's points.txt and catalogue
     (['core/hookpoints/*', 'maps/*', 'tools/map-car.py', 'tools/check-maps.py', 'tools/mkhookdoc.py', 'docs/hook-points.md', 'tools/test-hooks.py', 'tools/probe-test.py'], HOOKS),
-    (['tools/dexsig.py'], ['core/runtime/map-test.sh'] + HOOKS),   # MapProbeMethodTest checks Dex.walk against it
+    (['tools/dexsig.py'], ['core/runtime/map-test.sh'] + HOOKS),
+    (['tools/maplib.py'], HOOKS + INSTALL),   # every map reader and the payload's maps (build.sh expand)   # MapProbeMethodTest checks Dex.walk against it
     # the stock car trees: the finder every suite above uses, and cars.py
     (['tools/cartrees.py', 'tools/cars.py', 'tools/cars-test.sh'], ['tools/cars-test.sh'] + HOOKS),
     (['core/app/*'], ['core/app/qr-test.sh']),

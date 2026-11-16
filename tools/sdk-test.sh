@@ -162,6 +162,9 @@ pts ">=99.0.0" ""
 set +e; o=$(python3 $S/check-points.py $T/p/p 2>&1); r=$?; set -e
 check "... a floor above the SDK: fails" 1 $r
 has "... says to pin a newer SDK" "but the SDK is $V" "$o"
+printf '{"id": "p", "version": "1.0.0-rc.1", "hmgapi": ">=%s", "hooks": {"jar": "hooks.jar", "entry": "x.X", "points": {"%s": "observe"}}}\n' "$V" "$P3" > $T/p/p/mod.json
+o=$(python3 $S/check-points.py $T/p/p 2>&1) && r=0 || r=$?
+check "... a floor that is the SDK's own version: its own points, nothing fetched" 0 $r
 pts "<3" "\"$P1\": \"observe\""
 set +e; o=$(HMGAPI_FLOOR_POINTS=$T/floor.txt python3 $S/check-points.py $T/p/p 2>&1); r=$?; set -e
 check "... points but no floor: fails" 1 $r

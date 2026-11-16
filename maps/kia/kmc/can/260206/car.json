@@ -139,6 +139,18 @@
       ]
     }
   },
+  "names": {
+    "dipo.iap2_client.manager": {
+      "field": "L",
+      "type": "com.daudio.app.dipo.e.b",
+      "static": false
+    },
+    "homesetting.edit_list.items": {
+      "field": "cu",
+      "type": "java.util.List",
+      "static": true
+    }
+  },
   "missing": {
     "framework.bcm_listener_stub.drive_mode": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
     "framework.hev_flag.battery_comp_power": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
