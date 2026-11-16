@@ -59,7 +59,7 @@ RULES = [
     # every tool that orders versions, against Version (docs/releasing.md)
     (['tools/nemesis-version.py', 'tools/check-points.py', 'tools/catalog.py', 'tools/version-test.sh'], ['tools/version-test.sh']),
     (['tools/mkicon.sh', 'tools/mkicon-hmgapi.sh', 'tools/mkicon-test.sh'], ['tools/mkicon-test.sh']),
-    (['tools/mark-verified.py', 'tools/report-map.py'], HOOKS),   # they write or read the maps
+    (['tools/mark-verified.py', 'tools/report-map.py', 'tools/report-map-test.py'], HOOKS),   # they write or read the maps
     (['catalog/*', 'tools/catalog*', 'maps/authors.json', '.github/workflows/catalog.yml'], ['tools/catalog-test.sh']),
     (['tools/micom-*'], ['tools/micom-decode-test.sh']),
     (['tools/check-scripts.sh'], ['tools/check-scripts.sh']),
