@@ -1,6 +1,8 @@
 #!/bin/sh
-# Make a signed mod package: out/packages/<id>-<version>.zip from mods/<id>
-# (its build.sh first, if it has one), signed with the author's key.
+# Make a signed mod package: out/packages/<id>-<version>.zip from mods/<id>, signed
+# with the author's key: the mod folder (but build.sh, test.sh, src, tools, native) with
+# what build-mod.sh built on top (hooks.jar, the APK, and what the mod's executable
+# build.sh, if it has one, wrote in build-mod.sh's out dir).
 #   tools/mkmodpkg.sh mods/<id> <author key>
 # New key: java -cp out/engine-host hmgapi.engine.Signing keygen <key file>
 # In the mod SDK (bin/mkmodpkg.sh), the mod dir is relative to where it's run, the
@@ -28,18 +30,20 @@ APPSRC=no; [ -f "$M/app/AndroidManifest.xml" ] && APPSRC=yes   # app/ is the mod
 for f in "$M"/*; do
     case "${f##*/}" in build.sh|test.sh|src|tools|native) ;; app) [ $APPSRC = yes ] || cp -r "$f" "$W/$ID/" ;; *) cp -r "$f" "$W/$ID/" ;; esac
 done
-if [ -d "$M/src" ] || [ $APPSRC = yes ]; then
+if [ -d "$M/src" ] || [ $APPSRC = yes ] || [ -x "$M/build.sh" ]; then
     if [ $SDK = no ]; then ./build.sh mods >/dev/null || exit 1; B=out/mods/$ID
     elif [ -n "$HMGAPI_MOD_BUILD" ]; then B=$HMGAPI_MOD_BUILD
     else B=$W/build; sh "$HERE/build-mod.sh" "$M" "$B" "$W/work" >/dev/null || exit 1
     fi
+    [ "$(sed -n 's/.*"id": *"\([^"]*\)".*/\1/p' "$B/mod.json" 2>/dev/null | head -1)" = "$ID" ] \
+        || { echo "mkmodpkg.sh: $B isn't $ID as built (build-mod.sh's out dir for $M, with its mod.json)"; exit 1; }
+    cp -R "$B"/. "$W/$ID/"   # what build-mod.sh built, the mod's build.sh's files too
 fi
-[ -d "$M/src" ] && cp "$B/hooks.jar" "$W/$ID/"
+[ -d "$M/src" ] && { [ -f "$W/$ID/hooks.jar" ] || { echo "mkmodpkg.sh: no hooks.jar in $B"; exit 1; }; }
 if [ $APPSRC = yes ]; then
     APK=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["apps"][0]["apk"])' "$M/mod.json")
-    mkdir -p "$W/$ID/$(dirname "$APK")" && cp "$B/$APK" "$W/$ID/$APK" || { echo "no built $APK"; exit 1; }
+    [ -f "$W/$ID/$APK" ] || { echo "no built $APK"; exit 1; }
 fi
-[ -x "$M/build.sh" ] && sh "$M/build.sh" "$W/$ID" >/dev/null
 # Everything in the mod's folder goes into the package, which is public: a signing key
 # left there (the author key itself, an app's keystore) would go out with it, signed.
 LEAK=$(cd "$W/$ID" && {

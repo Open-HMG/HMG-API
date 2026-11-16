@@ -10,9 +10,11 @@
 #   {"version": "1.1.0", "sha256": "<hex>"}   the release's hmgapi-mod-sdk-<version>.zip, refused
 #                                             unless its sha256 is this one
 # Then, for each mod: its "hmgapi" floor and hook points (bin/check-points.py), the build
-# (bin/build-mod.sh), its test.sh and tools/*/test.sh (with HMGAPI_SDK and HMGAPI_MOD_BUILD),
-# check-scripts, and the package and NEMESIS package, signed with a throwaway key (a test
-# build: releases are signed by the mod repo's own release workflow, with its MOD_KEY).
+# (bin/build-mod.sh: src/, app/, then the mod's own executable build.sh), its test.sh and
+# tools/*/test.sh (with HMGAPI_SDK and HMGAPI_MOD_BUILD), check-scripts, and the package and
+# NEMESIS package, signed with a throwaway key (a test build: releases are signed by the mod
+# repo's own release workflow, with its MOD_KEY). A mod's id is its mod.json "id", whatever
+# its folder is called; its build is in out/build/<id>.
 # With ndk: that Android NDK (sdkmanager's version) installed first, in NDK and ANDROID_NDK_HOME,
 # for a mod whose build.sh compiles native code (hmgapi-adbd: 21.4.7075529, r21e, for API 19).
 # HMG-API's own CI runs it on mods/examples/hello (ci.yml, mod-workflow; weekly with an NDK too).
@@ -150,8 +152,27 @@ jobs:
             [ -f "$m/mod.json" ] || { echo "$m has no mod.json"; exit 1; }
           done
           [ -n "$MODS" ] || { echo "no mod folders (a folder with a mod.json)"; exit 1; }
+          # each mod's id, from its mod.json: "<folder> <id>" lines in MOD_IDS
+          python3 - $MODS > "$RUNNER_TEMP/mod-ids" <<'PY'
+          import json, re, sys
+          seen = {}
+          for m in sys.argv[1:]:
+              m = m.rstrip("/")
+              try:
+                  j = json.load(open(m + "/mod.json"))
+              except ValueError as e:
+                  sys.exit("%s/mod.json isn't valid JSON: %s" % (m, e))
+              i = j.get("id") if isinstance(j, dict) else None
+              if not isinstance(i, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", i) or i == "hmgapi":
+                  sys.exit('%s/mod.json: "id" is a mod id (a-z, 0-9 and -, up to 64), not %r' % (m, i))
+              if i in seen:
+                  sys.exit("%s and %s are both mod %s" % (seen[i], m, i))
+              seen[i] = m
+              print(m, i)
+          PY
+          echo "MOD_IDS=$RUNNER_TEMP/mod-ids" >> "$GITHUB_ENV"
           echo "MODS=$(echo $MODS)" >> "$GITHUB_ENV"
-          echo "Mods: $MODS" >> "$GITHUB_STEP_SUMMARY"
+          echo "Mods: $(awk '{ printf "%s%s", (NR > 1 ? ", " : ""), ($1 == $2 ? $1 : $1 " (" $2 ")") }' "$RUNNER_TEMP/mod-ids")" >> "$GITHUB_STEP_SUMMARY"
 
       - name: HMG-API floor and hook points
         env:
@@ -161,24 +182,23 @@ jobs:
       - name: Build
         run: |
           cp=""
-          for m in $MODS; do
-            id=$(basename "$m")
+          while read -r m id; do
             # mods built before this one are on the classpath (a mod that requires another in this repo)
-            HMGAPI_MOD_CP="$cp" sh "$HMGAPI_SDK/bin/build-mod.sh" "$m" "out/build/$id" "out/work/$id"
+            HMGAPI_MOD_CP="$cp" sh "$HMGAPI_SDK/bin/build-mod.sh" "$m" "out/build/$id" "out/work/$id" < /dev/null
             if [ -d "out/work/$id/classes" ]; then cp="${cp:+$cp:}$PWD/out/work/$id/classes"; fi
-          done
+          done < "$MOD_IDS"
 
       - name: Tests
         run: |
           rc=0
-          for m in $MODS; do
+          while read -r m id; do
             for t in "$m/test.sh" "$m"/tools/*/test.sh; do
               [ -f "$t" ] || continue
               echo "::group::$t"
-              HMGAPI_MOD_BUILD="$PWD/out/build/$(basename "$m")" sh "$t" || { echo "::error::$t failed"; rc=1; }
+              HMGAPI_MOD_BUILD="$PWD/out/build/$id" sh "$t" < /dev/null || { echo "::error::$t failed"; rc=1; }
               echo "::endgroup::"
             done
-          done
+          done < "$MOD_IDS"
           exit $rc
 
       - name: Scripts only use what the head unit has
@@ -187,11 +207,11 @@ jobs:
       - name: Packages (throwaway key)
         run: |
           java -cp "$HMGAPI_SDK/lib/hmgapi-engine.jar" hmgapi.engine.Signing keygen "$RUNNER_TEMP/throwaway.key"
-          for m in $MODS; do
-            out=$(HMGAPI_MOD_BUILD="$PWD/out/build/$(basename "$m")" sh "$HMGAPI_SDK/bin/mkmodpkg.sh" "$m" "$RUNNER_TEMP/throwaway.key")
+          while read -r m id; do
+            out=$(HMGAPI_MOD_BUILD="$PWD/out/build/$id" sh "$HMGAPI_SDK/bin/mkmodpkg.sh" "$m" "$RUNNER_TEMP/throwaway.key" < /dev/null)
             echo "$out"
-            sh "$HMGAPI_SDK/bin/mknemesismod.sh" "$(echo "$out" | tail -1)"   # its last line: the zip
-          done
+            sh "$HMGAPI_SDK/bin/mknemesismod.sh" "$(echo "$out" | tail -1)" < /dev/null   # its last line: the zip
+          done < "$MOD_IDS"
           rm -f "$RUNNER_TEMP"/throwaway.key*
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

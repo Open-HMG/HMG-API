@@ -152,4 +152,118 @@ has "... says to pin a newer SDK" "but the SDK is $V" "$o"
 pts "<3" "\"$P1\": \"observe\""
 set +e; o=$(HMGAPI_FLOOR_POINTS=$T/floor.txt python3 $S/check-points.py $T/p/p 2>&1); r=$?; set -e
 check "... points but no floor: fails" 1 $r
+
+# ---- a mod's own build step (an executable build.sh) in a folder not named by its id, as egmp-aa-ev
+# has: hooks.jar from src/, then build.sh's service jar, built from tools/ (left out of the package)
+R=$T/r; mkdir -p $R && cd $R
+F=relay-folder
+mkdir -p $F/tools/relay/src/example/relay && cp -r $M/hello/src $F/
+printf '{"id": "built-step", "version": "1.0.0", "hmgapi": ">=1.0.0", "hooks": {"jar": "hooks.jar", "entry": "example.hello.Hello"},\n "services": [{"name": "relay", "jar": "relay.jar", "class": "example.relay.Relay", "user": "system"}]}\n' > $F/mod.json
+printf 'package example.relay;\npublic class Relay { public static void main(String[] a) { System.out.println(hmgapi.client.HmgApi.class.getName()); } }\n' \
+    > $F/tools/relay/src/example/relay/Relay.java
+cat > $F/build.sh <<'SH'
+#!/bin/sh
+# the relay service: relay.jar, with hmgapi-client.jar's classes inside
+set -e
+O=${1:?usage: build.sh <out dir>}
+W=$(mktemp -d); trap 'rm -rf "$W"' EXIT
+(cd "$W" && jar xf "$HMGAPI_CLIENT" hmgapi)
+javac --release 8 -Xlint:-options -nowarn -cp "$ANDROID_JAR:$HMGAPI_CLIENT" -d "$W" $(find "$(dirname "$0")/tools/relay/src" -name '*.java')
+"$D8" --release --min-api 19 --lib "$ANDROID_JAR" --output "$O/relay.jar" $(find "$W" -name '*.class')
+echo "relay.jar: sdk=$HMGAPI_SDK out=$O"
+SH
+chmod 755 $F/build.sh
+printf '#!/bin/sh\n[ -f "$HMGAPI_MOD_BUILD/relay.jar" ] && [ -f "$HMGAPI_MOD_BUILD/hooks.jar" ] && echo "ok    built-step: relay.jar and hooks.jar"\n' > $F/test.sh
+o=$(sh $S/build-mod.sh $F out/b 2>&1) && r=0 || r=$?
+check "build-mod.sh: a mod with a build.sh builds" 0 $r
+[ $r = 0 ] || echo "$o"
+check "... its id is mod.json's, not the folder's" "mod built-step" "$(echo "$o" | tail -1)"
+check "... hooks.jar from src/, then build.sh's relay.jar" yes "$([ -f out/b/hooks.jar ] && [ -f out/b/relay.jar ] && echo yes)"
+unzip -p out/b/relay.jar classes.dex > $T/relay.dex
+check "... hmgapi-client inside relay.jar" yes "$(grep -q 'Lhmgapi/client/HmgApi;' $T/relay.dex && grep -q 'Lexample/relay/Relay;' $T/relay.dex && echo yes)"
+has "... build.sh got the out dir as an absolute path, and HMGAPI_SDK" "relay.jar: sdk=$T/sdk out=$R/out/b" "$o"
+o=$(HMGAPI_MOD_BUILD=$R/out/b sh $S/mkmodpkg.sh $F $T/author.key 2>&1) || echo "$o"
+check "mkmodpkg.sh: named by the id" yes "$([ -f out/packages/built-step-1.0.0.zip ] && echo yes)"
+check "... with what build.sh built, without build.sh, src or tools" "hooks.jar|mod.json|relay.jar|" \
+    "$(unzip -Z1 out/packages/built-step-1.0.0.zip | grep -v '^META-HMGAPI/' | sort | tr '\n' '|')"
+cp out/packages/built-step-1.0.0.zip $T/built-step.zip
+o=$(sh $S/mkmodpkg.sh $F $T/author.key 2>&1) || echo "$o"
+check "... building it itself (no HMGAPI_MOD_BUILD) gives the same files" "$(pkg $T/built-step.zip)" "$(pkg $R/out/packages/built-step-1.0.0.zip)"
+set +e; o=$(HMGAPI_MOD_BUILD=$T/b/hello sh $S/mkmodpkg.sh $F $T/author.key 2>&1); r=$?; set -e
+check "... another mod's build in HMGAPI_MOD_BUILD: refused" 1 "$([ $r -ne 0 ] && echo 1)"
+has "... says so" "isn't built-step as built" "$o"
+printf '#!/bin/sh\necho "no NDK here"; exit 3\n' > $T/fail.sh
+cp -r $F failing && cp $T/fail.sh failing/build.sh && chmod 755 failing/build.sh
+set +e; o=$(sh $S/build-mod.sh failing out/f 2>&1); r=$?; set -e
+check "build-mod.sh: a failing build.sh fails the build" 1 "$([ $r -ne 0 ] && echo 1)"
+has "... with its output, and names it" "no NDK here|build-mod: failing/build.sh $R/out/f failed" "$(echo "$o" | tr '\n' '|')"
+chmod 644 failing/build.sh
+o=$(sh $S/build-mod.sh failing out/f 2>&1) && r=0 || r=$?
+check "... a build.sh that isn't executable isn't run (as mkmodpkg.sh)" 0 $r
+has "... and says so" "failing/build.sh isn't executable, so it isn't run" "$o"
+rm -rf failing out
+mkdir -p noid && printf '{"version": "1.0.0"}\n' > noid/mod.json
+set +e; o=$(sh $S/build-mod.sh noid out/x 2>&1); r=$?; set -e
+check "build-mod.sh: a mod.json without an id: refused" 1 "$([ $r -ne 0 ] && echo 1)"
+has "... says so" 'no "id" in noid/mod.json' "$o"
+rm -rf noid out
+
+# ---- the reusable workflow's own steps (.github/workflows/mod.yml), run here as Actions runs them
+# (bash -e, GITHUB_ENV between steps), on this mod repo: hello, and built-step in relay-folder/
+cp -r $M/hello hello
+GH=$T/gh; mkdir -p $GH; : > $GH/env
+ghstep() {   # ghstep <step name> [VAR=value...]: that step's run: script, with what earlier steps put in
+             # GITHUB_ENV, and the step's env: (the VAR=value)
+    python3 - "$REPO/.github/workflows/mod.yml" "$1" > $GH/step.sh <<'PY' || return 1
+import sys, textwrap
+lines = open(sys.argv[1]).read().split("\n")
+ind = lambda l: len(l) - len(l.lstrip())
+i = next(i for i, l in enumerate(lines) if l.strip() == "- name: " + sys.argv[2])
+j = next(j for j in range(i + 1, len(lines)) if lines[j].strip().startswith("run:"))
+if lines[j].strip() != "run: |":
+    print(lines[j].strip()[4:].strip())
+else:
+    body = []
+    for l in lines[j + 1:]:
+        if l.strip() and ind(l) <= ind(lines[j]):
+            break
+        body.append(l)
+    print(textwrap.dedent("\n".join(body)))
+PY
+    (while IFS= read -r kv; do export "$kv"; done < $GH/env
+     shift; for kv in "$@"; do export "$kv"; done
+     GITHUB_ENV=$GH/env GITHUB_STEP_SUMMARY=$GH/summary RUNNER_TEMP=$GH HMGAPI_SDK=$T/sdk bash -e $GH/step.sh)
+}
+o=$(ghstep "Which mods" MODS= 2>&1) || echo "$o"
+check "workflow, which mods: every folder with a mod.json, by mod.json's id" "hello hello|relay-folder built-step|" "$(tr '\n' '|' < $GH/mod-ids)"
+has "... the summary names both" "Mods: hello, relay-folder (built-step)" "$(cat $GH/summary)"
+o=$(ghstep "HMG-API floor and hook points" REPO=Open-HMG/HMG-API 2>&1) && r=0 || r=$?
+check "workflow, floor and hook points" 0 $r
+[ $r = 0 ] || echo "$o"
+o=$(ghstep "Build" 2>&1) && r=0 || r=$?
+check "workflow, build: out/build/<id>" 0 $r
+[ $r = 0 ] || echo "$o"
+check "... relay-folder in out/build/built-step, its build.sh's relay.jar too" yes "$([ -f out/build/built-step/relay.jar ] && [ -f out/build/hello/hooks.jar ] && echo yes)"
+o=$(ghstep "Tests" 2>&1) && r=0 || r=$?
+check "workflow, tests: each with its own build in HMGAPI_MOD_BUILD" 0 $r
+has "... built-step's test.sh ran" "ok    built-step: relay.jar and hooks.jar" "$o"
+o=$(ghstep "Scripts only use what the head unit has" 2>&1) && r=0 || r=$?
+check "workflow, check-scripts" 0 $r
+o=$(ghstep "Packages (throwaway key)" 2>&1) && r=0 || r=$?
+check "workflow, packages" 0 $r
+[ $r = 0 ] || echo "$o"
+check "... both packages and NEMESIS packages, by id" "built-step-1.0.0-nemesis-package.zip|built-step-1.0.0-nemesis.zip|hello-1.0.0-nemesis-package.zip|hello-1.0.0-nemesis.zip|built-step-1.0.0.zip|hello-1.0.0.zip|" \
+    "$(ls out/dist out/packages | grep zip | tr '\n' '|')"
+check "... built-step's package has relay.jar" yes "$(unzip -Z1 out/packages/built-step-1.0.0.zip | grep -qx relay.jar && echo yes)"
+check "... the throwaway key is gone" "" "$(ls $GH | grep throwaway || true)"
+# which mods: refused before anything is built
+mkdir -p twin && cp hello/mod.json twin/
+set +e; o=$(ghstep "Which mods" MODS= 2>&1); r=$?; set -e
+check "workflow, which mods: two folders with one id: refused" 1 "$([ $r -ne 0 ] && echo 1)"
+has "... names them" "hello and twin are both mod hello" "$o"
+printf '{"id": "Bad_Id"}\n' > twin/mod.json
+set +e; o=$(ghstep "Which mods" MODS=twin 2>&1); r=$?; set -e
+check "... an id the engine refuses: refused" 1 "$([ $r -ne 0 ] && echo 1)"
+has "... says what an id is" "\"id\" is a mod id (a-z, 0-9 and -, up to 64), not 'Bad_Id'" "$o"
+cd $REPO
 exit $fail
