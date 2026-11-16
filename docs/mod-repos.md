@@ -85,12 +85,13 @@ installs `android.jar` and `d8` as core's CI does).
 | `lib/hmgapi-client.jar` | `./build.sh client` | mods' own apps and services (bundled, as now) |
 | `lib/hmgapi-engine.jar` | `core/runtime/java/hmgapi/engine` | host tests (`Engine` with `HMGAPI_HOST=1`), `Signing`, `ScriptCheck` |
 | `bin/lpatch-host` + `src/lpatch/` | `tools/lpatch` | host tests of patches and recipes; source to build it on macOS |
+| `bin/hmgapi-mod`, `bin/mod-deps.py` | `tools/sdk/` | the mod's loop (new, build, check, deps, test, package, install over adb, logs, settings), wrapping the rest |
 | `bin/build-mod.sh` | `build.sh mods()`, one mod | `hooks.jar` and app APK from a mod folder |
 | `bin/mkmodpkg.sh`, `bin/mknemesismod.sh`, `bin/nemesis-meta.py`, `bin/nemesis-version.py`, `nemesis/mod/` | `tools/`, `install/nemesis/mod/`, `install/nemesis/bin/open.sh` | signed package, NEMESIS package |
 | `bin/check-scripts.sh`, `unit-commands.txt` | `tools/check-scripts.sh`, `core/runtime/unit-commands.txt` | unit-only commands in mod scripts |
 | `bin/mkrecipe.py`, `bin/mkdelta.py`, `bin/mkmemrecipe.py`, `bin/mkicon.sh`, `bin/mod-draft.py` | `tools/` | recipes, delta sets, tile pictures, new mod drafts |
 | `test/lib.sh` | the `check`/`has`/`eng` helpers every mod `test.sh` copies today | mod tests |
-| `test/plan.py`, `test/hmgapi-engine-test.jar` (`RecipeCheck`, `MemRecipeTest`) | `tools/sdk/plan.py`, `core/runtime/test` | `test/lib.sh`'s plan test, native recipes |
+| `test/plan.py`, `test/hmgapi-engine-test.jar` (`RecipeCheck`, `MemRecipeTest`, `Requires`) | `tools/sdk/plan.py`, `core/runtime/test` | `test/lib.sh`'s plan test, native recipes |
 | `maps/` | `maps/` (without `coverage.json`) | the plan test: a fake head unit per car with a map |
 | `points.txt`, `catalogue/*.json` | `core/hookpoints` | check the mod's `hooks.points` exist |
 | `VERSION` | `Engine.HMGAPI_VERSION` | |

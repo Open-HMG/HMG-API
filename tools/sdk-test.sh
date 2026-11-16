@@ -206,6 +206,200 @@ has "... the mistake is a problem" "got [user: prop ro.x: only persist.* propert
 check "... the fake unit's stand-in files aren't" "" "$(echo "$o" | grep 'libx.so: not on this head unit' || true)"
 has "... names the point" "gpm.no_such_point: not in this car's map" "$o"
 
+# ---- bin/hmgapi-mod: a mod repo's loop, from its root, with the SDK alone
+HM="sh $T/sdk/bin/hmgapi-mod"
+mkdir -p $T/repo && cd $T/repo
+SUM=$(printf 'ab%.0s' $(seq 32))
+printf 'aa  other.zip\n%s  hmgapi-mod-sdk-%s.zip\n' "$SUM" "$V" > $T/SHA256SUMS
+o=$(HMGAPI_SDK_SUMS=$T/SHA256SUMS $HM new my-mod --name "My mod" --author Tester 2>&1) || echo "$o"
+check "... hmgapi-sdk.json: the SDK's release, its SHA-256 from that release's SHA256SUMS" \
+    "{\"version\": \"$V\", \"sha256\": \"$SUM\"}" "$(cat hmgapi-sdk.json)"
+check "new: the mod, its test, the SDK pin, CI and .gitignore" \
+    "./.github/workflows/ci.yml ./.gitignore ./hmgapi-sdk.json ./my-mod/mod.json ./my-mod/src/mod/my_mod/MyMod.java ./my-mod/test.sh" \
+    "$(find . -type f | sort | tr '\n' ' ' | sed 's/ $//')"
+check "... mod.json: id, name, author, the SDK's release as the floor, its entry class" "my-mod|My mod|Tester|>=${V%%-*}|mod.my_mod.MyMod" \
+    "$(python3 -c 'import json; m=json.load(open("my-mod/mod.json")); print("|".join([m["id"], m["name"], m["authors"][0], m["hmgapi"], m["hooks"]["entry"]]))')"
+check "... CI calls HMG-API's mod workflow at the SDK's release" "    uses: Open-HMG/HMG-API/.github/workflows/mod.yml@v$V" "$(grep 'uses:' .github/workflows/ci.yml)"
+set +e; o=$($HM new my-mod --author Tester 2>&1); r=$?; set -e
+check "... an existing folder: refused" "2|hmgapi-mod: my-mod already exists" "$r|$o"
+set +e; o=$($HM new My_Mod --author Tester 2>&1); r=$?; set -e
+check "... not an id: refused" 2 $r
+# ids that can't start a Java name (a digit first, a keyword), and no SHA256SUMS to read
+mkdir -p $T/dg && (cd $T/dg && HMGAPI_SDK_SUMS=$T/none $HM new 3d-view --author Tester > $T/dg.out 2>&1 && $HM new new --author Tester > /dev/null 2>&1)
+entry() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["hooks"]["entry"])' "$1/mod.json"; }
+check "... a digit-first id: package mod.m3d_view, class Mod3dView" "mod.m3d_view.Mod3dView|yes" \
+    "$(entry $T/dg/3d-view)|$([ -f $T/dg/3d-view/src/mod/m3d_view/Mod3dView.java ] && echo yes)"
+check "... builds" yes "$(cd $T/dg && sh $S/build-mod.sh 3d-view $T/dg/b3 > /dev/null 2>&1 && [ -f $T/dg/b3/hooks.jar ] && echo yes)"
+check "... a keyword id (new): mod.mnew.New, builds" "mod.mnew.New|yes" \
+    "$(entry $T/dg/new)|$(cd $T/dg && sh $S/build-mod.sh new $T/dg/bn > /dev/null 2>&1 && [ -f $T/dg/bn/hooks.jar ] && echo yes)"
+check "... no SHA256SUMS to read: the pin's sha256 left empty, and said so" "{\"version\": \"$V\", \"sha256\": \"\"}|yes" \
+    "$(cat $T/dg/hmgapi-sdk.json)|$(grep -q 'put its sha256 in' $T/dg.out && echo yes)"
+o=$($HM build 2>&1) && r=0 || r=$?
+check "build: the one mod here, into out/build/<id>" "0|yes" "$r|$([ -f out/build/my-mod/hooks.jar ] && echo yes)"
+check "... the same hooks.jar as bin/build-mod.sh" "$(sh $S/build-mod.sh my-mod $T/bm >/dev/null 2>&1; md5 $T/bm/hooks.jar)" "$(md5 out/build/my-mod/hooks.jar)"
+o=$($HM check 2>&1) && r=0 || r=$?
+check "check: check-points.py and check-scripts.sh pass" 0 $r
+has "... check-points.py ran" 'my-mod: "hmgapi"' "$o"
+printf '#!/system/bin/sh\necho x | tr x y\n' > my-mod/s.sh
+python3 -c 'import json; m=json.load(open("my-mod/mod.json")); m["services"]=[{"name": "s", "script": "s.sh"}]; json.dump(m, open("my-mod/mod.json", "w"))'
+set +e; o=$($HM check 2>&1); r=$?; set -e
+check "... a script calling tr: fails" 1 $r
+has "... names it" "tr" "$o"
+rm my-mod/s.sh; python3 -c 'import json; m=json.load(open("my-mod/mod.json")); del m["services"]; json.dump(m, open("my-mod/mod.json", "w"))'
+python3 -c 'import json; m=json.load(open("my-mod/mod.json")); m["system"]={"product": "CVEV.USA."}; json.dump(m, open("my-mod/mod.json", "w"))'
+o=$($HM test 2>&1) && r=0 || r=$?
+check "test: builds, then its test.sh (the plan test)" 0 $r
+[ $r = 0 ] || echo "$o"
+has "... on the cars its \"system\" names" "ok    CVEV.USA.0000.V015.012.260507 (kia/ev6/usa/260507): my-mod's hooks load" "$o"
+has "... no mods required" 'no "requires" in mod.json' "$o"
+mkdir -p $T/nt && cp -r my-mod $T/nt/ && rm $T/nt/my-mod/test.sh
+o=$(cd $T/nt && $HM test 2>&1) && r=0 || r=$?
+check "... without a test.sh: the plan test" "0|yes" "$r|$(echo "$o" | grep -q "my-mod's hooks load" && echo yes)"
+mkdir $T/empty; set +e; o=$(cd $T/empty && $HM build 2>&1); r=$?; set -e
+check "no mod here: says so" "2" "$r"
+has "... and what to do" "name the mod's folder" "$o"
+
+# deps: a catalogue (catalog/ and maps/authors.json, as HMG-API has them) with a signed base mod in it
+C=$T/core; mkdir -p $C/catalog $C/maps $C/dl $T/repo/base
+java -cp $T/sdk/lib/hmgapi-engine.jar hmgapi.engine.Signing keygen $T/other.key > /dev/null
+UUID=$(java -cp $T/sdk/lib/hmgapi-engine.jar hmgapi.engine.Signing uuid $T/author.key)
+printf '{"id": "base", "version": "1.2.0", "hmgapi": ">=1.0.0", "system": {"product": "CVEV.USA."}}\n' > base/mod.json
+(OUT=$T/bo sh $S/mkmodpkg.sh base $T/author.key > /dev/null) && cp $T/bo/packages/base-1.2.0.zip $C/dl/
+cat > $T/entry.py <<'EOF'
+import hashlib, json, sys
+d, uuid, url, ver = sys.argv[1:5]
+json.dump({"id": "base", "name": "Base", "description": "x", "authors": ["Tester"], "uuid": uuid, "version": ver,
+           "repo": "https://example.invalid/base", "download": url,
+           "sha256": hashlib.sha256(open(sys.argv[5], "rb").read()).hexdigest()}, open(d + "/catalog/base.json", "w"))
+json.dump({"authors": {uuid: {"name": "Tester"}}}, open(d + "/maps/authors.json", "w"))
+EOF
+python3 $T/entry.py $C $UUID file://$C/dl/base-1.2.0.zip 1.2.0 $C/dl/base-1.2.0.zip
+rm -rf base
+python3 -c 'import json; m=json.load(open("my-mod/mod.json")); m["requires"]=["base ^1.1"]; json.dump(m, open("my-mod/mod.json", "w"))'
+export HMGAPI_CATALOG=$C/catalog
+o=$($HM deps 2>$T/err) && r=0 || r=$?
+TP=$(cd $T && pwd -P)   # mktemp's folder, as the tools see it (macOS: /private/var/...)
+check "deps: the required mod from the catalogue, its folder printed" "0|$TP/repo/.hmgapi/deps/base-1.2.0" "$r|$o"
+has "... SHA-256 and signature checked" "ok    base 1.2.0: downloaded from the catalogue, SHA-256 and signature match (author key $UUID)" "$(cat $T/err)"
+check "... the mod folder, as signed" yes "$(java -cp $T/sdk/lib/hmgapi-engine.jar hmgapi.engine.Signing verify $o $UUID > /dev/null && echo yes)"
+mv $C/dl/base-1.2.0.zip $C/dl/away.zip
+o=$($HM deps 2>$T/err) && r=0 || r=$?
+check "... next time from the cache (nothing to download)" "0|ok    base 1.2.0: cached ($TP/repo/.hmgapi/deps/base-1.2.0.zip)" "$r|$(cat $T/err)"
+mv $C/dl/away.zip $C/dl/base-1.2.0.zip
+o=$($HM test 2>&1) && r=0 || r=$?
+check "test: with the required mod beside it" 0 $r
+has "... in the plan" "ok    CVEV.USA.0000.V015.012.260507 (kia/ev6/usa/260507): my-mod's hooks load" "$o"
+rm -rf .hmgapi
+dep() { set +e; o=$($HM deps 2>&1); r=$?; set -e; }
+printf 'tampered' >> $C/dl/base-1.2.0.zip
+dep; check "... a download that isn't the catalogue's SHA-256: fails" 1 $r
+has "... says so" "base 1.2.0: the download's SHA-256 is" "$o"
+check "... nothing cached" "" "$(ls .hmgapi/deps)"
+cp $T/bo/packages/base-1.2.0.zip $C/dl/
+OTHER=$(java -cp $T/sdk/lib/hmgapi-engine.jar hmgapi.engine.Signing uuid $T/other.key)
+python3 $T/entry.py $C $OTHER file://$C/dl/base-1.2.0.zip 1.2.0 $C/dl/base-1.2.0.zip
+dep; check "... signed with another key than the entry's: fails" 1 $r
+has "... names the key" "$OTHER" "$o"
+python3 $T/entry.py $C $UUID file://$C/dl/base-1.2.0.zip 1.2.0 $C/dl/base-1.2.0.zip
+printf '{"authors": {}}\n' > $C/maps/authors.json
+dep; check "... an author key HMG-API doesn't list: fails" 1 $r
+has "... says so" "isn't on HMG-API's author list" "$o"
+python3 $T/entry.py $C $UUID file://$C/dl/base-1.2.0.zip 1.2.0 $C/dl/base-1.2.0.zip
+python3 -c 'import json; m=json.load(open("my-mod/mod.json")); m["requires"]=["base >=2.0.0-rc.1"]; json.dump(m, open("my-mod/mod.json", "w"))'
+dep; check "... a range the catalogue's version isn't in: fails" 1 $r
+has "... says which, and how to pin a pre-release" "my-mod requires base >=2.0.0-rc.1, but the catalogue has 1.2.0 (a pre-release can be pinned: hmgapi-deps.txt)" "$o"
+echo "base 2.0.0-rc.1 file://$C/dl/base-1.2.0.zip $(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' $C/dl/base-1.2.0.zip)" > hmgapi-deps.txt
+dep; check "... a pin outside the mod's own repo: refused" 1 $r
+has "... says where it must be" "must be a release of the mod's own repo (https://example.invalid/base/releases/download/...)" "$o"
+python3 -c 'import json; m=json.load(open("my-mod/mod.json")); m["requires"]=["nothere"]; json.dump(m, open("my-mod/mod.json", "w"))'
+rm hmgapi-deps.txt
+dep; check "... a mod not in the catalogue: fails" 1 $r
+has "... says so" "my-mod requires nothere, which isn't in HMG-API's catalogue" "$o"
+python3 -c 'import json; m=json.load(open("my-mod/mod.json")); m["requires"]=["base ^1.1"]; json.dump(m, open("my-mod/mod.json", "w"))'
+unset HMGAPI_CATALOG
+
+# package: the signed package and the NEMESIS one
+o=$($HM package --key $T/author.key 2>&1) && r=0 || r=$?
+check "package: out/packages and out/dist" "0|yes" "$r|$([ -f out/packages/my-mod-0.1.0.zip ] && [ -f out/dist/my-mod-0.1.0-nemesis-package.zip ] && echo yes)"
+set +e; o=$($HM package 2>&1); r=$?; set -e
+has "... without --key: says how to make one" "Signing keygen" "$o"
+
+# the adb commands, against a fake adb: it runs each "adb shell" line here with a fake hmgapid,
+# /data/ under $FK, and drops the link once during apply, as adbd's restart does
+FK=$T/fake; mkdir -p $FK/bin $FK/data/local/tmp $FK/data/hmgapi/settings $FK/data/hmgapi/logs/hmgapi
+cat > $FK/bin/adb <<EOF
+#!/bin/sh
+FK=$FK
+EOF
+cat >> $FK/bin/adb <<'EOF'
+echo "adb $*" >> $FK/adb.log
+case $1 in
+get-state) echo device ;;
+push) cp "$2" "$FK$3" ;;
+shell)
+    shift; c=$(printf '%s' "$*" | sed "s#/data/#$FK/data/#g")   # adb joins its arguments, the unit's shell splits them
+    if [ -f $FK/down ]; then rm $FK/down; echo "error: device offline" >&2; exit 1; fi
+    case $c in
+    *"engine apply"*)
+        [ -f $FK/drop ] || { PATH=$FK/bin:$PATH sh -c "$c"; exit 0; }
+        rm $FK/drop; PATH=$FK/bin:$PATH hmgapid engine apply; touch $FK/down; exit 0 ;;   # no exit code: the link dropped
+    esac
+    PATH=$FK/bin:$PATH sh -c "$c" | sed 's/$/\r/' ;;   # adb shell's line ends
+esac
+EOF
+cat > $FK/bin/hmgapid <<'EOF'
+#!/bin/sh
+FK=${0%/bin/hmgapid}
+echo "hmgapid $*" >> $FK/hmgapid.log
+case $1 in
+version) echo "hmgapid 1.1.0" ;;
+engine) case $2 in install) echo "installed $3" ;; apply) echo "change ..."; echo "applied" ;; status) echo "HMG-API owns no files" ;; esac ;;
+reboot) echo restarting ;;
+setting-set) printf '%s' "$3" > $FK/data/hmgapi/settings/$2.json; echo saved ;;
+setting-get) cat $FK/data/hmgapi/settings/$2.json ;;
+service-log) echo "log of $2/$3" ;;
+sh) sh -c "$2" ;;
+*) exit 2 ;;
+esac
+EOF
+chmod 755 $FK/bin/adb $FK/bin/hmgapid
+export ADB=$FK/bin/adb HMGAPI_ADB_WAIT=10
+o=$($HM install --adb --dry-run 2>&1) && r=0 || r=$?
+check "install --adb --dry-run: runs no adb command" "0|" "$r|$(cat $FK/adb.log 2>/dev/null)"
+has "... prints them: push, install, apply, wait, restart" "+ $ADB push out/packages/my-mod-0.1.0.zip /data/local/tmp/my-mod-0.1.0.zip|+ $ADB shell 'hmgapid engine install /data/local/tmp/my-mod-0.1.0.zip'|+ $ADB shell 'rm -f /data/local/tmp/my-mod-0.1.0.zip'|+ $ADB shell 'hmgapid engine apply'|+ $ADB wait-for-device, then $ADB shell echo until it answers|+ $ADB shell 'hmgapid reboot'|(dry run: nothing was sent)|" "$(echo "$o" | tr '\n' '|')"
+o=$($HM install --adb 2>&1) && r=0 || r=$?
+check "install --adb: push, install, apply, restart" 0 $r
+[ $r = 0 ] || echo "$o"
+check "... the head unit's commands, in order" "hmgapid version|hmgapid engine install $FK/data/local/tmp/my-mod-0.1.0.zip|hmgapid engine apply|hmgapid reboot|" "$(tr '\n' '|' < $FK/hmgapid.log)"
+check "... the package pushed, then removed" "" "$(ls $FK/data/local/tmp)"
+rm $FK/hmgapid.log; touch $FK/drop
+o=$($HM install --adb --no-reboot 2>&1) && r=0 || r=$?
+check "... adb dropped during the apply: waits, asks the engine" 0 $r
+[ $r = 0 ] || echo "$o"
+has "... says so" "adb dropped during the apply (it restarts adbd): asking the engine how it went" "$o"
+check "... then status, no restart (--no-reboot)" "hmgapid version|hmgapid engine install $FK/data/local/tmp/my-mod-0.1.0.zip|hmgapid engine apply|hmgapid engine status|" "$(tr '\n' '|' < $FK/hmgapid.log)"
+J='{"name": "it'"'"'s \"quoted\"", "list": [1, 2], "path": "a b;c $HOME"}'
+printf '%s\n' "$J" > $T/s.json
+o=$($HM settings set my-mod $T/s.json 2>&1) && r=0 || r=$?
+check "settings set: a JSON file reaches the unit as it is (quotes, spaces, \$)" "0|$J" "$r|$(cat $FK/data/hmgapi/settings/my-mod.json)"
+check "... pushed as a file, then removed" "" "$(ls $FK/data/local/tmp)"
+o=$($HM settings get my-mod 2>&1) && r=0 || r=$?
+check "settings get: the settings, indented" "0|$(python3 -c 'import json,sys; print(json.dumps(json.loads(sys.argv[1]), indent=2))' "$J")" "$r|$o"
+printf '{"a":' > $T/bad.json
+set +e; o=$($HM settings set my-mod $T/bad.json 2>&1); r=$?; set -e
+check "... not JSON: refused before adb" "2|yes|" "$r|$(echo "$o" | grep -q "isn't a JSON object" && echo yes)|$(grep -c bad.json $FK/adb.log | grep -v '^0$' || true)"
+printf '11-15 10:00:00.000 I/HMG-API( 1): [my-mod] old\n' > $FK/data/hmgapi/logs/hmgapi/log.log.1
+printf '11-15 10:00:01.000 I/HMG-API( 1): [other] x\n11-15 10:00:02.000 I/HMG-API( 1): [my-mod] zygote: version 0.1.0\n' > $FK/data/hmgapi/logs/hmgapi/log.log
+o=$($HM logs my-mod 2>&1) && r=0 || r=$?
+check "logs: the mod's lines in HMG-API's log, older file first" "0|11-15 10:00:00.000 I/HMG-API( 1): [my-mod] old|11-15 10:00:02.000 I/HMG-API( 1): [my-mod] zygote: version 0.1.0" "$r|$(echo "$o" | tr '\n' '|' | sed 's/|$//')"
+o=$($HM logs my-mod relay 2>&1) && r=0 || r=$?
+check "... a service's log" "0|log of my-mod/relay" "$r|$o"
+sed 's/^version) echo "hmgapid 1.1.0" ;;/version) echo "hmgapid: daemon not running" ;;/' $FK/bin/hmgapid > $FK/h && mv $FK/h $FK/bin/hmgapid && chmod 755 $FK/bin/hmgapid
+set +e; o=$($HM settings get my-mod 2>&1); r=$?; set -e
+check "... HMG-API not running on the unit: says so" "2|hmgapi-mod: HMG-API isn't running on the unit (hmgapid version: hmgapid: daemon not running)" "$r|$o"
+unset ADB HMGAPI_ADB_WAIT
+cd $M
+
 # ---- check-scripts.sh and check-points.py
 o=$(sh $S/check-scripts.sh hello side-panel 2>&1) && r=0 || r=$?
 check "check-scripts.sh: the examples pass" 0 $r

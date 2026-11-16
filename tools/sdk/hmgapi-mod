@@ -1,0 +1,326 @@
+#!/bin/sh
+# hmgapi-mod: a mod's whole loop with the HMG-API mod SDK, from its repository's root
+# (in the SDK as bin/hmgapi-mod; it wraps the SDK's other tools).
+#
+#   hmgapi-mod new <id> [--name <name>] [--author <name>]   a new mod: <id>/, hmgapi-sdk.json, CI
+#   hmgapi-mod build [<mod>]                 bin/build-mod.sh into out/build/<id>
+#   hmgapi-mod check [<mod>]                 bin/check-points.py and bin/check-scripts.sh
+#   hmgapi-mod deps [<mod>]                  the mods it requires, from HMG-API's catalogue,
+#                                            checked and cached in .hmgapi/deps (bin/mod-deps.py)
+#   hmgapi-mod test [<mod>]                  build, deps, then the mod's test.sh, or without one
+#                                            the plan test (test/lib.sh plan_test)
+#   hmgapi-mod package [<mod>] --key <file>  bin/mkmodpkg.sh, then bin/mknemesismod.sh
+#   hmgapi-mod install --adb [<zip>|<mod>] [--no-reboot]    over adb: push, engine install,
+#                                            engine apply, wait for adb, restart the head unit
+#   hmgapi-mod logs <id> [<service>]         the mod's lines in HMG-API's log, or a service's log
+#   hmgapi-mod settings get <id>             its settings (/data/hmgapi/settings/<id>.json)
+#   hmgapi-mod settings set <id> <file>      a JSON file as its settings
+#
+# <mod>: the mod's folder; by default the one folder here with a mod.json (or this one).
+# The adb commands take --dry-run (print the adb commands, run none); ADB names the adb
+# binary (default adb) and ANDROID_SERIAL picks the device, as for adb itself.
+# HMGAPI_SDK: the SDK (default: the one this script is in). Plain sh; python3 and a JDK.
+set -e
+HERE=$(cd "$(dirname "$0")" && pwd)
+HMGAPI_SDK=${HMGAPI_SDK:-$(cd "$HERE/.." && pwd)}
+export HMGAPI_SDK
+B=$HMGAPI_SDK/bin
+ADB=${ADB:-adb}
+DRY=
+REMOTE_DIR=/data/local/tmp
+
+die() { echo "hmgapi-mod: $*" >&2; exit 2; }
+usage() { sed -n '4,22s/^# \{0,1\}//p' "$0" >&2; exit 2; }
+jget() { python3 -c 'import json,sys; v=json.load(open(sys.argv[1])).get(sys.argv[2], ""); print(v if isinstance(v, str) else "")' "$1" "$2"; }
+valid_id() { printf '%s\n' "$1" | grep -Eq '^[a-z0-9][a-z0-9-]{0,63}$'; }
+
+# the mod folder: the argument, or the one folder here with a mod.json, or here
+mod_dir() {
+    if [ -n "$1" ]; then
+        [ -f "$1/mod.json" ] || die "no mod.json in $1"
+        M=${1%/}; return
+    fi
+    if [ -f mod.json ]; then M=.; return; fi
+    found=$(for f in */mod.json; do [ ! -f "$f" ] || dirname "$f"; done)
+    case $(printf '%s\n' "$found" | grep -c . || true) in
+        0) die "no mod here (no <folder>/mod.json): name the mod's folder, or make one with hmgapi-mod new <id>" ;;
+        1) M=$found ;;
+        *) die "several mods here ($(echo $found)): name one" ;;
+    esac
+}
+mod_id() { ID=$(jget "$M/mod.json" id); valid_id "$ID" || die "$M/mod.json: \"id\" is \"$ID\", not a mod id (a-z, 0-9 and -)"; }
+
+# ---- adb: each command printed with --dry-run instead of run; output without adb's \r
+adb_do() {
+    if [ -n "$DRY" ]; then echo "+ $ADB $*"; return 0; fi
+    "$ADB" "$@"
+}
+# adb_sh <command>: on the unit, its output shown and its exit code returned (adb shell on
+# Android 4.4 always exits 0, so the code comes back as a last line); 255: the link dropped
+adb_sh() {
+    if [ -n "$DRY" ]; then echo "+ $ADB shell '$1'"; return 0; fi
+    set +e
+    # (on a line of its own: setting-get's JSON has no newline at the end)
+    "$ADB" shell "$1; hmgapi_mod_rc=\$?; echo; echo hmgapi-mod-rc=\$hmgapi_mod_rc" > "$TMPF" 2>&1
+    set -e
+    tr -d '\r' < "$TMPF" | sed -e '/^hmgapi-mod-rc=/d' | sed -e '$ { /^$/d; }'
+    r=$(tr -d '\r' < "$TMPF" | sed -n 's/^hmgapi-mod-rc=\([0-9]*\)$/\1/p')
+    return "${r:-255}"
+}
+# the unit back on adb (apply restarts adbd): up to HMGAPI_ADB_WAIT seconds (default 120)
+adb_wait() {
+    if [ -n "$DRY" ]; then echo "+ $ADB wait-for-device, then $ADB shell echo until it answers"; return 0; fi
+    n=0 max=${HMGAPI_ADB_WAIT:-120}
+    while [ $n -lt "$max" ]; do
+        if "$ADB" shell echo hmgapi-mod-up 2>/dev/null | tr -d '\r' | grep -q '^hmgapi-mod-up$'; then return 0; fi
+        sleep 2; n=$((n + 2))
+    done
+    die "the head unit didn't come back on adb within $max s (HMGAPI_ADB_WAIT)"
+}
+adb_ready() {
+    [ -n "$DRY" ] && return 0
+    command -v "$ADB" >/dev/null 2>&1 || die "no $ADB: install Android's platform-tools, or set ADB"
+    st=$("$ADB" get-state 2>&1 | tr -d '\r') || true
+    [ "$st" = device ] || die "no head unit on adb ($ADB get-state: $st): USB adb on, cable in the USB port"
+    v=$("$ADB" shell 'hmgapid version' 2>&1 | tr -d '\r')
+    case $v in "hmgapid "[0-9]*) ;; *) die "HMG-API isn't running on the unit (hmgapid version: $v)" ;; esac
+}
+
+TMPF=$(mktemp); trap 'rm -f "$TMPF"' EXIT
+cmd=${1:-}; [ $# -gt 0 ] && shift
+case $cmd in
+new)
+    id=${1:-}; [ $# -gt 0 ] && shift
+    valid_id "$id" || die "new <id>: an id is a-z, 0-9 and -, starting with a letter or digit"
+    name=$id author=$(git config user.name 2>/dev/null || true)
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --name) name=${2:?--name <name>}; shift 2 ;;
+            --author) author=${2:?--author <name>}; shift 2 ;;
+            *) die "new: unknown option $1" ;;
+        esac
+    done
+    [ -n "$author" ] || die "new: give --author <name> (no git user.name here)"
+    [ ! -e "$id" ] || die "$id already exists"
+    V=$(cat "$HMGAPI_SDK/VERSION")
+    # the package: mod.<id, - as _>, with an m first where the id can't start a Java name
+    # (a digit: 3d-view is mod.m3d_view; a keyword: new is mod.mnew)
+    pkg=mod.$(python3 -c 'import sys
+s = sys.argv[1].replace("-", "_")
+java = ("abstract assert boolean break byte case catch char class const continue default do double else enum extends final "
+        "finally float for goto if implements import instanceof int interface long native new package private protected public "
+        "return short static strictfp super switch synchronized this throw throws transient try void volatile while true false "
+        "null var record yield sealed permits").split()
+print("m" + s if s[0].isdigit() or s in java else s)' "$id")
+    # the entry class: the id in CamelCase (my-mod: MyMod), Mod first if it starts with a digit
+    cls=$(python3 -c 'import sys; c="".join(p[:1].upper() + p[1:] for p in sys.argv[1].split("-") if p); print(("Mod" if c[0].isdigit() else "") + c)' "$id")
+    mkdir -p "$id/src/$(echo "$pkg" | sed 's#\.#/#g')"
+    python3 - "$id" "$name" "$author" "${V%%-*}" "$pkg.$cls" <<'PY'
+import json, sys
+mid, name, author, floor, entry = sys.argv[1:]
+m = {"id": mid, "name": name, "version": "0.1.0", "hmgapi": ">=" + floor, "authors": [author], "license": "AGPL-3.0",
+     "description": "", "system": "all", "hooks": {"jar": "hooks.jar", "entry": entry, "points": {}}}
+open(mid + "/mod.json", "w").write(json.dumps(m, indent=2) + "\n")
+PY
+    cat > "$id/src/$(echo "$pkg" | sed 's#\.#/#g')/$cls.java" <<EOF
+package $pkg;
+
+import hmgapi.hook.LoadedApp;
+import hmgapi.hook.ModContext;
+import hmgapi.hook.ModEntry;
+
+/** $name: where its code runs (HMG-API's mod reference: docs/mod-reference.md). */
+public final class $cls extends ModEntry {
+    @Override
+    public void zygoteInit(ModContext mod) {
+        mod.log("zygote: version " + mod.version);
+    }
+
+    @Override
+    public void appLoaded(ModContext mod, LoadedApp app) {
+        mod.log("app: " + app.packageName);
+    }
+}
+EOF
+    cat > "$id/test.sh" <<'EOF'
+#!/bin/sh
+# Off-car test: this mod through HMG-API's plan on a fake head unit for each car its
+# "system" names that HMG-API has a map for (the SDK's test/lib.sh, plan_test), beside
+# the mods it requires (hmgapi-mod test passes them in HMGAPI_MOD_DEPS; without it, they
+# come from HMG-API's catalogue here). Add your own checks below (check, has, eng...).
+set -e
+M=$(cd "$(dirname "$0")" && pwd)
+. "${HMGAPI_SDK:?set HMGAPI_SDK to the unpacked HMG-API mod SDK}/test/lib.sh"
+DEPS=${HMGAPI_MOD_DEPS-$("$HMGAPI_SDK/bin/hmgapi-mod" deps "$M")}
+plan_test "$M" $DEPS
+exit $fail
+EOF
+    chmod 755 "$id/test.sh"
+    # the pin: the release's zip and its SHA-256 from that release's SHA256SUMS, when it can be
+    # fetched (HMGAPI_SDK_SUMS: another URL or file); otherwise left for the author to fill in
+    sum=
+    if [ ! -e hmgapi-sdk.json ]; then
+        sum=$(python3 -c 'import re, sys, urllib.request
+v, src = sys.argv[1:]
+if re.match(r"^[a-z][a-z0-9+.-]*://", src):
+    text = urllib.request.urlopen(urllib.request.Request(src, headers={"User-Agent": "hmgapi-mod new"}), timeout=15).read().decode()
+else:
+    text = open(src).read()
+for line in text.splitlines():
+    w = line.split()
+    if len(w) == 2 and w[1].lstrip("*") == "hmgapi-mod-sdk-%s.zip" % v and re.match(r"^[0-9a-f]{64}$", w[0]):
+        print(w[0])' "$V" "${HMGAPI_SDK_SUMS:-https://github.com/Open-HMG/HMG-API/releases/download/v$V/SHA256SUMS}" 2>/dev/null || true)
+        printf '{"version": "%s", "sha256": "%s"}\n' "$V" "$sum" > hmgapi-sdk.json
+    fi
+    if [ ! -e .github/workflows/ci.yml ]; then
+        mkdir -p .github/workflows
+        printf 'name: ci\non: [push, pull_request]\njobs:\n  mod:\n    uses: Open-HMG/HMG-API/.github/workflows/mod.yml@v%s\n' "$V" > .github/workflows/ci.yml
+    fi
+    [ -e .gitignore ] || printf 'out/\n.hmgapi/\n*.key\n' > .gitignore
+    echo "$id/: mod.json, src/$(echo "$pkg" | sed 's#\.#/#g')/$cls.java, test.sh"
+    echo "$id/mod.json: \"system\" is \"all\" (any head unit): name the cars the mod is for, with their region (\"product\": [\"CVEV.USA.\"])"
+    if [ -n "$sum" ]; then
+        echo "hmgapi-sdk.json: pins SDK $V (sha256 from the v$V release's SHA256SUMS)"
+    elif grep -q '"sha256": ""' hmgapi-sdk.json; then
+        echo "hmgapi-sdk.json: pins SDK $V; put its sha256 in (SHA256SUMS on HMG-API's v$V release; CI fails without it)"
+    fi
+    echo "next: hmgapi-mod build, hmgapi-mod test (docs/mod-reference.md in HMG-API: \"Building a mod outside this repo\")"
+    ;;
+build)
+    mod_dir "${1:-}"; mod_id
+    sh "$B/build-mod.sh" "$M" "out/build/$ID" "out/build-work/$ID"
+    echo "built: out/build/$ID"
+    ;;
+check)
+    mod_dir "${1:-}"
+    r=0
+    python3 "$B/check-points.py" "$M" || r=1
+    sh "$B/check-scripts.sh" "$M" || r=1
+    exit $r
+    ;;
+deps)
+    mod_dir "${1:-}"
+    python3 "$B/mod-deps.py" "$M"
+    ;;
+test)
+    mod_dir "${1:-}"; mod_id
+    sh "$B/build-mod.sh" "$M" "out/build/$ID" "out/build-work/$ID" > "$TMPF" 2>&1 || { cat "$TMPF"; die "build failed"; }
+    HMGAPI_MOD_DEPS=$(python3 "$B/mod-deps.py" "$M") || die "the mods $ID requires aren't all here (above)"
+    HMGAPI_MOD_BUILD=$PWD/out/build/$ID
+    export HMGAPI_MOD_DEPS HMGAPI_MOD_BUILD
+    r=0
+    if [ -f "$M/test.sh" ]; then
+        sh "$M/test.sh" || r=$?
+    else
+        sh -c 'set -e; . "$HMGAPI_SDK/test/lib.sh"; plan_test "$1" $HMGAPI_MOD_DEPS; exit $fail' - "$M" || r=$?
+    fi
+    exit $r
+    ;;
+package)
+    key=; arg=
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --key) key=${2:?--key <file>}; shift 2 ;;
+            -*) die "package: unknown option $1" ;;
+            *) arg=$1; shift ;;
+        esac
+    done
+    [ -n "$key" ] || die "package: --key <your author key> (new one: java -cp \$HMGAPI_SDK/lib/hmgapi-engine.jar hmgapi.engine.Signing keygen <file>; keep it out of the repo)"
+    mod_dir "$arg"; mod_id
+    sh "$B/mkmodpkg.sh" "$M" "$key"
+    V=$(jget "$M/mod.json" version)
+    sh "$B/mknemesismod.sh" "out/packages/$ID-$V.zip"
+    ;;
+install)
+    adb=; arg=; reboot=1
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --adb) adb=1; shift ;;
+            --dry-run) DRY=1; shift ;;
+            --no-reboot) reboot=; shift ;;
+            -*) die "install: unknown option $1" ;;
+            *) arg=$1; shift ;;
+        esac
+    done
+    [ -n "$adb" ] || die "install: only --adb for now (a USB stick or NEMESIS: HMG-API's docs)"
+    case $arg in
+        *.zip) Z=$arg; [ -f "$Z" ] || die "no $Z" ;;
+        *) mod_dir "$arg"; mod_id; V=$(jget "$M/mod.json" version); Z=out/packages/$ID-$V.zip
+           [ -f "$Z" ] || die "no $Z: hmgapi-mod package --key <your key> first" ;;
+    esac
+    base=$(basename "$Z")
+    printf '%s\n' "$base" | grep -Eq '^[A-Za-z0-9._+-]+$' || die "$base: a package name is letters, digits and . _ + -"
+    adb_ready
+    adb_do push "$Z" "$REMOTE_DIR/$base"
+    r=0; adb_sh "hmgapid engine install $REMOTE_DIR/$base" || r=$?
+    adb_sh "rm -f $REMOTE_DIR/$base" || true
+    [ $r = 0 ] || die "engine install failed (exit $r)"
+    # apply restarts adbd when a mod changes it: the link may drop before the exit code comes back
+    r=0; adb_sh "hmgapid engine apply" || r=$?
+    adb_wait
+    if [ $r = 255 ]; then
+        echo "adb dropped during the apply (it restarts adbd): asking the engine how it went"
+        r=0; adb_sh "hmgapid engine status" || r=$?
+        if [ -z "$DRY" ] && grep -q "an apply didn't finish" "$TMPF"; then die "the apply didn't finish (engine status above)"; fi
+        [ $r = 0 ] || [ $r = 255 ] || die "engine status: exit $r (above)"
+    elif [ $r != 0 ]; then
+        die "engine apply failed (exit $r): nothing changed, see above"
+    fi
+    if [ -n "$DRY" ]; then
+        [ -z "$reboot" ] || adb_sh "hmgapid reboot"
+        echo "(dry run: nothing was sent)"
+    elif [ -n "$reboot" ]; then
+        adb_sh "hmgapid reboot" || true
+        echo "the head unit restarts; installed $base"
+    else
+        echo "installed $base (applied; restart the head unit for hooks and file changes)"
+    fi
+    ;;
+logs)
+    while [ $# -gt 0 ]; do case $1 in --dry-run) DRY=1; shift ;; *) break ;; esac; done
+    id=${1:-}; svc=${2:-}
+    valid_id "$id" || die "logs <mod id> [<service>]"
+    adb_ready
+    if [ -n "$svc" ]; then
+        printf '%s\n' "$svc" | grep -Eq '^[A-Za-z0-9._-]+$' || die "$svc: not a service name"
+        adb_sh "hmgapid service-log $id $svc"
+        exit $?
+    fi
+    # the log keeper's file (logcat only holds seconds on these units), the older part first
+    L=/data/hmgapi/logs/hmgapi/log.log
+    if [ -n "$DRY" ]; then adb_sh "hmgapid sh 'cat $L.1 $L 2>/dev/null'"; echo "+ (lines with [$id])"; exit 0; fi
+    r=0; adb_sh "hmgapid sh 'cat $L.1 $L 2>/dev/null'" > "$TMPF.log" || r=$?
+    [ $r = 0 ] || [ $r = 1 ] || { cat "$TMPF.log"; rm -f "$TMPF.log"; die "can't read $L (exit $r)"; }
+    grep -F "[$id]" "$TMPF.log" || echo "no lines from $id in HMG-API's log (yet)" >&2
+    rm -f "$TMPF.log"
+    ;;
+settings)
+    while [ $# -gt 0 ]; do case $1 in --dry-run) DRY=1; shift ;; *) break ;; esac; done
+    sub=${1:-}; id=${2:-}
+    valid_id "$id" || die "settings get <mod id> | settings set <mod id> <file>"
+    case $sub in
+    get)
+        adb_ready
+        if [ -n "$DRY" ]; then adb_sh "hmgapid setting-get $id"; exit 0; fi
+        r=0; adb_sh "hmgapid setting-get $id" > "$TMPF.json" || r=$?
+        [ $r = 0 ] || { cat "$TMPF.json"; rm -f "$TMPF.json"; die "setting-get: exit $r"; }
+        python3 -c 'import json,sys; print(json.dumps(json.load(open(sys.argv[1])), indent=2))' "$TMPF.json" 2>/dev/null || cat "$TMPF.json"
+        rm -f "$TMPF.json"
+        ;;
+    set)
+        f=${3:-}; [ -f "$f" ] || die "settings set $id <file>: no file $f"
+        python3 -c 'import json,sys; v=json.load(open(sys.argv[1])); sys.exit(0 if isinstance(v, dict) else "a JSON object, {...}")' "$f" \
+            || die "$f isn't a JSON object"
+        adb_ready
+        # pushed as a file and read on the unit: JSON in a shell command line loses its quotes
+        T=$REMOTE_DIR/hmgapi-mod-settings.json
+        adb_do push "$f" "$T"
+        r=0; adb_sh "hmgapid setting-set $id \"\$(cat $T)\"; r=\$?; rm -f $T; (exit \$r)" || r=$?
+        [ $r = 0 ] || die "setting-set: exit $r"
+        ;;
+    *) die "settings get <mod id> | settings set <mod id> <file>" ;;
+    esac
+    ;;
+''|-h|--help|help) usage ;;
+*) die "unknown command $cmd (hmgapi-mod help)" ;;
+esac

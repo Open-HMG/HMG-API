@@ -54,6 +54,14 @@
   hook point the mod declares is mapped, its hooks load, which points it shares with other
   mods, and that its native recipes stay clear of a required mod's recipes for the same
   library build. Mod repos no longer need HMG-API's source for its maps.
+- **`hmgapi-mod`: a mod's whole loop in one command.** The SDK's `bin/hmgapi-mod` wraps its
+  tools: `new` (a mod folder, its test, the SDK pin and CI), `build`, `check`, `test`
+  (with the plan test), `package` (the signed and the NEMESIS package), and `deps`, which
+  gets the mods `"requires"` names from HMG-API's catalogue, checks each download's SHA-256
+  and author key, and caches it. On a head unit over adb: `install --adb` (install, apply,
+  wait for adb after adbd's restart, restart the unit), `logs` (HMG-API's log file, not
+  logcat's few seconds) and `settings get|set` (pushed as a file, so the JSON keeps its
+  quotes); each with `--dry-run`.
 
 ## 1.1.0-rc.2 (2026-11-15)
 

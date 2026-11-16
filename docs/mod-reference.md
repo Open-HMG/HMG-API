@@ -409,7 +409,36 @@ A mod whose `build.sh` compiles native code can ask for an Android NDK with
 `with: ndk: "<version>"`, as `sdkmanager` names it (hmgapi-adbd: `21.4.7075529`, r21e).
 The workflow installs it before the build, with `NDK` and `ANDROID_NDK_HOME` pointing at it.
 
-On your machine, with the SDK unpacked in `$HMGAPI_SDK` and the Android SDK in `ANDROID_HOME`:
+On your machine, with the SDK unpacked in `$HMGAPI_SDK` and the Android SDK in
+`ANDROID_HOME`, `hmgapi-mod` runs the whole loop from the repository's root:
+
+```
+$HMGAPI_SDK/bin/hmgapi-mod new my-mod --name "My mod"   # my-mod/, hmgapi-sdk.json, CI
+$HMGAPI_SDK/bin/hmgapi-mod build                        # out/build/my-mod
+$HMGAPI_SDK/bin/hmgapi-mod check                        # the "hmgapi" floor, points, scripts
+$HMGAPI_SDK/bin/hmgapi-mod test                         # build, deps, my-mod/test.sh
+$HMGAPI_SDK/bin/hmgapi-mod package --key ~/keys/me.key  # out/packages, out/dist (NEMESIS)
+$HMGAPI_SDK/bin/hmgapi-mod install --adb                # on the head unit, then it restarts
+$HMGAPI_SDK/bin/hmgapi-mod logs my-mod
+$HMGAPI_SDK/bin/hmgapi-mod settings set my-mod my-settings.json
+```
+
+Your author key: `java -cp $HMGAPI_SDK/lib/hmgapi-engine.jar hmgapi.engine.Signing keygen <file>`,
+kept out of the repository. `deps` gets each mod your `"requires"` names from HMG-API's
+catalogue (`catalog/`): the download, checked against the entry's SHA-256 and signed by its
+author key, which must be on HMG-API's author list; cached in `.hmgapi/deps`. A required
+mod's pre-release isn't in the catalogue: pin it in `hmgapi-deps.txt` at the root,
+`<id> <version> <url> <sha256>`, from a release of that mod's own repository. `test` passes
+the folders to your `test.sh` in `HMGAPI_MOD_DEPS`, for `plan_test` (below).
+
+`install --adb` pushes `out/packages/<id>-<version>.zip`, runs `hmgapid engine install` and
+`engine apply`, waits for adb to come back (an apply can restart adbd: then it asks
+`engine status` how the apply went), and restarts the head unit (`--no-reboot` to skip).
+`logs` reads HMG-API's log file, as logcat holds only seconds on these units. `settings set`
+pushes the file and reads it on the unit: JSON written through a shell command line loses
+its quotes. Each takes `--dry-run`, which prints the adb commands and runs none.
+
+The same steps by hand, which is what `hmgapi-mod` runs:
 
 ```
 $HMGAPI_SDK/bin/build-mod.sh my-mod out/build/my-mod
@@ -436,6 +465,9 @@ names, such as recipes; no build needed):
 plan_test "$(dirname "$0")" ../other-mod/other-mod
 exit $fail
 ```
+
+The `test.sh` that `hmgapi-mod new` writes takes them from `HMGAPI_MOD_DEPS` (set by
+`hmgapi-mod test`), or runs `hmgapi-mod deps` itself (HMG-API's mod workflow, in CI).
 
 A unit there has stand-ins, not the car's files, so file changes (`patches.json`) are
 left to the stock-file tests below. `PLAN_POINTS` adds points your code reads by name

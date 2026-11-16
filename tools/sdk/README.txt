@@ -10,6 +10,8 @@ the Android SDK (build-tools, a platform android.jar) and set ANDROID_HOME.
   lib/hmgapi-runtime-stubs.jar  the car classes runtime signatures name: compile only
   lib/hmgapi-client.jar         for a mod's own app or service (bundled in it)
   lib/hmgapi-engine.jar         the engine on this machine (HMGAPI_HOST=1), Signing, ScriptCheck
+  bin/hmgapi-mod <command>      a mod's whole loop, wrapping the tools below (see under)
+  bin/mod-deps.py <mod>         the mods it requires, from HMG-API's catalogue (hmgapi-mod deps)
   bin/build-mod.sh <mod> <out>  hooks.jar from src/, the APK from app/
   bin/mkmodpkg.sh <mod> <key>   the signed package, out/packages/<id>-<version>.zip
   bin/mknemesismod.sh <zip>     the same mod as a NEMESIS package, out/dist/
@@ -27,6 +29,30 @@ the Android SDK (build-tools, a platform android.jar) and set ANDROID_HOME.
                                 stock files each map was made from; no car files)
   points.txt, catalogue/        the hook points this release has, and their catalogue
   nemesis/                      the NEMESIS package templates
+
+hmgapi-mod, from the mod repository's root (<mod>: the mod's folder, by default the one
+folder there with a mod.json):
+  hmgapi-mod new <id> [--name <name>] [--author <name>]   <id>/ (mod.json, an entry class,
+                                test.sh), hmgapi-sdk.json (this SDK's release, its sha256 from
+                                the release's SHA256SUMS if it can be fetched), CI, .gitignore
+  hmgapi-mod build [<mod>]      bin/build-mod.sh into out/build/<id>
+  hmgapi-mod check [<mod>]      bin/check-points.py and bin/check-scripts.sh
+  hmgapi-mod deps [<mod>]       each mod "requires" names (and what those require), from HMG-API's
+                                catalogue: its SHA-256 and author key checked, cached in
+                                .hmgapi/deps; prints their folders. HMGAPI_CATALOG: a catalog/
+                                folder or URL; hmgapi-deps.txt: "<id> <version> <url> <sha256>"
+                                pins of a pre-release, from the mod's own repo, same author key
+  hmgapi-mod test [<mod>]       build, deps, then its test.sh (HMGAPI_MOD_BUILD, HMGAPI_MOD_DEPS
+                                set), or the plan test if it has none
+  hmgapi-mod package [<mod>] --key <file>    bin/mkmodpkg.sh, then bin/mknemesismod.sh
+  hmgapi-mod install --adb [<zip>|<mod>] [--no-reboot]   push, hmgapid engine install, engine
+                                apply, wait for adb (the apply may restart adbd), hmgapid reboot
+  hmgapi-mod logs <id> [<service>]           its lines in HMG-API's log (logcat only holds
+                                seconds on these units), or one of its services' log
+  hmgapi-mod settings get <id> | set <id> <file>   its settings; set pushes the file (JSON
+                                in a shell command line loses its quotes)
+The adb commands need HMG-API on the unit and USB adb; --dry-run prints them instead.
+ADB: the adb binary; ANDROID_SERIAL: which device.
 
 The plan test: in a mod's test.sh, after `. "$HMGAPI_SDK/test/lib.sh"`,
   plan_test <mod folder> [<folder of each mod it requires>...]
