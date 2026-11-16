@@ -36,7 +36,12 @@ import java.util.TreeSet;
  * must have (or, with "!", must not); features are the <feature name> entries
  * in /system/etc/permissions plus HMG-API's own: hmgapi.wifi (a Wi-Fi chip
  * answered on SDIO, or its driver and firmware are in /system/wifi on a car with
- * the stock hotspot; the wifi.module feature file is there even without one).
+ * the stock hotspot; the wifi.module feature file is there even without one), and
+ * hmgapi.wifi.unpowered (not seen, but the driver, firmware and wifi.module feature are
+ * there and the stock hotspot feature isn't: the unit never powers the chip, so it may
+ * be there; Korean units and some US trims). A mod that asks HMG-API for the hotspot
+ * ("wifi": {"hotspot": true}) turns it on, so for that mod hmgapi.wifi.unpowered meets
+ * hmgapi.wifi; once the chip has shown on SDIO, it's hmgapi.wifi for every mod.
  *
  * "system" may also be a list of such objects: any one of them is enough, for
  * a mod that supports e.g. the US EV6 on 260507 and the Canadian Ioniq 5 on 260206.
@@ -234,6 +239,8 @@ public final class SystemCheck {
                 }
             } else if (seen.exists() || wifiDriver()) {
                 features.add("hmgapi.wifi");
+            } else if (driverFiles() && features.contains("com.hkmc.software.wifi.module")) {
+                features.add("hmgapi.wifi.unpowered");
             }
             return features;
         }
@@ -245,9 +252,36 @@ public final class SystemCheck {
          * hotspot, stand for it.
          */
         boolean wifiDriver() {
-            return features.contains("com.hkmc.software.wifihotspot")
-                    && new File(root + "/system/wifi/bcmdhd.ko").isFile()
-                    && new File(root + "/system/wifi/fw_bcmdhd.bin").isFile();
+            return features.contains(Engine.HOTSPOT) && !hmgapiHotspot() && driverFiles();
+        }
+
+        /** the Broadcom driver and its firmware */
+        boolean driverFiles() {
+            return new File(root + "/system/wifi/bcmdhd.ko").isFile() && new File(root + "/system/wifi/fw_bcmdhd.bin").isFile();
+        }
+
+        /**
+         * Is the hotspot feature HMG-API's own file ("wifi": {"hotspot": true})? Then it isn't the
+         * car's: it says nothing about a chip, until the chip shows on SDIO. Known by its bytes,
+         * which HMG-API writes the same everywhere (Engine.featureXml) and no stock file has.
+         */
+        boolean hmgapiHotspot() {
+            File x = new File(root + "/system/etc/permissions/" + Engine.HOTSPOT + ".xml");
+            try {
+                return x.isFile() && Engine.read(x).equals(Engine.featureXml(Engine.HOTSPOT));
+            } catch (Exception e) {
+                return false;
+            }
+        }
+
+        /** for the Car Report: "seen" (on SDIO, now or once), "stock hotspot", "unpowered" or "none" */
+        public String wifi() {
+            TreeSet<String> fs = features();
+            if (fs.contains("hmgapi.wifi")) {
+                String[] sdio = new File(root + "/sys/bus/sdio/devices").list();
+                return (sdio != null && sdio.length > 0) || new File(root + WIFI_SEEN).exists() ? "seen" : "stock hotspot";
+            }
+            return fs.contains("hmgapi.wifi.unpowered") ? "unpowered" + (hmgapiHotspot() ? " (HMG-API turned the hotspot feature on)" : "") : "none";
         }
 
         /** One line for logs and the app: what HMG-API thinks this unit is. */
@@ -283,13 +317,26 @@ public final class SystemCheck {
     /** null if the unit meets the requirements, else why not (plain words). */
     @SuppressWarnings("unchecked")
     public static String check(Object system, Facts facts) {
+        return check(system, facts, false);
+    }
+
+    /** does this mod.json ask HMG-API for the hotspot ("wifi": {"hotspot": true})? */
+    @SuppressWarnings("unchecked")
+    public static boolean asksHotspot(Map<String, Object> mod) {
+        Object w = mod == null ? null : mod.get("wifi");
+        return w instanceof Map && Boolean.TRUE.equals(((Map<String, Object>) w).get("hotspot"));
+    }
+
+    /** powersWifi: the mod asks for the hotspot, so a chip that's only unpowered will do (hmgapi.wifi.unpowered) */
+    @SuppressWarnings("unchecked")
+    public static String check(Object system, Facts facts, boolean powersWifi) {
         if (system == null || (!(system instanceof Map) && !(system instanceof List) && isAll(system))) return null;
         if (system instanceof List) {
             List<Object> alts = (List<Object>) system;
             if (alts.isEmpty()) return null;
             List<String> why = new ArrayList<String>();
             for (Object o : alts) {
-                String r = check(o, facts);
+                String r = check(o, facts, powersWifi);
                 if (r == null) return null;
                 why.add(r);
             }
@@ -306,7 +353,7 @@ public final class SystemCheck {
             Object spec = req.get(k);
             if (spec == null || isAll(spec)) continue;
             String r;
-            if ("features".equals(k)) r = features(spec, facts);
+            if ("features".equals(k)) r = features(spec, facts, powersWifi);
             else if ("props".equals(k)) r = props(spec, facts);
             else r = one(k, facts.get(k), spec);
             if (r != null) return r;
@@ -373,13 +420,20 @@ public final class SystemCheck {
         return !e.isEmpty() && "<>=^~".indexOf(e.charAt(0)) >= 0;
     }
 
-    static String features(Object spec, Facts facts) {
+    static String features(Object spec, Facts facts, boolean powersWifi) {
         for (String e : entries(spec)) {
             boolean not = e.startsWith("!");
             String name = not ? e.substring(1).trim() : e;
-            boolean has = facts.features().contains(name);
+            boolean unpowered = facts.features().contains("hmgapi.wifi.unpowered");
+            boolean has = facts.features().contains(name) || ("hmgapi.wifi".equals(name) && powersWifi && unpowered);
             if (not && has) return "not for units with " + name;
-            if (!not && !has) return "needs " + name + (name.equals("hmgapi.wifi") ? " (no Wi-Fi chip or driver found on this unit)" : "");
+            if (!not && !has) {
+                if (!"hmgapi.wifi".equals(name)) return "needs " + name;
+                return "needs " + name + (unpowered
+                        ? " (no Wi-Fi chip seen yet: this car's hotspot feature is off, so the unit never powers it; a mod that"
+                                + " asks HMG-API for the hotspot, \"wifi\": {\"hotspot\": true}, turns it on)"
+                        : " (no Wi-Fi chip or driver found on this unit)");
+            }
         }
         return null;
     }
@@ -425,11 +479,12 @@ public final class SystemCheck {
         Facts facts = new Facts(root, (Map<String, Object>) hmgapi.get("car"));
         if (a.length == 0) {
             System.out.println(facts.describe());
-            System.out.println("features: " + facts.features().size() + (facts.features().contains("hmgapi.wifi") ? ", Wi-Fi chip found" : ", no Wi-Fi chip"));
+            System.out.println("features: " + facts.features().size() + (facts.features().contains("hmgapi.wifi") ? ", Wi-Fi chip found"
+                    : facts.features().contains("hmgapi.wifi.unpowered") ? ", Wi-Fi chip not seen: the hotspot feature is off, so the unit never powers it" : ", no Wi-Fi chip"));
             return;
         }
         Map<String, Object> mod = Json.object(Engine.read(new File(a[0], "mod.json")));
-        String r = check(mod.get("system"), facts);
+        String r = check(mod.get("system"), facts, asksHotspot(mod));
         System.out.println(r == null ? "ok: " + mod.get("id") + " supports this unit" : mod.get("id") + ": " + r);
         System.exit(r == null ? 0 : 1);
     }

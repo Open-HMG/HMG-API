@@ -16,6 +16,19 @@
   off the car only, on stock CarPlay libraries and NEMESIS's `libautoreceiver_infobank.so`
   build: the Wireless CarPlay/AA and EGMP Android Auto EV recipes come out the same, and the
   matcher never matched once in a wrong place under fuzzing.
+- **`"wifi": {"hotspot": true}`: HMG-API turns on the Wi-Fi hotspot feature** for mods
+  that need the Wi-Fi chip. Without the stock hotspot feature the unit never powers its
+  chip, so it was never seen and HMG-API said "no Wi-Fi chip" (Korean units, and US cars
+  such as the 2023 Santa Fe, #112, #170). Where the stock file is there, only its
+  `featurexml.cfg` line is commented out; otherwise HMG-API's own file goes in, shared by
+  every mod that asks, back to stock when none does. The older Hyundai and Kia builds and
+  the Korean ones mapped in this release have no stock hotspot file.
+- **A chip that isn't powered yet counts for the mod that powers it.** The driver,
+  firmware and `wifi.module` feature without the stock hotspot are now
+  `hmgapi.wifi.unpowered`; for a mod that asks for the hotspot, that meets `hmgapi.wifi`.
+  HMG-API's own hotspot file doesn't count as the car's, so `hmgapi.wifi` still means a
+  chip that showed on SDIO or a car whose stock software has the hotspot. The Car Report
+  says which (`unit.wifi`).
 - **The repo keeps one base map and each build's differences** (#236). The names a hook point
   resolves to hardly change between builds, so `maps/base/<app>.json` holds each point's
   entry on most builds, and a build's `car.json` lists only what's its own: `"names"` (0 to

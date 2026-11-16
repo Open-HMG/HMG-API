@@ -410,6 +410,17 @@ sysctl comes back).
   its `featurexml.cfg` line; it stays while any mod wants it.
 - **Wi-Fi client:** `"wifi": {"client": true}` (the `android.hardware.wifi` feature
   and `persist.wifi.state=3`, as Tilepad's toggle does); any number of mods can ask.
+- **Wi-Fi hotspot:** `"wifi": {"hotspot": true}`: the stock hotspot feature
+  (`com.hkmc.software.wifihotspot`), without which the unit never powers its Wi-Fi chip.
+  Korean units and some US trims ship without it, or delete it at boot from
+  `featurexml.cfg`. Where the stock file is there, HMG-API only comments out its
+  `featurexml.cfg` line; where it isn't, HMG-API's own file goes in. Shared by every mod
+  that asks, and back to stock when none does. Both asks can go together.
+  A mod that asks for the hotspot and lists `"features": ["hmgapi.wifi"]` in `"system"`
+  also runs on a unit where the chip hasn't been seen yet but its driver, firmware and
+  `com.hkmc.software.wifi.module` feature are there (`hmgapi.wifi.unpowered`): the mod
+  turns it on. Once the chip has shown on SDIO, it's `hmgapi.wifi` for every mod. The
+  Car Report's `unit.wifi` says which: `seen`, `stock hotspot`, `unpowered` or `none`.
 - **`media_codecs.xml` by codec name** (patches.json):
   `{"type": "codecs", "path": "/system/etc/media_codecs.xml", "stock": "any",
   "remove": ["OMX.google.h264.decoder"], "add": [{"name": "OMX.google.vp9.decoder",

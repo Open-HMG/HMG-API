@@ -296,7 +296,8 @@ final class Mods {
         info.description = mod.optString("description", "");
         if (mod.has("system")) {
             Map<String, Object> hmgapi = hmgapiRaw();
-            String why = SystemCheck.check(Json.object(read(new File(dir, "mod.json"))).get("system"), facts(hmgapi));
+            Map<String, Object> mj = Json.object(read(new File(dir, "mod.json")));
+            String why = SystemCheck.check(mj.get("system"), facts(hmgapi), SystemCheck.asksHotspot(mj));
             if (why != null && !SystemCheck.ignored(hmgapi, id)) {
                 info.state = "unsupported";
                 info.error = why;
