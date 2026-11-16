@@ -1,5 +1,85 @@
 # Changelog
 
+## Unreleased
+
+- **A unit maps the points HMG-API's map lacks only because the map is older than them.**
+  This happens after each HMG-API install or update (a boot step), or from Settings ("Map the
+  points HMG-API's map lacks"). Only points found by name are mapped, in apps whose stock
+  files are the ones the map was made from. Each is checked in the car's own apps before
+  it's kept. They're kept in `/data/hmgapi/state/local-map.json`, which an update doesn't
+  replace, and go in the Car Report for a maintainer to make official. Readings and mods'
+  observe hooks use them. HMG-API's own hooks, calls, constructors and mods' change or
+  replace hooks need the point in HMG-API's map, or "Try unchecked maps". An app whose
+  stock files change, or a broken file, leaves HMG-API's map as it is. The owner can turn
+  them off in Settings ("Use points mapped on this car"). Every point missing from a map
+  today is a by-name one, so units can fill each of them.
+- **"Map this car from its files" survives updates, and works on a car whose map doesn't
+  fit.** `map-car --write` keeps the car's own map in `state/local-map.json`. It used to
+  write into `maps/`, which every HMG-API update replaces. It's now also used when HMG-API's
+  map for the car doesn't fit its framework (`mismatch`): before, `--write` refused there.
+  With HMG-API's map fitting, `--write` now says to use `--local`; before, it overwrote a
+  shipped `probed` map in place.
+- Add a Canadian Ioniq 6 (CEEV) 260206 map with 351 hook points, from a Car Report
+  and matching stock Bluetooth settings files. Its projection helper is `iO`, not
+  the `iP` used by the other maps. All 351 points passed verification on the car.
+- Recognize CEEV as Hyundai Ioniq 6. Report import accepts an explicit make/name for
+  older reports and preserves their unresolved points and absent apps.
+- The on-car mapper checks a reference class's members together, so an unrelated
+  class reusing another build's name does not hide the correct projection helper.
+- **The on-car mapper takes another car's method name only for the same code.** For the
+  methods only a smali pattern finds, it used to keep another map's name if this car had a
+  method of that name and signature. On the Korean 260902 builds that picks the wrong
+  method twice: `py()Z` is the test gate elsewhere but reads `ro.product.model` there, and
+  `gl()I` is another field's getter; `verify-map` passes both. Maps now keep a code
+  signature (`"sig"`, `tools/dexsig.py`) on those 9 methods, and `engine map-car` takes the
+  one method whose code matches, whatever its name; when several share that code, the point
+  is left for the car's own map. The maps made from stock trees gain `sig`; the runtime
+  ignores it. The seven maps made on cars (Car Reports) have none yet: their smali-only
+  methods were taken by name. `tools/check-maps.py` lists them as unconfirmed until a
+  Car Report from a newer HMG-API confirms them (one per build: the Carnival, Sportage,
+  Telluride and Niro EV maps are one build).
+### Cars
+
+- **The 2022 Ioniq 5 (`NEEV`) on US 260903 uses the 260903 map**, as the 2023-on
+  (`NEEV23`) does. Its 18 mapped files are the same bytes, and its owner's check found all
+  351 hook points (#192; also #72, #186). Before, it had no map there: hooks were off
+  unless the owner made one on the car.
+### Fixes
+
+- **The USB install puts the HMG-API app in right away** (#187). With Android up, the
+  package manager couldn't read the app where the USB installer had copied it (root only),
+  so it refused it (`INSTALL_FAILED_INVALID_URI`) and the head unit came back without the
+  app. It now installs from the copy in `/data/hmgapi/public/`, which it can read, as the
+  retry at the next restart already did.
+- **A mod's NEMESIS package depends on the mods it requires.** `tools/mknemesismod.sh`
+  (and the mod SDK's copy) wrote only `hmgapi@>=1.0` and the refusals, so NEMESIS installed
+  a mod without the mods in its `"requires"`; HMG-API's install only noted the missing mod.
+  EGMP Android Auto EV, which requires `wireless-carplay-aa >=2.1.0`, got
+  `depends="hmgapi@>=1.0,!hmgapi.egmp-aa-ev-standalone"`. Each required mod is now
+  `hmgapi.<id>@>=<lowest version its range allows>`, a pre-release floor as its NEMESIS
+  package-version (`^2.2.0-rc.1` is `>=2.1.99.1`); an optional one (`"optional": true`)
+  stays out. NEMESIS checks only that floor; the
+  rest of a range (`^`, `~`, upper bounds) stays HMG-API's check, and the build says so.
+  The build refuses a `"requires"` entry that isn't a mod id, and a mod that requires a mod
+  whose package it refuses. Since NEMESIS won't unlist a package another one needs, the
+  NEMESIS sync and HMG-API's uninstall now unlist mod packages in rounds, so a required
+  mod's comes off after the one needing it instead of staying listed (and keeping
+  HMG-API's own package listed with it).
+- **A mod's `"conflicts"` hold for mods that only hook.** The list was checked only for
+  mods with files or settings to apply (`patches.json` and the like), so two hook-only
+  mods that said they can't run together both loaded, and `engine plan` said nothing
+  (two builds of egmp-aa-ev, with and without the Wireless mod, list each other). The mod
+  loader and the plan now load the first of the two in load order (mods they require
+  first, then by id), whichever of them lists the other; the other is shown as a
+  conflict in the HMG-API app, with which mod to turn off to use it instead. A mod turned
+  on while apps run doesn't load next to one it conflicts with that those apps loaded
+  (even one turned off since); the next restart settles it.
+- **A mod whose `"requires"` aren't met isn't loaded.** One whose required mod was off
+  or missing still loaded at start (its code ran, then it was switched off), and one
+  outside the version range it asked for ran; the HMG-API app showed it as on. It now
+  isn't loaded, and the app shows why. This also keeps such a mod from winning a
+  conflict it then can't use.
+
 ## 1.1.0-rc.2 (2026-11-15)
 
 The second release candidate: fixes from a review of rc.1, nothing new in HMG-API itself.
@@ -91,6 +171,11 @@ The release candidate: feature freeze. 1.1.0 will be this code unless a blocker 
 
 ### Fixes
 
+- **The right split-screen panel keeps the Mobis font with hooks on** (#174). HMG-API
+  made its panel page's views as soon as the panel app started, even with no mod page;
+  that loaded the process's fonts before the Mobis font's fallback was in place, so
+  Korean text in the whole panel showed in NanumGothic (seen on an Avante CN7 KOR
+  260902). The views are now made only when the panel first shows HMG-API's page.
 - **Vehicle readings answer at once, with code 0** (#145). Every `hmgapid vehicle` read
   took 3 s and came back with code 1, the values right: on these units an accepted
   `LocalSocket`'s `close()` doesn't close its fd, so the vehicle service never ended its

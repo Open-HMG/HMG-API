@@ -71,24 +71,11 @@ public final class Engine {
     final String lpatch = env("HMGAPI_LPATCH", "/system/bin/lpatch");
     /** How the enabled mods' hooks fit together (the same rules the zygote's loader uses). */
     HookPlan hookPlan() {
-        Map<String, Map<String, Object>> enabled = new LinkedHashMap<String, Map<String, Object>>();
-        File[] ds = new File(data, "mods").listFiles();
-        if (ds != null) {
-            java.util.Arrays.sort(ds);
-            for (File d : ds) {
-                File mj = new File(d, "mod.json");
-                if (!d.isDirectory() || new File(d, ".disabled").exists() || !mj.isFile()) continue;
-                try {
-                    enabled.put(d.getName(), Json.object(read(mj)));
-                } catch (Exception ignored) {
-                    // reported by the mod loader
-                }
-            }
-        }
+        Map<String, Map<String, Object>> enabled = HookPlan.enabled(new File(data, "mods"));   // as the mod loader reads them
         CarMap map = CarMap.load(root, facts, hmgapi);
         if (host && "1".equals(env("HMGAPI_TEST_ANY_CAR", ""))) return HookPlan.of(enabled, null);   // desktop tests: no map
         if (!map.runnable) return HookPlan.of(enabled, java.util.Collections.<String>emptySet(), offMissing(map));
-        return HookPlan.of(enabled, map.points.keySet(), map.missing);
+        return HookPlan.of(enabled, map.points.keySet(), map.missing, map.localOnly());
     }
 
     /** hooks off on this car: every catalogue point counts as missing, with the map's reason */
@@ -270,7 +257,7 @@ public final class Engine {
 
         if ("status".equals(cmd)) return status();
         if ("verify-map".equals(cmd)) return MapCheck.run(this);
-        if ("map-car".equals(cmd)) return MapProbe.run(this, args.length > 1 && "--write".equals(args[1]));
+        if ("map-car".equals(cmd)) return MapProbe.run(this, args);
         if ("report".equals(cmd)) return Report.run(this, args.length > 1 && "--usb".equals(args[1]));
         if ("usb-scan".equals(cmd)) return UsbUpdates.scan(this);
         if ("publish-state".equals(cmd)) return LiveState.publish(this);
@@ -335,7 +322,7 @@ public final class Engine {
             if (!map.runnable) out.add("hooks are off on this car (" + map.reason + "): mods apply without their hooks");
         }
         if (!restoreAll && !"plan".equals(cmd) && !"apply".equals(cmd)) {
-            out.add("usage: engine plan | apply [--trial] | keep | restore | status | recover | firmware-reset | install <zip|dir> | remove <id> | nemesis-sync | map | map-car [--write] | verify-map | report [--usb] | usb-scan | update-hmgapi <zip> | publish-state | apps");
+            out.add("usage: engine plan | apply [--trial] | keep | restore | status | recover | firmware-reset | install <zip|dir> | remove <id> | nemesis-sync | map | map-car [--local [--if-needed] | --write | --forget] | verify-map | report [--usb] | usb-scan | update-hmgapi <zip> | publish-state | apps");
             return 2;
         }
         Plan p = plan(restoreAll, force);

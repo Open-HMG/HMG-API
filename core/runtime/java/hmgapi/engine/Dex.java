@@ -28,6 +28,7 @@ public final class Dex {
         public List<String> params;
         public boolean isStatic;
         public Set<String> strings;   // methods: const-strings in its own code
+        public long sig;              // methods: codeSig of its code (0: none)
     }
 
     public static final class Cls {
@@ -204,7 +205,7 @@ public final class Dex {
             }
             m.isStatic = (acc & 0x8) != 0;
             m.strings = new LinkedHashSet<String>();
-            if (code != 0) constStrings(base + code, m.strings);
+            if (code != 0) m.sig = walk(base + code, m.strings);
             c.strings.addAll(m.strings);
             if (m.strings.isEmpty()) m.strings = java.util.Collections.emptySet();   // most methods: the framework has ~100k
             c.methods.add(m);
@@ -212,9 +213,17 @@ public final class Dex {
         }
     }
 
-    /** const-string / const-string/jumbo operands in a code item (walks the instructions by their sizes) */
-    void constStrings(int item, Set<String> out) {
+    /**
+     * Walks a code item by instruction sizes: adds its const-string / const-string/jumbo operands
+     * to out, and returns its code signature (tools/dexsig.py computes the same): 64-bit FNV-1a
+     * over each instruction's opcode, plus the second code unit of Dalvik's quickened opcodes
+     * (field offset, vtable slot, inline index), which say what the code touches when names
+     * can't. Table payloads are skipped. Registers, constants and table indices are left out,
+     * so the same source gives the same signature in builds whose names differ.
+     */
+    long walk(int item, Set<String> out) {
         int n = u4(item + 12), start = item + 16;
+        long sig = 0xcbf29ce484222325L;
         int i = 0;
         while (i < n) {
             int at = start + i * 2, unit = u2(at), op = unit & 0xff;
@@ -225,11 +234,28 @@ public final class Dex {
                 else i += 1;
                 continue;
             }
+            sig = (sig ^ op) * 0x100000001b3L;
+            if (QUICK[op]) {
+                int v = u2(at + 2);
+                sig = (sig ^ (v & 0xff)) * 0x100000001b3L;
+                sig = (sig ^ (v >>> 8)) * 0x100000001b3L;
+            }
             if (op == 0x1a) out.add(string(u2(at + 2)));
             else if (op == 0x1b) out.add(string(u4(at + 2)));
             i += SIZE[op];
         }
+        return sig;
     }
+
+    /** a method's code signature as maps write it ("sig"): 16 hex digits */
+    public static String sigHex(long sig) {
+        String h = Long.toHexString(sig);
+        while (h.length() < 16) h = "0" + h;
+        return h;
+    }
+
+    /** Dalvik's quickened opcodes (the volatile field ops keep a field index, which moves between builds) */
+    static final boolean[] QUICK = new boolean[256];
 
     /** instruction sizes in 16-bit units, by opcode (dex 035, plus Dalvik's odex opcodes 0xe3-0xfe) */
     static final int[] SIZE = new int[256];
@@ -246,5 +272,7 @@ public final class Dex {
             {0xf8, 0xfb, 3}, {0xfc, 0xfe, 2}, {0xff, 0xff, 1},
         };
         for (int[] r : ranges) for (int op = r[0]; op <= r[1]; op++) SIZE[op] = r[2];
+        for (int op = 0xee; op <= 0xef; op++) QUICK[op] = true;   // execute-inline(/range): inline index
+        for (int op = 0xf2; op <= 0xfb; op++) QUICK[op] = true;   // iget/iput-*-quick: offset; invoke-*-quick: vtable slot
     }
 }

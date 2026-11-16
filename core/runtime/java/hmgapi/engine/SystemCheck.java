@@ -55,6 +55,7 @@ public final class SystemCheck {
      */
     static final String[][] MODELS = {
         {"CVEV", "kia", "EV6"},
+        {"CEEV", "hyundai", "Ioniq 6"},
         {"NEEV", "hyundai", "Ioniq 5"},
         {"NEEV23", "hyundai", "Ioniq 5"},
         {"NEEV23SE", "hyundai", "Ioniq 5"},

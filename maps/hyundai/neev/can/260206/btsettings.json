@@ -6,7 +6,8 @@
     "method": "ih",
     "params": [],
     "ret": "boolean",
-    "static": true
+    "static": true,
+    "sig": "78dd9126b1e70d24"
   },
   "btsettings.projection_helper.open_device_connections": {
     "method": "a",
@@ -15,7 +16,8 @@
       "int"
     ],
     "ret": "void",
-    "static": true
+    "static": true,
+    "sig": "3992e4b2185762b2"
   },
   "btsettings.projection_helper.open_other_page": {
     "method": "aj",
@@ -23,7 +25,8 @@
       "android.content.Context"
     ],
     "ret": "void",
-    "static": true
+    "static": true,
+    "sig": "188748786200352d"
   },
   "btsettings.projection_helper.open_wireless_page": {
     "method": "aQ",
@@ -31,6 +34,7 @@
       "android.content.Context"
     ],
     "ret": "void",
-    "static": true
+    "static": true,
+    "sig": "4c117e3a11d56395"
   }
 }
