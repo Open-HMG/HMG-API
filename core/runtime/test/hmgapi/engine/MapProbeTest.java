@@ -3,6 +3,7 @@ package hmgapi.engine;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -16,12 +17,16 @@ public final class MapProbeTest {
         m.ret = ret;
         m.isStatic = isStatic;
         m.params = Arrays.asList(params);
+        m.strings = new LinkedHashSet<String>();
+        m.calls = new LinkedHashSet<String>();
+        m.constants = new LinkedHashSet<Integer>();
         return m;
     }
 
     static Dex.Cls cls(String name, Dex.Member... members) {
         Dex.Cls c = new Dex.Cls();
         c.name = name;
+        for (Dex.Member m : members) m.owner = name;
         c.methods.addAll(Arrays.asList(members));
         return c;
     }
@@ -99,6 +104,31 @@ public final class MapProbeTest {
         classes.remove("sample.New");
         missing("partial reference is not a fallback for a nonmatching complete reference",
                 new MapProbe(root.getPath(), null, partialMaps), classes, "0");
+
+        Dex.Member menu = method("menu", "void", false);
+        cls("sample.Menu", menu);
+        menu.strings.add("wireless-a");
+        menu.strings.add("wireless-b");
+        Dex.Member available = method("renamed", "boolean", true);
+        cls("sample.Helper", available);
+        available.calls.add("getStepOfSpec");
+        available.constants.add(25);
+        available.callers.add(menu);
+        Map<String, Object> calledShape = Json.object("{\"params\":[],\"ret\":\"boolean\",\"static\":true,"
+                + "\"calls\":[\"getStepOfSpec\"],\"constants\":[25],\"called_by\":{\"class\":\"sample.Menu\","
+                + "\"strings\":[\"wireless-a\",\"wireless-b\"]}}");
+        if (!p.methodOk(available, calledShape)) throw new AssertionError("call-site shape did not match");
+        checks++;
+        menu.strings.remove("wireless-b");
+        if (p.methodOk(available, calledShape)) throw new AssertionError("call-site shape ignored a caller string");
+        checks++;
+
+        Dex.Member oldWrongGate = method("pB", "boolean", true);
+        oldWrongGate.calls.add("isSupportMinimumStep");
+        Map<String, Object> gateShape = Json.object("{\"params\":[],\"ret\":\"boolean\",\"static\":true,"
+                + "\"not_calls\":[\"isSupportMinimumStep\"]}");
+        if (p.methodOk(oldWrongGate, gateShape)) throw new AssertionError("not_calls accepted the excluded call");
+        checks++;
         System.out.println("ok    reference class validation (" + checks + " checks)");
     }
 }

@@ -85,7 +85,8 @@ def parse(root):
                 w = s.split()
                 m = re.match(r'(.+)\((.*)\)(.+)', w[-1])
                 c.methods.append({'name': m.group(1), 'params': split_params(m.group(2)), 'ret': jtype(m.group(3)),
-                                  'static': 'static' in w, 'code': ''})
+                                  'static': 'static' in w, 'code': '', 'calls': set(), 'call_refs': set(),
+                                  'callers': [], 'constants': set()})
                 mcode = []
             elif s.startswith('.end method'):
                 if c.methods and mcode is not None:
@@ -95,13 +96,33 @@ def parse(root):
                 m = re.search(r'"(.*)"$', s)
                 if m:
                     c.strings.add(m.group(1))
+            if mcode is not None:
+                m = re.match(r'invoke-\S+\s+.*;->([^\s(]+)\(', s)
+                if m:
+                    c.methods[-1]['calls'].add(m.group(1))
+                m = re.match(r'invoke-\S+\s+.*?,\s+L([^;]+);->([^\s(]+)\(([^)]*)\)(\S+)$', s)
+                if m:
+                    c.methods[-1]['call_refs'].add((m.group(1).replace('/', '.'), m.group(2),
+                                                    tuple(split_params(m.group(3))), jtype(m.group(4))))
+                m = re.match(r'const(?:/4|/16|/high16)?\s+\w+,\s+(-?(?:0x[0-9a-fA-F]+|\d+))$', s)
+                if m:
+                    c.methods[-1]['constants'].add(int(m.group(1), 0))
             if s and not s.startswith('.line') and not s.startswith('#'):
                 code.append(s)
                 if mcode is not None:
                     mcode.append(s)
         if c:
+            for method in c.methods:
+                method['class'] = c.name
             c.code = '\n'.join(code) + '\n'
             classes[c.name] = c
+    methods = {(x['class'], x['name'], tuple(x['params']), x['ret']): x
+               for c in classes.values() for x in c.methods}
+    for c in classes.values():
+        for caller in c.methods:
+            for ref in caller['call_refs']:
+                if ref in methods:
+                    methods[ref]['callers'].append(caller)
     return classes
 
 
@@ -195,12 +216,25 @@ class Mapper:
             return False
         if 'static' in ms and x['static'] != ms['static']:
             return False
+        if 'class' in ms and x['class'] != self.resolve_type(ms['class']):
+            return False
         for st in ms.get('strings', []):   # const-strings in the method's own code
             if 'const-string' not in x['code'] or ('"%s"' % st) not in x['code']:
                 return False
         for st in ms.get('not_strings', []):
             if 'const-string' in x['code'] and ('"%s"' % st) in x['code']:
                 return False
+        for name in ms.get('calls', []):
+            if name not in x['calls']:
+                return False
+        for name in ms.get('not_calls', []):
+            if name in x['calls']:
+                return False
+        for n in ms.get('constants', []):
+            if n not in x['constants']:
+                return False
+        if 'called_by' in ms and not any(self.method_ok(caller, ms['called_by']) for caller in x['callers']):
+            return False
         if 'code' in ms and not re.search(ms['code'], x['code']):
             return False
         return True

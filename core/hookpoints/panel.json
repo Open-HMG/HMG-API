@@ -163,14 +163,23 @@
       "kind": "method",
       "of": "panel.test_gate",
       "find": {
-        "pattern": "test_slot",
-        "group": "gate_m",
         "params": [],
         "ret": "boolean",
         "static": true,
         "not_strings": [
           "ro.product.model"
-        ]
+        ],
+        "not_calls": [
+          "isSupportMinimumStep"
+        ],
+        "called_by": {
+          "class": "com.mobis.splitscreen.right.SplitScreenHome",
+          "params": [],
+          "ret": "java.lang.String[]",
+          "strings": [
+            "getAdvancedSettingList = "
+          ]
+        }
       },
       "about": "Mobis' test switch for slot 22 (always off on a car; HMG-API answers true only inside page_for_id and build_views)"
     }

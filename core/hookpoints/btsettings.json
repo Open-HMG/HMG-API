@@ -21,6 +21,17 @@
         "package": "com.android.settings2.bluetooth",
         "methods": [
           {
+            "params": [],
+            "ret": "boolean",
+            "static": true,
+            "calls": [
+              "getStepOfSpec"
+            ],
+            "constants": [
+              25
+            ]
+          },
+          {
             "params": [
               "android.content.Context"
             ],
@@ -76,11 +87,22 @@
       "kind": "method",
       "of": "btsettings.projection_helper",
       "find": {
-        "pattern": "phone_projection_menu",
-        "group": "available",
         "params": [],
         "ret": "boolean",
-        "static": true
+        "static": true,
+        "calls": [
+          "getStepOfSpec"
+        ],
+        "constants": [
+          25
+        ],
+        "called_by": {
+          "class": "com.android.settings2.bluetooth.BluetoothSettings",
+          "strings": [
+            "com.hkmc.software.connectivity.carplay_wireless",
+            "com.hkmc.software.connectivity.androidauto_wireless"
+          ]
+        }
       }
     },
     {

@@ -17,17 +17,21 @@ import java.util.zip.ZipFile;
  * A reader for the classes in a dex: an .odex (the head unit's /system/app and
  * /system/framework files: "dey" header, the dex inside), a plain classes.dex, or a
  * jar or APK holding one. For each class: its name, superclass, fields and methods
- * (names and Java types, static or not), and the strings its code loads
- * (const-string), per method and for the whole class. That's what the hook point
- * catalogue describes points by (MapProbe), the same facts tools/map-car.py reads
- * from baksmali's output. Names only; no code is kept.
+ * (names and Java types, static or not), and the strings and integers its code
+ * loads and method names it calls, per method. That's what the hook point catalogue
+ * describes points by (MapProbe), the same facts tools/map-car.py reads from
+ * baksmali's output. Names and constants only; no code is kept.
  */
 public final class Dex {
     public static final class Member {
-        public String name, type, ret;
+        public String name, type, ret, owner;
         public List<String> params;
         public boolean isStatic;
-        public Set<String> strings;   // methods: const-strings in its own code
+        public Set<String> strings, calls;   // methods: constants and calls in its own code
+        public Set<Integer> constants;
+        public final List<Member> callers = new ArrayList<Member>();
+        int dexIndex;
+        List<Integer> callIndexes;
     }
 
     public static final class Cls {
@@ -164,6 +168,14 @@ public final class Dex {
             if (data != 0) classData(c, base + data);
             out.put(c.name, c);
         }
+        Map<Integer, Member> methods = new LinkedHashMap<Integer, Member>();
+        for (Cls c : out.values()) for (Member m : c.methods) methods.put(m.dexIndex, m);
+        for (Cls c : out.values()) for (Member caller : c.methods) {
+            for (Integer idx : caller.callIndexes) {
+                Member target = methods.get(idx);
+                if (target != null) target.callers.add(caller);
+            }
+        }
         return out;
     }
 
@@ -193,6 +205,8 @@ public final class Dex {
             int save = pos;
             int mo = base + h(0x5c) + idx * 8;
             Member m = new Member();
+            m.owner = c.name;
+            m.dexIndex = idx;
             m.name = string(u4(mo + 4));
             int proto = base + h(0x4c) + u2(mo + 2) * 12;
             m.ret = type(u4(proto + 4));
@@ -204,16 +218,27 @@ public final class Dex {
             }
             m.isStatic = (acc & 0x8) != 0;
             m.strings = new LinkedHashSet<String>();
-            if (code != 0) constStrings(base + code, m.strings);
+            m.calls = new LinkedHashSet<String>();
+            m.constants = new LinkedHashSet<Integer>();
+            m.callIndexes = new ArrayList<Integer>();
+            if (code != 0) codeFacts(base + code, m.strings, m.calls, m.callIndexes, m.constants);
             c.strings.addAll(m.strings);
             if (m.strings.isEmpty()) m.strings = java.util.Collections.emptySet();   // most methods: the framework has ~100k
+            if (m.calls.isEmpty()) m.calls = java.util.Collections.emptySet();
+            if (m.constants.isEmpty()) m.constants = java.util.Collections.emptySet();
             c.methods.add(m);
             pos = save;
         }
     }
 
-    /** const-string / const-string/jumbo operands in a code item (walks the instructions by their sizes) */
-    void constStrings(int item, Set<String> out) {
+    String methodName(int idx) {
+        int m = base + h(0x5c) + idx * 8;
+        return string(u4(m + 4));
+    }
+
+    /** Constants and called method names in a code item (walks the instructions by their sizes). */
+    void codeFacts(int item, Set<String> stringsOut, Set<String> callsOut, List<Integer> callIndexesOut,
+                   Set<Integer> constantsOut) {
         int n = u4(item + 12), start = item + 16;
         int i = 0;
         while (i < n) {
@@ -225,8 +250,19 @@ public final class Dex {
                 else i += 1;
                 continue;
             }
-            if (op == 0x1a) out.add(string(u2(at + 2)));
-            else if (op == 0x1b) out.add(string(u4(at + 2)));
+            if (op == 0x12) {
+                int v = unit >> 12;
+                constantsOut.add(v < 8 ? v : v - 16);
+            } else if (op == 0x13) constantsOut.add((int) (short) u2(at + 2));
+            else if (op == 0x14) constantsOut.add(u4(at + 2));
+            else if (op == 0x15) constantsOut.add(((int) (short) u2(at + 2)) << 16);
+            else if (op == 0x1a) stringsOut.add(string(u2(at + 2)));
+            else if (op == 0x1b) stringsOut.add(string(u4(at + 2)));
+            else if ((op >= 0x6e && op <= 0x72) || (op >= 0x74 && op <= 0x78)) {
+                int idx = u2(at + 2);
+                callsOut.add(methodName(idx));
+                callIndexesOut.add(idx);
+            }
             i += SIZE[op];
         }
     }

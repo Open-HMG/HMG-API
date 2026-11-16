@@ -20,8 +20,10 @@ build (it must match exactly once, or the car isn't mapped):
 
 - class: `package` (prefix), `name` (exact, when it isn't obfuscated), `super`,
   `ctors` (lists of parameter types), `fields` (`{name?, type, static?}`),
-  `methods` (`{name?, params, ret?, static?}`), `strings` (string constants in its code)
-- method: `name?`, `params`, `ret?`, `static?`, `strings?`, `not_strings?`; ctor: `params`; field: `name?`, `type`, `static?`
+  `methods` (method shapes), `strings` (string constants in its code)
+- method: `name?`, `params`, `ret?`, `static?`, `strings?`, `not_strings?`, `calls?`,
+  `not_calls?`, `constants?`, `called_by?` (a method shape, optionally with `class`);
+  ctor: `params`; field: `name?`, `type`, `static?`
 
 Types are Java names (`int`, `java.lang.String`, `android.content.Context`);
 `@<point id>` is another class point's class.

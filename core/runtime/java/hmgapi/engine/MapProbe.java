@@ -226,14 +226,25 @@ public final class MapProbe {
         return true;
     }
 
+    @SuppressWarnings("unchecked")
     boolean methodOk(Dex.Member x, Map<String, Object> ms) throws Miss {
         if (x.name.equals("<init>") || x.name.equals("<clinit>")) return false;
         if (ms.containsKey("name") && !x.name.equals(ms.get("name"))) return false;
         if (ms.containsKey("params") && !x.params.equals(resolveAll(ms.get("params")))) return false;
         if (ms.containsKey("ret") && !x.ret.equals(resolve(String.valueOf(ms.get("ret"))))) return false;
         if (ms.containsKey("static") && x.isStatic != Boolean.TRUE.equals(ms.get("static"))) return false;
+        if (ms.containsKey("class") && !x.owner.equals(resolve(String.valueOf(ms.get("class"))))) return false;
         for (Object s : list(ms.get("strings"))) if (!x.strings.contains(String.valueOf(s))) return false;
         for (Object s : list(ms.get("not_strings"))) if (x.strings.contains(String.valueOf(s))) return false;
+        for (Object s : list(ms.get("calls"))) if (!x.calls.contains(String.valueOf(s))) return false;
+        for (Object s : list(ms.get("not_calls"))) if (x.calls.contains(String.valueOf(s))) return false;
+        for (Object n : list(ms.get("constants"))) if (!x.constants.contains(Integer.valueOf(((Number) n).intValue()))) return false;
+        if (ms.containsKey("called_by")) {
+            boolean any = false;
+            Map<String, Object> shape = (Map<String, Object>) ms.get("called_by");
+            for (Dex.Member caller : x.callers) if (methodOk(caller, shape)) any = true;
+            if (!any) return false;
+        }
         return true;
     }
 
