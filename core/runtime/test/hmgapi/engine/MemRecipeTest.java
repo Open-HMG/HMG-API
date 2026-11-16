@@ -108,6 +108,16 @@ public final class MemRecipeTest {
         check("other bytes: mismatch, nothing written", res.status == MemRecipe.Result.MISMATCH && mo.peek(base + 0x110, 1)[0] == other[0x110]);
         check("a region past the code segment: mismatch", r.apply(new Fake(base, lib), base, 0x110, "x").status == MemRecipe.Result.MISMATCH);
 
+        // a region that is only checked (before = after, e.g. a branch target): stock and patched alike
+        String target = MemRecipe.md5(java.util.Arrays.copyOfRange(lib, 0x300, 0x318));
+        MemRecipe c = MemRecipe.parse(text + "verify 0x300 24 " + target + " " + target + "\n");
+        Fake mc = new Fake(base, lib);
+        check("with a checked-only region: applied", c.apply(mc, base, lib.length, "x").status == MemRecipe.Result.APPLIED);
+        check("... and applied twice: already, not a mismatch", c.apply(mc, base, lib.length, "x").status == MemRecipe.Result.ALREADY);
+        byte[] moved = lib.clone();
+        moved[0x305] ^= 1;
+        check("... its bytes changed: mismatch", c.apply(new Fake(base, moved), base, lib.length, "x").status == MemRecipe.Result.MISMATCH);
+
         // added code: segment with a table entry back into the library and a branch into it
         String br = MemRecipe.md5(java.util.Arrays.copyOfRange(lib, 0x200, 0x210));
         String seg = "0000000011223344";

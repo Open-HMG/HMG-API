@@ -185,7 +185,7 @@ cat > "$D/mods/tube/mod.json" <<'J'
                 "aa_ev_connectors": [4, 1], "events": true}}
 J
 mkdir -p "$D/mods/dpi"
-printf '{"id": "dpi", "version": "1.0.0", "projection": {"aa_density": 160, "aa_sensors": {"remove": ["speed"]}, "aa_ev_connectors": [1, 5]}}\n' > "$D/mods/dpi/mod.json"
+printf '{"id": "dpi", "version": "1.0.0", "projection": {"aa_density": 160, "aa_sensors": {"remove": ["speed"], "add": [30]}, "aa_ev_connectors": [1, 5], "aa_raw": "yes"}}\n' > "$D/mods/dpi/mod.json"
 eng publish-state
 st=$(tr -d ' \n' < $D/public/state.json)
 has "density: the first by id wins" '"projection":{"aa_density":160,"aa_density_by":"dpi"' "$st"
@@ -193,12 +193,22 @@ has "... and the owner is told how to pick" 'conflict: tube asks Android Auto de
 has "sensors, fuel and connectors: together" '"aa_sensors_remove":["speed"],"aa_sensors_add":[23],"aa_fuel_types":[10],"aa_ev_connectors":[1,5,4]' "$st"
 has "events: the asking mod's apps" '"events":["dev.example.tube"]' "$st"
 has "only speed can be left out" "tube: projection aa_sensors remove: gps (only [speed])" "$out"
+has "sensor types: what the library can read (1-23)" "dpi: projection aa_sensors add: 30 isn't 1-23" "$out"
+has "aa_raw: true or false" "dpi: projection aa_raw: true or false" "$out"
+has "type 23 asks for HMG-API's library recipe" '"aa_raw_by":["tube"]' "$st"
 mkdir -p "$D/settings"; printf '{"overrides": {"projection": {"aa_density": "tube"}}}\n' > "$D/settings/hmgapi.json"
 eng publish-state
 has "the owner's pick wins" '"aa_density":200,"aa_density_by":"tube"' "$(tr -d ' \n' < $D/public/state.json)"
 eng plan
 has "plan: density" "projection Android Auto density 200 [tube]" "$out"
 has "plan: sensor removal says it's for every mod" "projection Android Auto: the phone isn't offered [speed] (for every mod) [dpi]" "$out"
+has "plan: type 23 only where the library recipe is" "projection Android Auto sensors added [23] ([23] only where HMG-API's Android Auto library recipe applies) [tube]" "$out"
+printf '{"id": "dpi", "version": "1.0.0", "projection": {"aa_raw": true, "aa_sensors": {"add": [13]}}}\n' > "$D/mods/dpi/mod.json"
+eng publish-state
+has "aa_raw: the mod asks for the recipe as well" '"aa_raw_by":["dpi","tube"]' "$(tr -d ' \n' < $D/public/state.json)"
+eng plan
+has "plan: raw sensor batches" "projection Android Auto raw sensor batches from its hook code (only where HMG-API's Android Auto library recipe applies) [dpi]" "$out"
+has "plan: a type the stock library reads needs nothing more" "projection Android Auto sensors added [13] [dpi]" "$out"
 rm -r "$D/mods/dpi" "$D/settings/hmgapi.json"
 
 # side panel pages: the mod's own apps' widgets

@@ -167,9 +167,10 @@ public final class MemRecipe {
                 continue;
             }
             String h = md5(m.peek(base + v.off, v.len));
-            if (h.equals(v.before)) before++;
-            else if (h.equals(v.after)) after++;
-            else spots.append(" 0x").append(Long.toHexString(v.off)).append(":other");
+            boolean b = h.equals(v.before), f = h.equals(v.after);
+            if (b) before++;
+            if (f) after++;   // a region only checked (before = after) counts both ways
+            if (!b && !f) spots.append(" 0x").append(Long.toHexString(v.off)).append(":other");
         }
         if (after == verifies.size() && !verifies.isEmpty()) return new Result(Result.ALREADY, id + ": already patched", 0);
         if (before != verifies.size()) return new Result(Result.MISMATCH, id + ": not this library's stock bytes (" + spots.toString().trim() + ")", 0);

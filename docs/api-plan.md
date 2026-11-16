@@ -46,7 +46,7 @@ other mods yet.
 | Ambient Sound | APK, worker service, tile with day/night icons, ambient light (lease) | |
 | Steering Arcade | APK, tile, readings: steering, pedal, brake | |
 | Launchpad | APK, daemon service, readings, TUNE hold, conditioning | |
-| EGMP AA EV | native patches, USB folder, readings, conditioning (auto-start), sensor 23, fuel and connector types, navigation messages | its energy-model sender (its own native patch); outside temperature, range |
+| EGMP AA EV | native patches, USB folder, readings, conditioning (auto-start), sensor 23, fuel and connector types, navigation messages (apps and hook code), the raw sensor-batch sender and its library recipe (US 260507 build) | the energy model itself; library recipes for builds core doesn't have yet; outside temperature, range |
 | Factory82 | watcher as a service, startup notice (behind the owner's switch) | |
 | Rear Dashcam | root helpers as services, USB folder, readings: gear, mute ×4, guide lines, rear camera turns | its display-layer helper stays a root service (raw display registers) |
 | Cold-start Heat | service, seat and wheel heat | outside temperature |
@@ -211,9 +211,11 @@ Hyundai feature flags with shared use. These come out of the Wireless mod into c
    **Features**. *Android Auto done (off-car; mapped on the EV6): `"projection"`
    density, sensors (remove speed, add types), fuel and connector types, events
    (connected, disconnected, navigation focus, guidance, navigation messages 0x8006
-   and 0x8007 from the Wireless mod's library patch); through hooks on GPM's
-   `VideoSink.nearestVideoConfiguration` and `SensorSource.init`. Not yet: CarPlay
-   events, Features.*
+   and 0x8007 from the Wireless mod's library patch, for apps and hook code); through
+   hooks on GPM's `VideoSink.nearestVideoConfiguration` and `SensorSource.init`. Raw
+   sensor batches (`"aa_raw"`, `ProjectionHooks.sendRaw`) and types 22-23 through
+   HMG-API's own library recipe (`core/recipes`, US 260507 build `48ee793a` only so
+   far). Not yet: CarPlay events, Features.*
 5. **Camera, Wi-Fi, iAP2, Bluetooth, config merges.** *Done (off-car): shared
    `feature_flags` (the Wireless mod's two flags moved to it), `"wifi": {"client":
    true}`, `codecs` changes merged by codec name, list settings merged per entry,

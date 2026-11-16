@@ -20,20 +20,41 @@ import hmgapi.engine.MemRecipe;
  * another mod's on the same library isn't applied, and the log names both. The first
  * of a mod's recipes that fits the library (its stock bytes) is the one used, so one
  * mod can carry a recipe per build of a library.
+ *
+ * HMG-API's own recipes (CoreRecipes) go in the same way, owned by "HMG-API", and are
+ * asked for before any mod's, so a mod recipe on the same bytes is the one refused.
  */
 final class NativePatch {
     private NativePatch() {}
 
+    /** the owner of HMG-API's own recipes */
+    static final String CORE = "HMG-API";
+
     static final class Want {
+        /** null: HMG-API's own */
         final ModContext mod;
-        final String lib;
+        final String owner, lib;
         final List<MemRecipe> recipes;
         boolean done;
+        /** one of its recipes is in place (applied, already there, or the library has it) */
+        volatile boolean applied;
 
         Want(ModContext mod, String lib, List<MemRecipe> recipes) {
             this.mod = mod;
+            this.owner = mod == null ? CORE : mod.id;
             this.lib = lib;
             this.recipes = recipes;
+        }
+
+        void log(String msg) {
+            if (mod != null) mod.log(msg);
+            else HmgApi.i(msg);
+        }
+
+        void error(String msg, Throwable t) {
+            if (mod != null) mod.error(msg, t);
+            else if (t != null) HmgApi.e(msg, t);
+            else HmgApi.i(msg);
         }
     }
 
@@ -75,6 +96,24 @@ final class NativePatch {
         Want w = new Want(mod, lib, recipes);
         wants.add(w);
         tryAll();
+    }
+
+    /** HMG-API's own recipes for a library (CoreRecipes), once per process */
+    static synchronized void core(String lib) {
+        for (Want w : wants) if (w.mod == null && w.lib.equals(lib)) return;
+        List<MemRecipe> r = new ArrayList<MemRecipe>();
+        for (String text : CoreRecipes.of(lib)) r.add(MemRecipe.parse(text));
+        if (r.isEmpty()) {
+            HmgApi.i("native patch " + lib + ": HMG-API has no recipe for it");
+            return;
+        }
+        request(null, lib, r);
+    }
+
+    /** whether one of owner's recipes for lib is in place in this process (owner: a mod id, or CORE) */
+    static synchronized boolean patched(String owner, String lib) {
+        for (Want w : wants) if (w.applied && w.owner.equals(owner) && w.lib.equals(lib)) return true;
+        return false;
     }
 
     /** after every library load in this process, the patches still waiting are tried */
@@ -126,18 +165,19 @@ final class NativePatch {
             try {
                 res = r.apply(MEMORY, base, textEnd, md5);
             } catch (Throwable t) {
-                w.mod.error("native patch " + r.id + " on " + w.lib, t);
+                w.error("native patch " + r.id + " on " + w.lib, t);
                 return;
             }
             if (res.ok()) {
-                here.add(new Owned(w.mod.id, r.id, r.regions()));
-                w.mod.log("native patch " + w.lib + ": " + res.message);
+                here.add(new Owned(w.owner, r.id, r.regions()));
+                w.applied = true;
+                w.log("native patch " + w.lib + ": " + res.message);
                 return;
             }
             tried.append("; ").append(res.message);
             if (res.status == MemRecipe.Result.FAILED) break;   // something was written: no other recipe on top
         }
-        w.mod.error("native patch " + w.lib + " not applied" + tried, null);
+        w.error("native patch " + w.lib + " not applied" + tried, null);
     }
 
     static Owned overlap(List<Owned> here, List<long[]> regions) {

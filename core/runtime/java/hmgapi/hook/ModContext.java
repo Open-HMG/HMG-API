@@ -139,6 +139,16 @@ public final class ModContext {
         }
     }
 
+    /**
+     * Whether one of this mod's recipes for lib (nativePatch) is in place in this
+     * process: applied, already there, or built into this build of the library. False
+     * until the library is loaded, so ask when you use the patch, not in appLoaded. For
+     * HMG-API's own Android Auto recipe, ask ProjectionHooks.rawReady().
+     */
+    public boolean nativePatched(String lib) {
+        return NativePatch.patched(id, lib);
+    }
+
     /** Is the mod on right now? (Its hooks don't run while it's off.) */
     public boolean enabled() {
         return enabled;

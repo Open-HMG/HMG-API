@@ -5,7 +5,7 @@
   "hmgapi": ">=1.0.0",
   "authors": ["VysseCodes"],
   "license": "AGPL-3.0",
-  "description": "For test sessions: shows a notice for every button binding and projection event it gets, sets Android Auto to 200 DPI without the tap limit, and may use every vehicle reading and command. Remove it after testing.",
+  "description": "For test sessions: shows a notice for every button binding and projection event it gets, sets Android Auto to 200 DPI without the tap limit, puts on HMG-API's Android Auto library recipe (it sends nothing through it), and may use every vehicle reading and command. Remove it after testing.",
   "live": true,
   "apps": [
     { "apk": "app/CarCheck.apk", "package": "dev.hmgapi.example.carcheck" }
@@ -27,6 +27,7 @@
   "projection": {
     "aa_density": 200,
     "aa_sensors": { "remove": ["speed"] },
+    "aa_raw": true,
     "events": true
   },
   "vehicle": {
