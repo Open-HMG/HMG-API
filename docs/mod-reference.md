@@ -119,6 +119,8 @@ Each entry is `"<id>"`, `"<id> <range>"` or `{"id": …, "version": <range>}`; r
   A mod's apps and services (`"apps"`, `"services"`) stop while a mod it requires is off,
   but don't follow `conflicts` yet.
 
+## Vehicle readings
+
 | Name | Unit | From the car's |
 |---|---|---|
 | `gear.park` | 0/1 | system service, gear P |
