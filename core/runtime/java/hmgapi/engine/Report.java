@@ -58,6 +58,8 @@ final class Report {
         mj.put("folder", map.folder);
         mj.put("hooks_on", map.runnable);
         mj.put("missing", notNoFiles(map.missing));
+        mj.put("mapped_here", new ArrayList<Object>(map.local));   // state/local-map.json: for a maintainer to make official
+        if (map.localWhy != null) mj.put("mapped_here_off", map.localWhy);
         r.put("map", mj);
 
         // this car mapped from its own files: names for a new map, or what changed on a known car
