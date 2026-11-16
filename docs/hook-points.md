@@ -17,37 +17,37 @@ Every point and map lives here, in HMG-API, including the ones only a mod in its
 uses (the wireless mod's, for one): a mod gets new points through an HMG-API release and its
 mod SDK ([mod-repos.md](mod-repos.md), section 4).
 
-351 hook points. **Cars** (`maps/`):
+353 hook points. **Cars** (`maps/`):
 
 | Car | Map | Points |
 |---|---|---|
-| Genesis G70 CAN 260903 | mapped on cars by HMG-API's own mapper | 278 of 351 |
-| Genesis G70 KOR 260902 | mapped on cars by HMG-API's own mapper | 341 of 351 |
-| Genesis G70 USA 260507 | mapped on cars by HMG-API's own mapper | 325 of 351 |
-| Hyundai Ioniq 6 CAN 260206 | checked on a car | 351 of 351 |
-| Hyundai Ioniq 6 SGP 260907 | mapped on cars by HMG-API's own mapper | 306 of 351 |
-| Hyundai Ioniq 6 USA 260903 | mapped on cars by HMG-API's own mapper | 347 of 351 |
-| Hyundai Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N, Palisade 2020-22 CAN 260206 | mapped from stock files | 351 of 351 |
-| Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902 | mapped on cars by HMG-API's own mapper | 341 of 351 |
-| Hyundai Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N, Palisade 2020-22 USA 260507 | mapped from stock files | 351 of 351 |
-| Hyundai Palisade USA 260903 | mapped on cars by HMG-API's own mapper | 343 of 351 |
-| Hyundai Ioniq 5 CAN 260206 | mapped from stock files | 351 of 351 |
-| Hyundai Ioniq 5 KOR 260902 | mapped from stock files | 351 of 351 |
-| Hyundai Ioniq 5 USA 260507 | mapped from stock files | 351 of 351 |
-| Hyundai Ioniq 5 USA 260903 | mapped on cars by HMG-API's own mapper | 351 of 351 |
-| Hyundai Creta IND 260430 | mapped on cars by HMG-API's own mapper | 339 of 351 |
-| Kia K3 KOR 260902 | mapped on cars by HMG-API's own mapper | 323 of 351 |
-| Kia EV6 CAN 260206 | mapped from stock files | 351 of 351 |
-| Kia EV6 KOR 260902 | mapped on cars by HMG-API's own mapper | 319 of 351 |
-| Kia EV6 USA 260507 | checked on a car | 351 of 351 |
-| Kia Carnival USA 260507 | mapped on cars by HMG-API's own mapper | 343 of 351 |
-| Kia K5, Sorento, Stinger, Soul, Seltos 2021, Niro 2020-21, Telluride 2020-21 CAN 260206 | mapped from stock files | 351 of 351 |
-| Kia K5, Sorento, Stinger, Seltos, Soul, Niro, Mohave, K7, Morning, Ray KOR 260902 | mapped from stock files | 351 of 351 |
-| Kia K5, Sorento, Stinger, Soul, Seltos 2021, Niro 2020-22, Cadenza, Telluride 2020-21 USA 260507 | mapped from stock files | 351 of 351 |
-| Kia Sportage (and Hybrid, Plug-in Hybrid), Forte, Carnival 2022, Niro Hybrid and Plug-in Hybrid, Soul, Seltos 2024 USA 260507 | mapped on cars by HMG-API's own mapper | 351 of 351 |
-| Kia Telluride USA 260507 | mapped on cars by HMG-API's own mapper | 351 of 351 |
-| Kia Niro, Sportage, Carnival, Telluride, Forte, Soul, Seltos 2024 CAN 260206 | mapped on cars by HMG-API's own mapper | 347 of 351 |
-| Kia Niro EV USA 260507 | mapped on cars by HMG-API's own mapper | 343 of 351 |
+| Genesis G70 CAN 260903 | mapped on cars by HMG-API's own mapper | 280 of 353 |
+| Genesis G70 KOR 260902 | mapped on cars by HMG-API's own mapper | 343 of 353 |
+| Genesis G70 USA 260507 | mapped on cars by HMG-API's own mapper | 327 of 353 |
+| Hyundai Ioniq 6 CAN 260206 | checked on a car | 353 of 353 |
+| Hyundai Ioniq 6 SGP 260907 | mapped on cars by HMG-API's own mapper | 308 of 353 |
+| Hyundai Ioniq 6 USA 260903 | mapped on cars by HMG-API's own mapper | 349 of 353 |
+| Hyundai Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N, Palisade 2020-22 CAN 260206 | mapped from stock files | 353 of 353 |
+| Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902 | mapped on cars by HMG-API's own mapper | 343 of 353 |
+| Hyundai Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N, Palisade 2020-22 USA 260507 | mapped from stock files | 353 of 353 |
+| Hyundai Palisade USA 260903 | mapped on cars by HMG-API's own mapper | 345 of 353 |
+| Hyundai Ioniq 5 CAN 260206 | mapped from stock files | 353 of 353 |
+| Hyundai Ioniq 5 KOR 260902 | mapped from stock files | 353 of 353 |
+| Hyundai Ioniq 5 USA 260507 | mapped from stock files | 353 of 353 |
+| Hyundai Ioniq 5 USA 260903 | mapped on cars by HMG-API's own mapper | 353 of 353 |
+| Hyundai Creta IND 260430 | mapped on cars by HMG-API's own mapper | 341 of 353 |
+| Kia K3 KOR 260902 | mapped on cars by HMG-API's own mapper | 325 of 353 |
+| Kia EV6 CAN 260206 | mapped from stock files | 353 of 353 |
+| Kia EV6 KOR 260902 | mapped on cars by HMG-API's own mapper | 321 of 353 |
+| Kia EV6 USA 260507 | checked on a car | 353 of 353 |
+| Kia Carnival USA 260507 | mapped on cars by HMG-API's own mapper | 345 of 353 |
+| Kia K5, Sorento, Stinger, Soul, Seltos 2021, Niro 2020-21, Telluride 2020-21 CAN 260206 | mapped from stock files | 353 of 353 |
+| Kia K5, Sorento, Stinger, Seltos, Soul, Niro, Mohave, K7, Morning, Ray KOR 260902 | mapped from stock files | 353 of 353 |
+| Kia K5, Sorento, Stinger, Soul, Seltos 2021, Niro 2020-22, Cadenza, Telluride 2020-21 USA 260507 | mapped from stock files | 353 of 353 |
+| Kia Sportage (and Hybrid, Plug-in Hybrid), Forte, Carnival 2022, Niro Hybrid and Plug-in Hybrid, Soul, Seltos 2024 USA 260507 | mapped on cars by HMG-API's own mapper | 353 of 353 |
+| Kia Telluride USA 260507 | mapped on cars by HMG-API's own mapper | 353 of 353 |
+| Kia Niro, Sportage, Carnival, Telluride, Forte, Soul, Seltos 2024 CAN 260206 | mapped on cars by HMG-API's own mapper | 349 of 353 |
+| Kia Niro EV USA 260507 | mapped on cars by HMG-API's own mapper | 345 of 353 |
 
 In the tables, **Cars** is "all" when every car above has the point, otherwise the cars without it.
 
@@ -66,6 +66,8 @@ Android framework and the car's service interfaces (any process).
 | `framework.resources` | class | `android.content.res.Resources` |  | all |
 | `framework.resources.get_drawable` | method | `getDrawable(int)` → android.graphics.drawable.Drawable | HMG-API answers its own resource ids (launcher tile icons) | all |
 | `framework.resources.get_text` | method | `getText(int)` → CharSequence |  | all |
+| `framework.activity` | class | `android.app.Activity` |  | all |
+| `framework.activity.start_activity_for_result` | method | `startActivityForResult(android.content.Intent, int, android.os.Bundle)` → void | an Activity starts another Activity (mods can change the destination Intent before Android resolves it) | all |
 | `framework.context_impl` | class | `android.app.ContextImpl` |  | all |
 | `framework.context_impl.start_service` | method | `startService(android.content.Intent)` → android.content.ComponentName | an app starts a service (the Wireless mod: no wired Android Auto for USB drives) | all |
 | `framework.io_bridge` | class | `libcore.io.IoBridge` |  | all |

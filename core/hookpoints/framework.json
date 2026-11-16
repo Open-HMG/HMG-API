@@ -98,6 +98,28 @@
       }
     },
     {
+      "id": "framework.activity",
+      "kind": "class",
+      "find": {
+        "name": "android.app.Activity"
+      }
+    },
+    {
+      "id": "framework.activity.start_activity_for_result",
+      "kind": "method",
+      "of": "framework.activity",
+      "find": {
+        "name": "startActivityForResult",
+        "params": [
+          "android.content.Intent",
+          "int",
+          "android.os.Bundle"
+        ],
+        "ret": "void"
+      },
+      "about": "an Activity starts another Activity (mods can change the destination Intent before Android resolves it)"
+    },
+    {
       "id": "framework.context_impl",
       "kind": "class",
       "find": {
