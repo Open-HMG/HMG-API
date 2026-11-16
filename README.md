@@ -45,8 +45,14 @@ and the install starts again from the new firmware's
 | Hyundai Palisade | USA | 260903 | from a Car Report, waiting for a check on a car |
 | Hyundai Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N, Palisade 2020-22 | USA | 260507 | from stock files, waiting for a check on a car |
 | Kia K5, Sorento, Stinger, Soul, Seltos 2021, Niro 2020-22, Cadenza, Telluride 2020-21 | USA | 260507 | from stock files, waiting for a check on a car |
+| Hyundai Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N, Palisade 2020-22 | Canada | 260206 | from stock files, waiting for a check on a car |
+| Kia K5, Sorento, Stinger, Soul, Seltos 2021, Niro 2020-21, Telluride 2020-21 | Canada | 260206 | from stock files, waiting for a check on a car |
 | Kia K5, Sorento, Stinger, Seltos, Soul, Niro, Mohave, K7, Morning, Ray | Korea | 260902 | from stock files, waiting for a check on a car |
 | Hyundai Ioniq 5 | Korea | 260902 | from stock files, waiting for a check on a car |
+| Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade | Korea | 260902 | from Car Reports, waiting for a check on a car |
+| Kia Niro, Sportage, Carnival, Telluride, Forte, Soul, Seltos 2024 | Canada | 260206 | from a Car Report, waiting for a check on a car |
+| Genesis G70 | USA | 260507 | from a Car Report, waiting for a check on a car |
+| Genesis G70 | Korea | 260902 | from a Car Report, waiting for a check on a car |
 
 ## Help and requests
 

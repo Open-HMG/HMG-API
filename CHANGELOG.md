@@ -40,6 +40,32 @@
   Telluride and Niro EV maps are one build).
 ### Cars
 
+- **The older Hyundai and Kia builds in Canada (260206), from stock files** (351 of 351
+  hook points each, status mapped: waiting for a check on a car):
+  - `hyundai/hmc/can/260206`: Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N
+    and the 2020-22 Palisade, with their hybrids and EVs (25 products);
+  - `kia/kmc/can/260206`: K5, Sorento, Stinger, Soul, the 2021 Seltos, the 2020-21 Niro
+    and Telluride (23 products).
+  Every `onebin` folder in these builds is a product: no Canadian package of another build
+  has one there. The Kia build's names differ from its US build in the same two fields as
+  the Canadian Ioniq 5's (`homesetting.edit_list.items`, `dipo.iap2_client.manager`), and
+  the Hyundai build's projection helper is the EV6's `iP`, not its US build's `iO`. Neither
+  build has the Wi-Fi hotspot feature file.
+- **Four maps from Car Reports** (status probed: hooks run after `verify-map` passes on
+  the car, or with "Try unchecked maps"):
+  - `hyundai/hmc/kor/260902`: the Korean Sonata, Sonata Hybrid, Santa Fe and Palisade, 341
+    points. Five reports from three of them (#89, #91, #160) have the same files and points;
+  - `kia/sg2ev/can/260206`: the newer Kia build in Canada, 347 points, from a Niro EV's
+    report (#205). Its products are the Canadian packages that install that build: Niro,
+    Sportage, Carnival, Telluride, Forte, Soul and the 2024 Seltos. On the US build, the
+    products its Car Reports show (`NQ5`, `ONPE`, `SG2EV`, `KA423`) are all among the codes
+    that rule gives;
+  - `genesis/ikfl/usa/260507` (#2, 325 points) and `genesis/ikfl/kor/260902` (#93, 341
+    points): the G70. The points newer than each report are listed as missing.
+  These reports predate #233, so their smali-only methods were borrowed by name;
+  `check-maps.py` lists them as unconfirmed. On the two Korean maps the panel's test switch
+  (`panel.test_gate.on`) is left out: its borrowed name `py` is another method on the
+  Korean builds read from stock files (the switch is `pB` there). `SystemCheck` knows the new model codes.
 - **The 2022 Ioniq 5 (`NEEV`) on US 260903 uses the 260903 map**, as the 2023-on
   (`NEEV23`) does. Its 18 mapped files are the same bytes, and its owner's check found all
   351 hook points (#192; also #72, #186). Before, it had no map there: hooks were off
