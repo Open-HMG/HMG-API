@@ -157,6 +157,19 @@ final class Commands {
         this.car = car;
     }
 
+    /** resets per-start / per-drive latches across QuickBoot STR resume or EV_RDY shutoff */
+    synchronized void onNewSession() {
+        if (conditioningBy != null) {
+            car.log("conditioning: drive ended; stopping (" + conditioningBy + ")");
+            stopConditioning();
+        } else if ("ended".equals(conditioningState) || "timed_out".equals(conditioningState)) {
+            conditioningState = "off";
+        }
+        noticeDone = false;
+        manualStop = false;
+        timedOut = false;
+    }
+
     /** when each (mod, command) question last went on screen: asked again after ASK_MS */
     final Map<String, Long> asked = new java.util.HashMap<String, Long>();
     static final long ASK_MS = 30000;
