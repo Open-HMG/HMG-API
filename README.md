@@ -39,6 +39,7 @@ and the install starts again from the new firmware's
 | Kia EV6 | USA | 260507 | checked on a car |
 | Kia EV6, Hyundai Ioniq 5 | Canada | 260206 | waiting for a Car Report |
 | Hyundai Ioniq 6 | Canada | 260206 | checked on a car |
+| Hyundai Ioniq 6 | USA | 260507 | from stock files, waiting for a check on a car |
 | Hyundai Ioniq 5 | USA | 260507 | waiting for a Car Report |
 | Hyundai Ioniq 5 | USA | 260903 | waiting for a check on a car |
 | Kia Sportage, Telluride, Niro, Carnival, Forte, Soul, Seltos 2024 | USA | 260507 | from Car Reports, waiting for a check on a car |
