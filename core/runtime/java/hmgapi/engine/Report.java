@@ -87,6 +87,10 @@ final class Report {
                     if (have != null && !String.valueOf(have).equals(String.valueOf(en.getValue()))) differs.add(en.getKey());
                 }
                 pj.put("differs_from_map", differs);
+                // points HMG-API's map itself lists as missing (car.json "missing") that this
+                // unit finds: the map is likely wrong there (#47), a maintainer should look
+                pj.put("found_here_missing_in_map", foundHereMissingInMap(
+                        map.carJson == null ? null : (Map<String, Object>) map.carJson.get("missing"), p.points, map.points));
             }
         } catch (Throwable t) {
             pj.put("error", scrub(String.valueOf(t)));
@@ -168,6 +172,8 @@ final class Report {
         e.out.add(map.describe());
         e.out.add("map-car: " + pj.get("found") + " hook point(s) found, " + ((Map<?, ?>) pj.get("not_found") == null ? 0
                 : ((Map<?, ?>) pj.get("not_found")).size()) + " not found");
+        String dis = disagreement(pj);
+        if (dis != null) e.out.add("check the map: " + dis);
         e.out.add("saved: " + dir.getPath() + "/" + name + ".json");
         if (net.get("summary") != null) e.out.add("network: " + net.get("summary"));
         for (String s : sticks) e.out.add("usb: " + s + "/" + name + ".json");
@@ -248,7 +254,20 @@ final class Report {
         s.append("- ").append(map.get("summary")).append("\n");
         Map<String, Object> nf = (Map<String, Object>) pj.get("not_found");
         s.append("- Mapped from this car's files: ").append(pj.get("found")).append(" points found, ")
-                .append(nf == null ? 0 : nf.size()).append(" not found\n\n");
+                .append(nf == null ? 0 : nf.size()).append(" not found\n");
+        String dis = disagreement(pj);
+        if (dis != null) s.append("- **Check the map:** ").append(dis).append("\n");
+        s.append("\n");
+        Map<String, Object> fh = (Map<String, Object>) pj.get("found_here_missing_in_map");
+        List<Object> df = (List<Object>) pj.get("differs_from_map");
+        if (dis != null) {
+            s.append("## This unit's mapper and HMG-API's map disagree\n\n");
+            if (fh != null) for (Map.Entry<String, Object> x : fh.entrySet()) {
+                s.append("- `").append(x.getKey()).append("`: found here; the map says missing (").append(x.getValue()).append(")\n");
+            }
+            if (df != null) for (Object x : df) s.append("- `").append(x).append("`: found here under another name than the map's\n");
+            s.append("\n");
+        }
         if (nf != null && !nf.isEmpty()) {
             s.append("## Hook points not found\n\n");
             for (Map.Entry<String, Object> x : nf.entrySet()) s.append("- `").append(x.getKey()).append("`: ").append(x.getValue()).append("\n");
@@ -278,6 +297,32 @@ final class Report {
             for (Object l : errs) s.append(l).append("\n");
             s.append("```\n");
         }
+        return s.toString();
+    }
+
+    /** the points the map's car.json lists as missing (said) that this unit found and the map still lacks, with the map's why */
+    static Map<String, Object> foundHereMissingInMap(Map<String, Object> said, Map<String, ?> foundHere, Map<String, ?> inMap) {
+        Map<String, Object> out = new TreeMap<String, Object>();
+        if (said == null) return out;
+        for (Map.Entry<String, Object> ms : said.entrySet()) {
+            if (foundHere.containsKey(ms.getKey()) && !inMap.containsKey(ms.getKey())) out.put(ms.getKey(), ms.getValue());
+        }
+        return out;
+    }
+
+    /**
+     * One line when this unit's own mapper and HMG-API's map disagree (map_car
+     * found_here_missing_in_map, differs_from_map), else null: a sign the map is wrong.
+     */
+    @SuppressWarnings("unchecked")
+    static String disagreement(Map<String, Object> pj) {
+        Map<String, Object> fh = (Map<String, Object>) pj.get("found_here_missing_in_map");
+        List<Object> df = (List<Object>) pj.get("differs_from_map");
+        int a = fh == null ? 0 : fh.size(), b = df == null ? 0 : df.size();
+        if (a + b == 0) return null;
+        StringBuilder s = new StringBuilder("this unit's mapper and HMG-API's map disagree on " + (a + b) + " point(s)");
+        if (a > 0) s.append(", ").append(a).append(" found here that the map lists as missing");
+        if (b > 0) s.append(", ").append(b).append(" found here under other names");
         return s.toString();
     }
 

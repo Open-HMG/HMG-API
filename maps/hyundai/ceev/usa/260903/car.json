@@ -8,8 +8,14 @@
     "CEEV.CAN.",
     "CEEV.USA."
   ],
-  "status": "probed",
-  "verified": null,
+  "status": "verified",
+  "verified": {
+    "by": "ianpf",
+    "date": "2026-11-17",
+    "product": "CEEV.USA.0000.V016.010.260903",
+    "points": 351,
+    "report": "hmgapid engine verify-map passed on the car (CEEV.USA.0000.V016.010.260903, Mon Nov 16 18:27:56 GMT-05:00 2026)"
+  },
   "files": {
     "/system/app/ButtonSettings.odex": "f0867c1b46d33fdc6849d7128e9661c3",
     "/system/app/HKMC_BtSettings.odex": "1153269091ff27d5f4dcefd259b87648",
@@ -118,17 +124,6 @@
       ]
     }
   },
-  "by_reference": [
-    "btsettings.projection_helper",
-    "dipo.iap2.bt_address",
-    "dipo.iap2.set_notify_on",
-    "panel.home.build_views",
-    "panel.home.test_page",
-    "panel.test_gate",
-    "panel.test_gate.on",
-    "panel.test_page",
-    "themesettings.split_item.type"
-  ],
   "names": {
     "btsettings.projection_helper": {
       "class": "com.android.settings2.bluetooth.iO"
