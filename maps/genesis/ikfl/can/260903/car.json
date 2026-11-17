@@ -115,10 +115,11 @@
     }
   },
   "missing": {
-    "btsettings.projection_helper.device_connections_available": "0 methods match in com.android.settings2.bluetooth.iP",
-    "btsettings.projection_helper.open_device_connections": "0 methods match in com.android.settings2.bluetooth.iP",
-    "btsettings.projection_helper.open_other_page": "0 methods match in com.android.settings2.bluetooth.iP",
-    "btsettings.projection_helper.open_wireless_page": "0 methods match in com.android.settings2.bluetooth.iP",
+    "btsettings.projection_helper": "not kept from the Car Report: its by-reference class com.android.settings2.bluetooth.iP has none of its 4 members here, so it is likely a different class with the same name (stock files or a newer Car Report map it)",
+    "btsettings.projection_helper.device_connections_available": "not kept from the Car Report: its by-reference class com.android.settings2.bluetooth.iP has none of its 4 members here, so it is likely a different class with the same name (stock files or a newer Car Report map it)",
+    "btsettings.projection_helper.open_device_connections": "not kept from the Car Report: its by-reference class com.android.settings2.bluetooth.iP has none of its 4 members here, so it is likely a different class with the same name (stock files or a newer Car Report map it)",
+    "btsettings.projection_helper.open_other_page": "not kept from the Car Report: its by-reference class com.android.settings2.bluetooth.iP has none of its 4 members here, so it is likely a different class with the same name (stock files or a newer Car Report map it)",
+    "btsettings.projection_helper.open_wireless_page": "not kept from the Car Report: its by-reference class com.android.settings2.bluetooth.iP has none of its 4 members here, so it is likely a different class with the same name (stock files or a newer Car Report map it)",
     "dipo.bt": "no stock /system/app/HKMC_DiPO.odex on this car",
     "dipo.bt.set_carplay_bt_address": "no stock /system/app/HKMC_DiPO.odex on this car",
     "dipo.btcm": "no stock /system/app/HKMC_DiPO.odex on this car",
@@ -203,7 +204,6 @@
     "iap2.service_receiver.service": "no stock /system/app/Iap2ServerApp.odex on this car"
   },
   "by_reference": [
-    "btsettings.projection_helper",
     "panel.home.build_views",
     "panel.home.test_page",
     "panel.test_gate",

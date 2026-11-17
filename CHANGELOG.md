@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The Ioniq 6 on 260903 (USA and Canada) is checked on a car. `hmgapid engine verify-map`
+  passed all 351 points on a US car (`CEEV.USA.0000.V016.010.260903`), so the map runs
+  without "Try unchecked maps".
 - **The Ioniq 6 on 260903 has all 351 hook points, in Canada as well as the USA.** The
   shared `hyundai/ceev/usa/260903` map (products `CEEV.CAN.` and `CEEV.USA.`) listed the 4
   `btsettings.projection_helper` points missing: they were looked for in class `iP`, which
@@ -12,6 +15,32 @@
   The panel's test switch (`panel.test_gate.on`) is `pB`, as the three newest Canadian
   reports find it by code signature; the map had the older report's `py`, matched by name
   only. With that, none of this build's points are unconfirmed.
+- **Kia Canada 260206 (Niro, Sportage, Carnival, Telluride, Forte, Soul, Seltos 2024):
+  the Phone Projection hook points.** The map, from an rc.1 Car Report, had borrowed the
+  helper class name `iP`, a different class on this build (it's `iO`), so all four
+  points were missing and Wireless CarPlay + Android Auto's hooks stayed off
+  (hmgapi-wireless-cp-aa#47). The map is now made from the build's stock files.
+- **Maps that look wrong fail the map check.** A class mapped while every one of its
+  members is missing is almost always a borrowed name that a different class has on
+  that build; `check-maps.py` fails on it.
+- **Maps from Car Reports don't keep doubtful by-reference classes.** `report-map.py`
+  lists a by-reference class and its members as missing ("not kept from the Car Report")
+  when the report's mapper is older than 1.1.0-rc.3 (it didn't check a reference class's
+  members), or when none of the class's members were found: stock files or a newer Car
+  Report map them.
+- **The Car Report says when the unit's mapper and HMG-API's map disagree:** points the
+  map lists as missing that the unit finds, and points found under other names ("Check
+  the map", with each point).
+- **Six more maps from their builds' stock files:** the Ioniq 5 2023 (USA 260903), the
+  Ioniq 6 260903 (USA and Canada; the same points as above, now confirmed from stock) and
+  the newer Kia build in the USA (260507: Sportage, Telluride, Carnival, Niro). All 351
+  points each, every smali-only point with its code signature. On the Ioniq 5 2023 the
+  panel's test switch is `pB`, not the borrowed `py`; the Kia maps gain the 8 points
+  their Car Reports predated.
+- **Four maps list the Phone Projection helper as missing** instead of the borrowed `iP`,
+  which has none of its members there: the Ioniq 6 Singapore 260907, the G70 Canada
+  260903, the Creta India 260430 and the Korean EV6 260902. Stock files or a Car Report
+  from 1.1.0-rc.3 on will map them.
 
 ## 1.1.0-rc.3 (2026-11-16)
 
@@ -299,6 +328,12 @@ The release candidate: feature freeze. 1.1.0 will be this code unless a blocker 
 
 ### Fixes
 
+- **`outside_temp` no longer reads -40 before climate control has a value.** Right
+  after the car wakes, climate control can report -40 (the raw zero of its signal, the
+  same in °F and °C), and `outside_temp`/`outside_temp_f` passed it on as a reading (seen
+  on an Ioniq 5 through Battery Watchdog). Such a -40 is held back: the last real value
+  stays, or the reading stays `-`. It counts if it holds for 10 minutes, or at once when
+  the last reading was already -31 °F or colder, so a real -40 still shows.
 - **The right split-screen panel keeps the Mobis font with hooks on** (#174). HMG-API
   made its panel page's views as soon as the panel app started, even with no mod page;
   that loaded the process's fonts before the Mobis font's fallback was in place, so

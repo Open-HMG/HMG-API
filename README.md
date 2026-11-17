@@ -53,7 +53,7 @@ and the install starts again from the new firmware's
 | Kia Niro, Sportage, Carnival, Telluride, Forte, Soul, Seltos 2024 | Canada | 260206 | from a Car Report, waiting for a check on a car |
 | Genesis G70 | USA | 260507 | from a Car Report, waiting for a check on a car |
 | Genesis G70 | Korea | 260902 | from a Car Report, waiting for a check on a car |
-| Hyundai Ioniq 6 | USA, Canada | 260903 | from Car Reports, waiting for a check on a car |
+| Hyundai Ioniq 6 | USA, Canada | 260903 | checked on a car |
 | Kia EV6 | Korea | 260902 | from a Car Report, waiting for a check on a car |
 | Kia K3 | Korea | 260902 | from a Car Report, waiting for a check on a car |
 | Genesis G70 | Canada | 260903 | from a Car Report (3 apps not in it), waiting for a check on a car |
