@@ -18,7 +18,7 @@
     "SK3PE.CAN.",
     "SP2PE.CAN."
   ],
-  "status": "probed",
+  "status": "mapped",
   "verified": null,
   "files": {
     "/system/app/ButtonSettings.odex": "f239d4bbb4f78d637bcf20b653254b16",
@@ -128,37 +128,20 @@
       ]
     }
   },
-  "missing": {
-    "btsettings.projection_helper.device_connections_available": "0 methods match in com.android.settings2.bluetooth.iP",
-    "btsettings.projection_helper.open_device_connections": "0 methods match in com.android.settings2.bluetooth.iP",
-    "btsettings.projection_helper.open_other_page": "0 methods match in com.android.settings2.bluetooth.iP",
-    "btsettings.projection_helper.open_wireless_page": "0 methods match in com.android.settings2.bluetooth.iP",
-    "framework.bcm_listener_stub.drive_mode": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
-    "framework.hev_flag.battery_comp_power": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
-    "framework.hev_flag.climate_power": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
-    "framework.hev_flag.dc_minutes": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
-    "framework.hev_flag.energy_capacity": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
-    "framework.hev_flag.energy_map": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
-    "framework.hev_flag.other_ecu_power": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
-    "framework.hev_flag.target_soc_ac": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
-    "framework.hev_flag.target_soc_dc": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)"
+  "names": {
+    "btsettings.projection_helper": {
+      "class": "com.android.settings2.bluetooth.iO"
+    }
   },
-  "by_reference": [
-    "btsettings.projection_helper",
-    "dipo.iap2.bt_address",
-    "dipo.iap2.set_notify_on",
-    "panel.home.build_views",
-    "panel.home.test_page",
-    "panel.test_gate",
-    "panel.test_gate.on",
-    "panel.test_page",
-    "themesettings.split_item.type"
-  ],
-  "unconfirmed": [
-    "dipo.iap2.bt_address",
-    "dipo.iap2.set_notify_on",
-    "panel.home.build_views",
-    "panel.test_gate.on",
-    "themesettings.split_item.type"
-  ]
+  "missing": {
+    "framework.bcm_listener_stub.drive_mode": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
+    "framework.hev_flag.battery_comp_power": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
+    "framework.hev_flag.climate_power": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
+    "framework.hev_flag.dc_minutes": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
+    "framework.hev_flag.energy_capacity": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
+    "framework.hev_flag.energy_map": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
+    "framework.hev_flag.other_ecu_power": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
+    "framework.hev_flag.target_soc_ac": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
+    "framework.hev_flag.target_soc_dc": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it"
+  }
 }
