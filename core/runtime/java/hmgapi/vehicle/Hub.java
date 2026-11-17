@@ -42,6 +42,31 @@ public final class Hub {
     static final Map<String, Object> services = new HashMap<String, Object>();
     static final Map<String, String> values = new HashMap<String, String>();
     static final Map<String, Long> readAt = new HashMap<String, Long>();
+    static long lastSleepGap = Long.MIN_VALUE;
+    static int lastReady = -1;
+
+    /**
+     * Detects QuickBoot STR resume (elapsedRealtime advances while uptimeMillis freezes)
+     * so per-start command guards and cached readings never carry stale state across drives.
+     */
+    static synchronized boolean checkSession() {
+        long sleepGap = android.os.SystemClock.elapsedRealtime() - android.os.SystemClock.uptimeMillis();
+        if (lastSleepGap == Long.MIN_VALUE) {
+            lastSleepGap = sleepGap;
+            return false;
+        }
+        boolean woke = sleepGap - lastSleepGap >= 3000;
+        lastSleepGap = sleepGap;
+        if (woke) {
+            System.out.println("vehicle: system resumed from suspend; refreshing session state");
+            values.clear();
+            readAt.clear();
+            callbacks.onWake();
+            if (commands != null) commands.onNewSession();
+            lastReady = -1;
+        }
+        return woke;
+    }
 
     public static void main(String[] args) throws Exception {
         facts = new SystemCheck.Facts("", null);
@@ -56,6 +81,7 @@ public final class Hub {
         }
         commands = new Commands(new CarServices());
         final MicomWatch watch = new MicomWatch();
+        checkSession();
         callbacks.ensure();
         Thread tick = new Thread("vehicle-tick") {
             @Override
@@ -63,6 +89,16 @@ public final class Hub {
                 while (true) {
                     try {
                         Thread.sleep(2000);
+                        checkSession();
+                        int rdy = -1;
+                        try { if (Points.ready()) rdy = hev("framework.hev_flag.ev_ready"); } catch (Throwable ignored) {}
+                        synchronized (Hub.class) {
+                            if (lastReady == 1 && rdy == 0 && commands != null) {
+                                System.out.println("vehicle: EV_RDY off; resetting per-drive command guards");
+                                commands.onNewSession();
+                            }
+                            if (rdy == 0 || rdy == 1) lastReady = rdy;
+                        }
                         commands.tick(declared());
                         watch.sync();
                         callbacks.ensure();
@@ -77,11 +113,13 @@ public final class Hub {
         LocalServerSocket server = new LocalServerSocket(SOCKET);
         System.out.println("vehicle: listening on @" + SOCKET);
         while (true) {
-            LocalSocket s = server.accept();
+            LocalSocket s = null;
             try {
+                s = server.accept();
                 serve(s);
             } catch (Throwable t) {
                 System.out.println("vehicle: " + t);
+                if (s == null) try { Thread.sleep(100); } catch (InterruptedException ignored) {}
             } finally {
                 close(s);
             }
@@ -95,7 +133,11 @@ public final class Hub {
      * and each connection leaked an fd.
      */
     static void close(LocalSocket s) {
-        java.io.FileDescriptor fd = s.getFileDescriptor();
+        if (s == null) return;
+        java.io.FileDescriptor fd = null;
+        try { fd = s.getFileDescriptor(); } catch (Throwable ignored) {}
+        try { s.shutdownOutput(); } catch (Throwable ignored) {}
+        try { s.shutdownInput(); } catch (Throwable ignored) {}
         try {
             if (fd != null && fd.valid()) libcore.io.Libcore.os.close(fd);
         } catch (Throwable t) {
@@ -111,6 +153,7 @@ public final class Hub {
     static void serve(LocalSocket s) throws Exception {
         int uid = s.getPeerCredentials().getUid();
         if (uid != 0 && uid != 1000) return;   // hmgapid (it checks what each mod declared); system_server only passes the light status
+        if (checkSession()) callbacks.ensure();
         s.setSoTimeout(2000);
         BufferedReader in = new BufferedReader(new InputStreamReader(s.getInputStream(), "UTF-8"), 1024);
         String line = in.readLine();
@@ -424,7 +467,28 @@ public final class Hub {
 
         public void setGuideLines(int state) { run(get("pgs"), "framework.pgs_service.request_guide_lines", state); }
 
-        public void hideStartupNotice() { run(get("factory"), "framework.factory_service.hide_consent_screen"); }
+        private final java.util.concurrent.atomic.AtomicInteger noticeGen = new java.util.concurrent.atomic.AtomicInteger();
+
+        public void hideStartupNotice() {
+            final int gen = noticeGen.incrementAndGet();
+            run(get("factory"), "framework.factory_service.hide_consent_screen");
+            Thread t = new Thread("startup-notice-confirm") {
+                @Override
+                public void run() {
+                    long[] gaps = { 150, 250, 400, 700, 1100 };
+                    for (long g : gaps) {
+                        pause(g);
+                        if (noticeGen.get() != gen) return;
+                        try {
+                            if (!park()) return;
+                            CarServices.run(get("factory"), "framework.factory_service.hide_consent_screen");
+                        } catch (Throwable ignored) {}
+                    }
+                }
+            };
+            t.setDaemon(true);
+            t.start();
+        }
 
         public boolean noticeAllowed() { return new java.io.File("/data/hmgapi/settings/allow/startup_notice").isFile(); }   // hmgapid allow
 

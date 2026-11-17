@@ -41,6 +41,16 @@ final class CarCallbacks {
     private String lastFailure, lastBcmFailure, lastClusterFailure;   // logged once, not every tick
     private boolean lightAsked;
 
+    /**
+     * After QuickBoot STR suspend, body control's cached push values may be from an earlier
+     * drive until CAN wakes up; clear them so stale readings aren't served.
+     */
+    synchronized void onWake() {
+        wheelHeat = Integer.MIN_VALUE;
+        defogger = Integer.MIN_VALUE;
+        lightAsked = false;
+    }
+
     /** a binder answering some transactions of one interface */
     abstract static class Listener extends Binder {
         static final int MAX_OUT_ARRAY = 64 * 1024;   // a callback's array; a larger last int is something else
