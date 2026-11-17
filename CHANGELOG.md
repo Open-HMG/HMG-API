@@ -16,6 +16,13 @@
   off the car only, on stock CarPlay libraries and NEMESIS's `libautoreceiver_infobank.so`
   build: the Wireless CarPlay/AA and EGMP Android Auto EV recipes come out the same, and the
   matcher never matched once in a wrong place under fuzzing.
+- **Hyundai Ioniq 6 (`CEEV`), USA 260507: a hook map** (`maps/hyundai/ceev/usa/260507`),
+  made with `tools/map-car.py` from the car's stock files, with the 4 newest 12 V battery
+  points (`framework.hscan_service.battery_12v_*`) and the smali-only points' code
+  signatures from an rc.3 Car Report (#253): all 351 points. Its apps are the same files as
+  the Canadian 260206 build's. `verify-map` passed on the car (343 of 343 with 1.0.2, and
+  351 of 351 against the car's own map with rc.3); it waits for a check on a car with this
+  map.
 - **A file a mod added, deleted by something else, no longer blocks uninstall and apply
   (#226).** The file wasn't there before HMG-API added it, so gone is its stock state:
   restore and uninstall go through, and apply puts it back. Seen with the wireless mod's

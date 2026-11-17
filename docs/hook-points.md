@@ -26,6 +26,7 @@ mod SDK ([mod-repos.md](mod-repos.md), section 4).
 | Genesis G70 USA 260507 | mapped on cars by HMG-API's own mapper | 325 of 351 |
 | Hyundai Ioniq 6 CAN 260206 | checked on a car | 351 of 351 |
 | Hyundai Ioniq 6 SGP 260907 | mapped on cars by HMG-API's own mapper | 305 of 351 |
+| Hyundai Ioniq 6 USA 260507 | mapped from stock files | 351 of 351 |
 | Hyundai Ioniq 6 USA 260903 | checked on a car | 351 of 351 |
 | Hyundai Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N, Palisade 2020-22 CAN 260206 | mapped from stock files | 351 of 351 |
 | Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902 | mapped on cars by HMG-API's own mapper | 341 of 351 |
