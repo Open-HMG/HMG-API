@@ -348,6 +348,30 @@ public final class CommandsTest {
         o.askFirst = false;
         check("asking off (trust_commands): runs", true, oc.handle("other", "wheel_heat", new String[] { "on" }).startsWith("ok"));
 
+        // QuickBoot STR resume / EV_RDY off resets per-drive guards without requiring process restart
+        FakeCar sc = new FakeCar();
+        sc.model = "NEEV";
+        sc.allowed = true;
+        Commands sess = new Commands(sc);
+        check("startup notice dismissed on drive 1", "ok startup notice dismissed", sess.handle("comfort", "startup_notice", new String[] { "dismiss" }));
+        check("startup notice refused again on drive 1", true, sess.handle("comfort", "startup_notice", new String[] { "dismiss" }).startsWith("refused:"));
+        check("auto-start on drive 1", "ok conditioning started", sess.handle("egmp", "conditioning", new String[] { "auto-start", "10", "10" }));
+        sc.now += 2 * 60000;
+        sess.tick(declared("egmp conditioning"));
+        check("timed out on drive 1", "timed_out", sess.conditioningState);
+        check("auto-start blocked after timeout on drive 1", true, sess.handle("egmp", "conditioning", new String[] { "auto-start", "10", "10" }).startsWith("refused:"));
+        sess.onNewSession();
+        check("new session resets conditioning state to off", "off", sess.conditioningState);
+        check("new session allows startup notice on drive 2", "ok startup notice dismissed", sess.handle("comfort", "startup_notice", new String[] { "dismiss" }));
+        check("new session clears timeout latch for auto-start on drive 2", "ok conditioning started", sess.handle("egmp", "conditioning", new String[] { "auto-start", "10", "10" }));
+        calls(sc);
+        sess.onNewSession();
+        check("new session stops active/waiting conditioning cleanly on shutoff", "off", sess.conditioningState);
+        check("... stop sent to car on shutoff", true, calls(sc).endsWith("route 2047 | time 1023 | station 0,0"));
+        sc.now += 5 * 60000;
+        sess.tick(declared("egmp conditioning"));
+        check("... shutoff stop does not trip timedOut while parked", false, sess.timedOut);
+
         // routed auto-start to a distant charger waits until <= ROUTE_MIN (18 min) before starting the activation timeout
         FakeCar rc = new FakeCar();
         rc.model = "NEEV";
