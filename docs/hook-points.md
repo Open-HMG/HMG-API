@@ -26,7 +26,7 @@ mod SDK ([mod-repos.md](mod-repos.md), section 4).
 | Genesis G70 USA 260507 | mapped on cars by HMG-API's own mapper | 325 of 364 |
 | Hyundai Ioniq 6 CAN 260206 | checked on a car | 351 of 364 |
 | Hyundai Ioniq 6 SGP 260907 | mapped on cars by HMG-API's own mapper | 306 of 364 |
-| Hyundai Ioniq 6 USA 260903 | mapped on cars by HMG-API's own mapper | 347 of 364 |
+| Hyundai Ioniq 6 USA 260903 | mapped on cars by HMG-API's own mapper | 351 of 364 |
 | Hyundai Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N, Palisade 2020-22 CAN 260206 | mapped from stock files | 351 of 364 |
 | Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902 | mapped on cars by HMG-API's own mapper | 341 of 364 |
 | Hyundai Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N, Palisade 2020-22 USA 260507 | mapped from stock files | 351 of 364 |
@@ -46,7 +46,7 @@ mod SDK ([mod-repos.md](mod-repos.md), section 4).
 | Kia K5, Sorento, Stinger, Soul, Seltos 2021, Niro 2020-22, Cadenza, Telluride 2020-21 USA 260507 | mapped from stock files | 351 of 364 |
 | Kia Sportage (and Hybrid, Plug-in Hybrid), Forte, Carnival 2022, Niro Hybrid and Plug-in Hybrid, Soul, Seltos 2024 USA 260507 | mapped on cars by HMG-API's own mapper | 351 of 364 |
 | Kia Telluride USA 260507 | mapped on cars by HMG-API's own mapper | 351 of 364 |
-| Kia Niro, Sportage, Carnival, Telluride, Forte, Soul, Seltos 2024 CAN 260206 | mapped on cars by HMG-API's own mapper | 347 of 364 |
+| Kia Niro, Sportage, Carnival, Telluride, Forte, Soul, Seltos 2024 CAN 260206 | mapped from stock files | 351 of 364 |
 | Kia Niro EV USA 260507 | mapped on cars by HMG-API's own mapper | 343 of 364 |
 
 In the tables, **Cars** is "all" when every car above has the point, otherwise the cars without it.
@@ -285,10 +285,10 @@ App `com.android.btsettings`.
 | Point | Kind | Looks for | About | Cars |
 |---|---|---|---|---|
 | `btsettings.projection_helper` | class | a class in `com.android.settings2.bluetooth` (no fixed name) | BtSettings' static helper that opens the Phone Projection pages | all |
-| `btsettings.projection_helper.open_wireless_page` | method | `static ?(android.content.Context)` → void | opens the wireless projection page (its only caller is the Phone Projection menu) | not on Genesis G70 CAN 260903, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260903, Hyundai Creta IND 260430, Kia EV6 KOR 260902, Kia Niro, Sportage, Carnival, Telluride, Forte, Soul, Seltos 2024 CAN 260206 |
-| `btsettings.projection_helper.device_connections_available` | method | `static ?()` → boolean |  | not on Genesis G70 CAN 260903, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260903, Hyundai Creta IND 260430, Kia EV6 KOR 260902, Kia Niro, Sportage, Carnival, Telluride, Forte, Soul, Seltos 2024 CAN 260206 |
-| `btsettings.projection_helper.open_device_connections` | method | `static ?(android.content.Context, int)` → void |  | not on Genesis G70 CAN 260903, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260903, Hyundai Creta IND 260430, Kia EV6 KOR 260902, Kia Niro, Sportage, Carnival, Telluride, Forte, Soul, Seltos 2024 CAN 260206 |
-| `btsettings.projection_helper.open_other_page` | method | `static ?(android.content.Context)` → void |  | not on Genesis G70 CAN 260903, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260903, Hyundai Creta IND 260430, Kia EV6 KOR 260902, Kia Niro, Sportage, Carnival, Telluride, Forte, Soul, Seltos 2024 CAN 260206 |
+| `btsettings.projection_helper.open_wireless_page` | method | `static ?(android.content.Context)` → void | opens the wireless projection page (its only caller is the Phone Projection menu) | not on Genesis G70 CAN 260903, Hyundai Ioniq 6 SGP 260907, Hyundai Creta IND 260430, Kia EV6 KOR 260902 |
+| `btsettings.projection_helper.device_connections_available` | method | `static ?()` → boolean |  | not on Genesis G70 CAN 260903, Hyundai Ioniq 6 SGP 260907, Hyundai Creta IND 260430, Kia EV6 KOR 260902 |
+| `btsettings.projection_helper.open_device_connections` | method | `static ?(android.content.Context, int)` → void |  | not on Genesis G70 CAN 260903, Hyundai Ioniq 6 SGP 260907, Hyundai Creta IND 260430, Kia EV6 KOR 260902 |
+| `btsettings.projection_helper.open_other_page` | method | `static ?(android.content.Context)` → void |  | not on Genesis G70 CAN 260903, Hyundai Ioniq 6 SGP 260907, Hyundai Creta IND 260430, Kia EV6 KOR 260902 |
 
 ## buttonsettings
 
