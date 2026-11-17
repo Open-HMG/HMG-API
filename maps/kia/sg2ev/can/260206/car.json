@@ -18,7 +18,7 @@
     "SK3PE.CAN.",
     "SP2PE.CAN."
   ],
-  "status": "probed",
+  "status": "mapped",
   "verified": null,
   "files": {
     "/system/app/ButtonSettings.odex": "f239d4bbb4f78d637bcf20b653254b16",
@@ -128,28 +128,9 @@
       ]
     }
   },
-  "missing": {
-    "btsettings.projection_helper.device_connections_available": "0 methods match in com.android.settings2.bluetooth.iP",
-    "btsettings.projection_helper.open_device_connections": "0 methods match in com.android.settings2.bluetooth.iP",
-    "btsettings.projection_helper.open_other_page": "0 methods match in com.android.settings2.bluetooth.iP",
-    "btsettings.projection_helper.open_wireless_page": "0 methods match in com.android.settings2.bluetooth.iP"
-  },
-  "by_reference": [
-    "btsettings.projection_helper",
-    "dipo.iap2.bt_address",
-    "dipo.iap2.set_notify_on",
-    "panel.home.build_views",
-    "panel.home.test_page",
-    "panel.test_gate",
-    "panel.test_gate.on",
-    "panel.test_page",
-    "themesettings.split_item.type"
-  ],
-  "unconfirmed": [
-    "dipo.iap2.bt_address",
-    "dipo.iap2.set_notify_on",
-    "panel.home.build_views",
-    "panel.test_gate.on",
-    "themesettings.split_item.type"
-  ]
+  "names": {
+    "btsettings.projection_helper": {
+      "class": "com.android.settings2.bluetooth.iO"
+    }
+  }
 }

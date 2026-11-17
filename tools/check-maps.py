@@ -7,6 +7,9 @@ usage: check-maps.py [--rebuild [--only CAR[,CAR]]]
 - every map (maps/<make>/<model>/<region>/<firmware>/) has every catalogue point,
   with an entry of the right kind, or lists it in car.json "missing" (with why), and
   a valid car.json
+- a class point mapped while every one of its (two or more) members is missing: the
+  wrong class, almost always (a name borrowed from another map that a different class
+  on this build has)
 - --rebuild: maps with a stock tree on this machine ($HMGAPI_CARS, docs/car-trees.md)
   are made again with map-car.py and must come out identical; trees whose files aren't
   exactly the map's (tools/cars.py list) are skipped
@@ -37,6 +40,10 @@ for p in points.values():
         o = points.get(p.get('of'))
         if o is None or o['kind'] != 'class':
             problems.append('%s: "of" %s isn\'t a class point' % (p['id'], p.get('of')))
+members = {}   # class point -> its member points
+for p in points.values():
+    if p['kind'] != 'class' and p.get('of') in points:
+        members.setdefault(p['of'], []).append(p['id'])
 KEY = {'class': 'class', 'method': 'method', 'ctor': 'ctor', 'field': 'field'}
 maps = [os.path.join(f, 'car.json') for f in maplib.folders()]
 for cj in maps:
@@ -55,6 +62,13 @@ for cj in maps:
         if pid not in points:
             problems.append('%s: names has %s, which isn\'t in the catalogue' % (rel, pid))
     missing = car.get('missing', {})
+    # a class mapped with none of its members almost always means the wrong class (a name
+    # borrowed "by reference" that another class on this build has): map it from stock
+    # files or a newer Car Report, or list the class as missing too
+    for cid, kids in members.items():
+        if cid in entries and len(kids) > 1 and all(k in missing for k in kids):
+            problems.append('%s: %s is mapped (%s) but none of its %d members are: likely the wrong class'
+                            % (rel, cid, entries[cid].get('class'), len(kids)))
     for pid, p in points.items():
         e = entries.get(pid)
         if e is None and pid not in missing:
