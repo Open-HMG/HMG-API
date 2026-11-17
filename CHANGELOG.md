@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **Hyundai Ioniq 6 (`CEEV`), USA 260507: a hook map** (`maps/hyundai/ceev/usa/260507`),
+  made with `tools/map-car.py` from the car's stock files, with the 4 newest 12 V battery
+  points (`framework.hscan_service.battery_12v_*`) and the smali-only points' code
+  signatures from an rc.3 Car Report (#253): all 351 points. Its apps are the same files as
+  the Canadian 260206 build's. `verify-map` passed on the car (343 of 343 with 1.0.2, and
+  351 of 351 against the car's own map with rc.3); it waits for a check on a car with this
+  map.
+- **A file a mod added, deleted by something else, no longer blocks uninstall and apply
+  (#226).** The file wasn't there before HMG-API added it, so gone is its stock state:
+  restore and uninstall go through, and apply puts it back. Seen with the wireless mod's
+  `libleafiaaac.so` after an old package's uninstall deleted it.
+- **`engine apply --force` writes back owned files that were deleted or changed outside
+  HMG-API (#103),** as its hint says. Before, a file whose rebuilt bytes matched HMG-API's
+  record was "same" and never written, so `--force` ended with "nothing to do".
 - The Ioniq 6 on 260903 (USA and Canada) is checked on a car. `hmgapid engine verify-map`
   passed all 351 points on a US car (`CEEV.USA.0000.V016.010.260903`), so the map runs
   without "Try unchecked maps".
