@@ -118,12 +118,6 @@
       ]
     }
   },
-  "missing": {
-    "btsettings.projection_helper.device_connections_available": "0 methods match in com.android.settings2.bluetooth.iP",
-    "btsettings.projection_helper.open_device_connections": "0 methods match in com.android.settings2.bluetooth.iP",
-    "btsettings.projection_helper.open_other_page": "0 methods match in com.android.settings2.bluetooth.iP",
-    "btsettings.projection_helper.open_wireless_page": "0 methods match in com.android.settings2.bluetooth.iP"
-  },
   "by_reference": [
     "btsettings.projection_helper",
     "dipo.iap2.bt_address",
@@ -136,6 +130,9 @@
     "themesettings.split_item.type"
   ],
   "names": {
+    "btsettings.projection_helper": {
+      "class": "com.android.settings2.bluetooth.iO"
+    },
     "dipo.iap2_client.manager": {
       "field": "L",
       "type": "com.daudio.app.dipo.e.b",
@@ -145,13 +142,13 @@
       "field": "cu",
       "type": "java.util.List",
       "static": true
+    },
+    "panel.test_gate.on": {
+      "method": "pB",
+      "params": [],
+      "ret": "boolean",
+      "static": true,
+      "sig": "c65792efa099ac9e"
     }
-  },
-  "unconfirmed": [
-    "dipo.iap2.bt_address",
-    "dipo.iap2.set_notify_on",
-    "panel.home.build_views",
-    "panel.test_gate.on",
-    "themesettings.split_item.type"
-  ]
+  }
 }

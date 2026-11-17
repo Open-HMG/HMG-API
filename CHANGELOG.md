@@ -16,6 +16,16 @@
   off the car only, on stock CarPlay libraries and NEMESIS's `libautoreceiver_infobank.so`
   build: the Wireless CarPlay/AA and EGMP Android Auto EV recipes come out the same, and the
   matcher never matched once in a wrong place under fuzzing.
+- **The Ioniq 6 on 260903 has all 351 hook points, in Canada as well as the USA.** The
+  shared `hyundai/ceev/usa/260903` map (products `CEEV.CAN.` and `CEEV.USA.`) listed the 4
+  `btsettings.projection_helper` points missing: they were looked for in class `iP`, which
+  has none of them. The cars' own mapper found them in `iO` (Canadian Car Reports, same 18
+  stock file md5s as the map's), so the map now names `iO` and the four methods are the
+  base map's. A Canadian car needs no map of its own and no mapping to the USA: its product
+  `CEEV.CAN.0000.V016.010.260903` already picks this build's map.
+  The panel's test switch (`panel.test_gate.on`) is `pB`, as the three newest Canadian
+  reports find it by code signature; the map had the older report's `py`, matched by name
+  only. With that, none of this build's points are unconfirmed.
 
 ## 1.1.0-rc.3 (2026-11-16)
 
