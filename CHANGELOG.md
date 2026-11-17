@@ -16,6 +16,13 @@
   off the car only, on stock CarPlay libraries and NEMESIS's `libautoreceiver_infobank.so`
   build: the Wireless CarPlay/AA and EGMP Android Auto EV recipes come out the same, and the
   matcher never matched once in a wrong place under fuzzing.
+- **A file a mod added, deleted by something else, no longer blocks uninstall and apply
+  (#226).** The file wasn't there before HMG-API added it, so gone is its stock state:
+  restore and uninstall go through, and apply puts it back. Seen with the wireless mod's
+  `libleafiaaac.so` after an old package's uninstall deleted it.
+- **`engine apply --force` writes back owned files that were deleted or changed outside
+  HMG-API (#103),** as its hint says. Before, a file whose rebuilt bytes matched HMG-API's
+  record was "same" and never written, so `--force` ended with "nothing to do".
 - The Ioniq 6 on 260903 (USA and Canada) is checked on a car. `hmgapid engine verify-map`
   passed all 351 points on a US car (`CEEV.USA.0000.V016.010.260903`), so the map runs
   without "Try unchecked maps".
