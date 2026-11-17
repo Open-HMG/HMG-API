@@ -88,6 +88,31 @@ check "restore: featurexml stock" "$FX_STOCK" "$(md5 "$FX")"
 check "restore: b.xml stock" "$BX_STOCK" "$(md5 "$BX")"
 check "restore: the library gone" absent "$(md5 "$LIB")"
 
+# the library deleted outside HMG-API (an old package's uninstall, #226): absent before HMG-API added it, so stock
+eng apply
+rm -f "$LIB"
+eng restore
+check "library deleted outside, restore: goes through" 0 $rc
+has "... taken as stock" "not there, as before HMG-API added it" "$out"
+check "... restore: b.xml stock" "$BX_STOCK" "$(md5 "$BX")"
+eng apply
+rm -f "$LIB"
+eng apply
+check "library deleted outside, apply: goes through" 0 $rc
+check "... the library back" "$(md5 "$D/mods/w/lib.so")" "$(md5 "$LIB")"
+
+# a stock file HMG-API changed, deleted outside (#103): refused; --force writes it again
+rm -f "$BX"
+eng apply
+check "b.xml deleted outside: refused" 3 $rc
+has "... says --force" "apply --force to rebuild it anyway" "$out"
+eng apply --force
+check "... apply --force: applies" 0 $rc
+check "... b.xml written again" "$(md5 "$D/mods/w/b.xml")" "$(md5 "$BX")"
+eng apply
+check "... then a plain apply: nothing to do" 0 $rc
+has "... nothing to do" "nothing to do" "$out"
+
 # a file put back to stock by someone else while no mod changes it any more: let go, its old backup gone
 mod ''
 eng apply

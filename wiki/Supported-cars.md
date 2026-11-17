@@ -18,6 +18,7 @@ the parts that change the car's own apps stay off, and the app says which.
 | Kia Carnival | USA | 260507 | made on an owner's car by HMG-API's own mapper (343 of 351 hook points: the 8 newest need a Car Report from 1.1.0 or newer); waiting for a check on a car |
 | Hyundai Palisade | USA | 260903 | made on an owner's car by HMG-API's own mapper (343 of 351 hook points: the 8 newest need a Car Report from 1.1.0 or newer); waiting for a check on a car |
 | Hyundai Ioniq 6 | Canada | 260206 | ✅ checked on a car (351 of 351 hook points), from a Car Report and stock Bluetooth settings files |
+| Hyundai Ioniq 6 | USA | 260507 | all 351 hook points, from stock files and an rc.3 Car Report (#253); waiting for a check on a car |
 | Hyundai Elantra (and Hybrid), Sonata (and Hybrid), Santa Fe (and Hybrid, Plug-in Hybrid), Kona, Kona Electric, Ioniq (Electric, Hybrid, Plug-in Hybrid), Venue, Veloster N, Palisade 2020-22 | USA | 260507 | 351 of 351 hook points found in stock files; waiting for a check on a car |
 | Kia K5, Sorento (and Hybrid, Plug-in Hybrid), Stinger, Soul, Seltos 2021, Niro 2020-22 (EV, Hybrid, Plug-in Hybrid), Cadenza, Telluride 2020-21 | USA | 260507 | 351 of 351 hook points found in stock files; waiting for a check on a car |
 | Hyundai Elantra (and Hybrid), Sonata (and Hybrid), Santa Fe (and Hybrid, Plug-in Hybrid), Kona, Kona Electric, Ioniq (Electric, Hybrid, Plug-in Hybrid), Venue, Veloster N, Palisade 2020-22 | Canada | 260206 | 351 of 351 hook points found in stock files; waiting for a check on a car |

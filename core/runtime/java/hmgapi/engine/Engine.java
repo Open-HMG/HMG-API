@@ -792,10 +792,12 @@ public final class Engine {
         Set<String> settingsRestore = new LinkedHashSet<String>();
         Map<String, String> rebased = new TreeMap<String, String>();   // path -> live md5: changed outside HMG-API, built on again
         Map<String, String> rebasedFrom = new TreeMap<String, String>();   // path -> what HMG-API had written (merges: checked after build)
+        boolean force;           // --force: owned files that aren't what HMG-API wrote are written again
 
-        boolean isEmpty() {
+        boolean isEmpty() throws IOException {
             if (!rebased.isEmpty()) return false;
             for (Target t : targets.values()) if (t.restore || t.result == null || !t.result.equals(owned(t.path))) return false;
+            if (force) for (Target t : targets.values()) if (!t.result.equals(md5(sys(t.path)))) return false;
             for (String k : settings.keySet()) if (!String.valueOf(settings.get(k)[0]).equals(ownedSetting(k))) return false;
             return settingsRestore.isEmpty() && bindsText(binds).equals(currentBinds());
         }
@@ -848,6 +850,7 @@ public final class Engine {
     @SuppressWarnings("unchecked")
     Plan plan(boolean restoreAll, boolean force) throws Exception {
         Plan p = new Plan();
+        p.force = force;
         p.state = loadState();
         Map<String, Object> files = (Map<String, Object>) p.state.get("files");
         Map<String, Object> st = (Map<String, Object>) p.state.get("settings");
@@ -1035,7 +1038,8 @@ public final class Engine {
      */
     @SuppressWarnings("unchecked")
     String rebaseWhy(String path, String live, Map<String, Object> owned, Target t) throws IOException {
-        if ("absent".equals(live)) return null;
+        // gone, as before HMG-API added it (another package's uninstall deleted it): stock again, safe to build on
+        if ("absent".equals(live)) return "absent".equals(owned.get("stock")) ? "not there, as before HMG-API added it" : null;
         if (t != null && !t.changes.isEmpty()) {
             boolean merge = true;
             for (Ch ch : t.changes) merge &= MERGES.contains(ch.type) && "any".equals(ch.c.get("stock"));
@@ -1679,7 +1683,10 @@ public final class Engine {
         Map<String, Object> files = (Map<String, Object>) p.state.get("files");
         Map<String, Object> st = (Map<String, Object>) p.state.get("settings");
         List<Target> changed = new ArrayList<Target>();
-        for (Target t : p.targets.values()) if (t.restore || !t.result.equals(p.owned(t.path))) changed.add(t);
+        for (Target t : p.targets.values()) {
+            // --force: also a file whose result is unchanged but which was deleted or changed outside HMG-API (#103)
+            if (t.restore || !t.result.equals(p.owned(t.path)) || (p.force && !t.result.equals(md5(sys(t.path))))) changed.add(t);
+        }
 
         // journal: what each file was before, so a lost apply or a trial can be rolled back
         rm(prevDir);
