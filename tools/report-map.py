@@ -69,6 +69,52 @@ def missing_points(mc, label):
     return missing
 
 
+# The first HMG-API whose on-car mapper checks a by-reference class's members (MapProbe):
+# before it, a name another map gives the class was taken whenever this build had a class
+# of that name and shape, even a different one (#47: iP for iO).
+MEMBER_CHECK = '1.1.0-rc.3'
+
+
+def version_key(v):
+    """1.0.2 < 1.1.0-beta.1 < 1.1.0-rc.1 < 1.1.0; None for anything else"""
+    m = re.fullmatch(r'(\d+)\.(\d+)\.(\d+)(?:-(beta|rc)\.(\d+))?', str(v or ''))
+    if not m:
+        return None
+    stage = {'beta': 0, 'rc': 1, None: 2}[m.group(4)]
+    return (int(m.group(1)), int(m.group(2)), int(m.group(3)), stage, int(m.group(5) or 0))
+
+
+def report_version(r):
+    h = r.get('hmgapi')
+    return h.get('version') if isinstance(h, dict) else h
+
+
+def distrusted(reps, mc, missing, catalogue):
+    """by-reference classes not to keep, with why: from a mapper before MEMBER_CHECK, or with
+    every member missing (a different class with the borrowed name, whatever the version)"""
+    kinds = {p['id']: p for p in catalogue}
+    members = collections.defaultdict(list)
+    for p in catalogue:
+        if p['kind'] != 'class' and p.get('of'):
+            members[p['of']].append(p['id'])
+    old = sorted({str(report_version(r) or 'unknown') for _, r in reps
+                  if (version_key(report_version(r)) or (0,)) < version_key(MEMBER_CHECK)})
+    out = {}
+    for cid in mc.get('by_reference', []):
+        if cid not in mc['points'] or kinds.get(cid, {}).get('kind') != 'class':
+            continue
+        kids = members.get(cid, [])
+        if old:
+            out[cid] = ('not kept from the Car Report: its by-reference class came from the on-car mapper of HMG-API %s, '
+                        'before %s, which could take a different class with the same name (stock files or a newer '
+                        'Car Report map it)' % (', '.join(old), MEMBER_CHECK))
+        elif len(kids) > 1 and all(k in missing for k in kids):
+            out[cid] = ('not kept from the Car Report: its by-reference class %s has none of its %d members here, so it '
+                        'is likely a different class with the same name (stock files or a newer Car Report map it)'
+                        % (mc['points'][cid].get('class'), len(kids)))
+    return out, members
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('reports', nargs='+')
@@ -122,12 +168,22 @@ def main():
         by_app[pid.split('.')[0]][pid] = e
     make, model, region, firmware = key(reps[0][1])
     missing = missing_points(mc, reps[0][0])
+    catalogue = [p for f in sorted(glob.glob(os.path.join(REPO, 'core', 'hookpoints', '*.json')))
+                 for p in json.load(open(f))['points']]
+    by_ref = set(mc.get('by_reference', []))
+    bad, members = distrusted(reps, mc, missing, catalogue)
+    for cid, why in sorted(bad.items()):
+        for pid in [cid] + members.get(cid, []):
+            by_app.get(pid.split('.')[0], {}).pop(pid, None)
+            by_ref.discard(pid)
+            missing[pid] = why
+        print('distrusted: %s (%s), and its %d members' % (cid, mc['points'][cid].get('class'), len(members.get(cid, []))))
+    found = {pid for entries in by_app.values() for pid in entries}
     # catalogue points newer than the HMG-API that made the reports: listed, not guessed
-    for f in sorted(glob.glob(os.path.join(REPO, 'core', 'hookpoints', '*.json'))):
-        for p in json.load(open(f))['points']:
-            if p['id'] not in mc['points'] and p['id'] not in missing:
-                missing[p['id']] = ('not in the Car Report: newer than the HMG-API that made it '
-                                    '(a Car Report from a newer HMG-API maps it)')
+    for p in catalogue:
+        if p['id'] not in found and p['id'] not in missing:
+            missing[p['id']] = ('not in the Car Report: newer than the HMG-API that made it '
+                                '(a Car Report from a newer HMG-API maps it)')
     d = os.path.join(a.maps, make, model.lower(), region.lower(), firmware)
     os.makedirs(d, exist_ok=True)
     car = {
@@ -141,8 +197,8 @@ def main():
     }
     if missing:
         car['missing'] = dict(sorted(missing.items()))
-    if mc.get('by_reference'):
-        car['by_reference'] = sorted(mc['by_reference'])
+    if by_ref:
+        car['by_reference'] = sorted(by_ref)
     base = maplib.base(a.maps)
     if base:   # the repo: base + this build's differences (tools/maplib.py)
         maplib.write_compact(d, car, {app: dict(sorted(e.items())) for app, e in by_app.items()}, base)
@@ -150,7 +206,7 @@ def main():
         for app, entries in by_app.items():
             maplib.dump(dict(sorted(entries.items())), os.path.join(d, app + '.json'))
         maplib.dump(car, os.path.join(d, 'car.json'))
-    print('%s: %d points, %d missing, from %d report(s)' % (os.path.relpath(d, REPO), len(mc['points']), len(missing), len(reps)))
+    print('%s: %d points, %d missing, from %d report(s)' % (os.path.relpath(d, REPO), len(found), len(missing), len(reps)))
 
 
 if __name__ == '__main__':

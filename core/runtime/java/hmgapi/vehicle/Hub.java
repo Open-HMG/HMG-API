@@ -213,7 +213,8 @@ public final class Hub {
         if ("defogger".equals(name)) return callbacks.defogger == Integer.MIN_VALUE ? null : String.valueOf(callbacks.defogger);
         if ("outside_temp".equals(name) || "outside_temp_f".equals(name)) {
             // climate control's status (pushed): Fahrenheit always; Celsius when the car's is valid, else converted
-            int f10 = callbacks.outsideF10, c10 = callbacks.outsideC10;
+            long now = android.os.SystemClock.elapsedRealtime();
+            int f10 = callbacks.outside.f10(now), c10 = callbacks.outside.c10(now);
             if (f10 == Integer.MIN_VALUE) return null;
             if ("outside_temp_f".equals(name)) return dec(f10 / 10f);
             return dec(c10 != Integer.MIN_VALUE ? c10 / 10f : (f10 / 10f - 32f) * 5f / 9f);

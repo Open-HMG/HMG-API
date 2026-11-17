@@ -118,10 +118,11 @@
     }
   },
   "missing": {
-    "btsettings.projection_helper.device_connections_available": "0 methods match in com.android.settings2.bluetooth.iP",
-    "btsettings.projection_helper.open_device_connections": "0 methods match in com.android.settings2.bluetooth.iP",
-    "btsettings.projection_helper.open_other_page": "0 methods match in com.android.settings2.bluetooth.iP",
-    "btsettings.projection_helper.open_wireless_page": "0 methods match in com.android.settings2.bluetooth.iP",
+    "btsettings.projection_helper": "not kept from the Car Report: its by-reference class com.android.settings2.bluetooth.iP has none of its 4 members here, so it is likely a different class with the same name (stock files or a newer Car Report map it)",
+    "btsettings.projection_helper.device_connections_available": "not kept from the Car Report: its by-reference class com.android.settings2.bluetooth.iP has none of its 4 members here, so it is likely a different class with the same name (stock files or a newer Car Report map it)",
+    "btsettings.projection_helper.open_device_connections": "not kept from the Car Report: its by-reference class com.android.settings2.bluetooth.iP has none of its 4 members here, so it is likely a different class with the same name (stock files or a newer Car Report map it)",
+    "btsettings.projection_helper.open_other_page": "not kept from the Car Report: its by-reference class com.android.settings2.bluetooth.iP has none of its 4 members here, so it is likely a different class with the same name (stock files or a newer Car Report map it)",
+    "btsettings.projection_helper.open_wireless_page": "not kept from the Car Report: its by-reference class com.android.settings2.bluetooth.iP has none of its 4 members here, so it is likely a different class with the same name (stock files or a newer Car Report map it)",
     "dipo.carplay.decode_failure": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "dipo.carplay.disable_bluetooth": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "dipo.carplay.force_key_frame": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
@@ -145,7 +146,6 @@
     "gpm.sensor_source.shutdown": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)"
   },
   "by_reference": [
-    "btsettings.projection_helper",
     "dipo.iap2.bt_address",
     "dipo.iap2.set_notify_on",
     "panel.home.build_views",

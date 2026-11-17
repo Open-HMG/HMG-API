@@ -26,8 +26,9 @@ import hmgapi.hook.Points;
  * fields); every other callback is acknowledged and ignored.
  */
 final class CarCallbacks {
-    /** outside temperature in tenths (Fahrenheit, and Celsius when the car's is valid); MIN_VALUE until climate control has said */
-    volatile int outsideF10 = Integer.MIN_VALUE, outsideC10 = Integer.MIN_VALUE;
+    /** the outside temperature (climate control's status), with its -40 "no value yet": see Ambient */
+    final Ambient outside = new Ambient();
+    volatile boolean saidNoAmbient;
     /** body control's heating status: steering wheel heat, rear defogger (raw); MIN_VALUE: not heard yet */
     volatile int wheelHeat = Integer.MIN_VALUE, defogger = Integer.MIN_VALUE;
     /** body control's drive mode (onDriveModeChanged, raw); MIN_VALUE: not heard yet */
@@ -187,10 +188,12 @@ final class CarCallbacks {
                             float f = (Float) Points.call(null, "framework.datc_status.ambient_f", st);
                             float cc = (Float) Points.call(null, "framework.datc_status.ambient_c", st);
                             int stateC = (Integer) Points.call(null, "framework.datc_status.ambient_state_c", st);
-                            boolean first = outsideF10 == Integer.MIN_VALUE;
-                            outsideF10 = Math.round(f * 10);
-                            outsideC10 = stateC == 255 ? Integer.MIN_VALUE : Math.round(cc * 10);   // 255: Celsius not valid (a US car)
-                            if (first) System.out.println("vehicle: climate status, first outside temperature: " + f + " F, " + cc + " C (state " + stateC + ")");
+                            String said = outside.status(f, cc, stateC, android.os.SystemClock.elapsedRealtime());
+                            if ("ignored".equals(said) && !saidNoAmbient) {
+                                System.out.println("vehicle: climate status: outside temperature " + f + " F, likely no value yet (held back; counts if it stays " + Ambient.HOLD_MS / 60000 + " min)");
+                                saidNoAmbient = true;
+                            }
+                            if ("first".equals(said)) System.out.println("vehicle: climate status, first outside temperature: " + f + " F, " + cc + " C (state " + stateC + ")");
                         }
                     };
                     Object proxy = Points.call(null, "framework.datc_listener_stub.as_interface", null, l);
