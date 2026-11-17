@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- **Maps from Car Reports: Elantra `CN7PE` (USA 260507), Elantra N 2024 `CN7NPE` and
+  Kona `OSPE` (USA 260903), Niro EV `SG225EV` (Canada 260206).** All 351 points each,
+  from rc.3 reports with code signatures (#252, #254, #257, #261), in the base map's
+  form: each differs from the base map in 1 to 4 points. Their builds' stock files
+  match no other map's. `SystemCheck` knows the three new model codes (`CN7PE`,
+  `CN7NPE`, `SG225EV`).
+- **Ioniq 6 Singapore 260907: 312 points, up from 305**, from two rc.3 Car Reports
+  (#265): the Phone Projection helper, the panel's test switch and the split-screen
+  item type, every smali-only point with its code signature. The 39 still missing are
+  in this build's button settings and iAP2 server, whose code differs.
+- **Genesis G70 Canada 260903 and the Korean Hyundai build (Sonata, Santa Fe,
+  Palisade, 260902): all 351 points**, from rc.3 Car Reports (#231, #276) with the
+  same stock files as their maps: the G70 up from 277 (3 apps weren't in the first
+  report), the Korean build up from 341 with its 7 unconfirmed points confirmed by code
+  signature. Both maps keep their folder and products.
+- **The Canadian Ioniq 5 on 260903 uses the US Ioniq 5 2023 map.** Its 18 stock files
+  are the same as that map's (Car Report #274), so `NEEV.CAN.` joins its products.
 - **Hyundai Ioniq 6 (`CEEV`), USA 260507: a hook map** (`maps/hyundai/ceev/usa/260507`),
   made with `tools/map-car.py` from the car's stock files, with the 4 newest 12 V battery
   points (`framework.hscan_service.battery_12v_*`) and the smali-only points' code
