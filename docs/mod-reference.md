@@ -98,6 +98,30 @@ knows your app by its uid and your service by its session, and only answers for
 your own mod. Your settings page comes from `settings.json`; the owner changes it in
 the HMG-API app, and hooks see new values at once.
 
+### Buttons in a mod's settings
+
+The Mods detail view supports `type: "action"` entries alongside settings:
+
+```json
+{"settings": [
+  {"key": "logcat", "type": "toggle", "title": "Android logs", "default": true, "apply": "live"},
+  {"type": "action", "title": "Export logs to USB", "service": "export"}
+]}
+```
+
+An action saves the current form values, then requests `service-start` for the named
+service of the same enabled mod. The service must be declared with `"start": "manual"`;
+use `"restart": false` for a one-shot task. Action entries have no setting key or value.
+There is no arbitrary command execution from the form. A running or waiting action
+is refused so another press does not interrupt it. The service reads the saved
+selections when it starts, so an export needs no Apply or restart. Toggles take effect
+when saved or when an action saves them; changing a switch alone does not persist it.
+The UI reports that the request was submitted; services should log their result and
+may send a stock notice. Reopen the mod to refresh its service log.
+
+This requires the settings-action UI extension; older HMG-API builds do not render
+action entries as buttons.
+
 ## Other mods
 
 ```json

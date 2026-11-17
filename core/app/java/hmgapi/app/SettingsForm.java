@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.graphics.Color;
 import android.text.InputType;
 import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
@@ -14,11 +15,13 @@ import android.widget.TextView;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
- * One mod's settings, drawn from its settings.json (toggle, text, number, choice)
+ * One mod's settings, drawn from its settings.json (toggle, text, number, choice, action)
  * into a column (the Mods tab). Save writes the owner's values with hmgapid
  * setting-set; "Apply changes" then rebuilds what they affect.
  */
@@ -30,6 +33,7 @@ final class SettingsForm {
     private final Map<String, View> inputs = new LinkedHashMap<String, View>();
     private final Map<String, String> types = new LinkedHashMap<String, String>();
     private TextView message;
+    private final List<Button> buttons = new ArrayList<Button>();
 
     SettingsForm(Activity a, LinearLayout list, String id, Runnable saved) {
         this.a = a;
@@ -72,6 +76,18 @@ final class SettingsForm {
             JSONObject s = settings.optJSONObject(i);
             if (s == null || s.optBoolean("private")) continue;
             String key = s.optString("key"), type = s.optString("type", "text");
+            if ("action".equals(type)) {
+                final String service = s.optString("service");
+                buttons.add(Ui.button(list, s.optString("title", "Run"), new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        save(service);
+                    }
+                }));
+                if (!s.optString("description").isEmpty()) Ui.text(list, s.optString("description"), 15, false, Ui.GREY);
+                if (!s.optString("warning").isEmpty()) Ui.text(list, s.optString("warning"), 15, false, Ui.WARN);
+                continue;
+            }
             Object value = values.has(key) ? values.opt(key) : s.opt("default");
             if ("toggle".equals(type)) {
                 Switch sw = Ui.switchRow(list, s.optString("title", key));
@@ -106,16 +122,16 @@ final class SettingsForm {
             if (s.optString("description").length() > 0) Ui.text(list, s.optString("description"), 15, false, Ui.GREY);
             if (s.optString("warning").length() > 0) Ui.text(list, s.optString("warning"), 15, false, Ui.WARN);
         }
-        Ui.button(list, "Save settings", new View.OnClickListener() {
+        buttons.add(Ui.button(list, "Save settings", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                save();
+                save(null);
             }
-        });
+        }));
         message = Ui.text(list, "", 16, false, Color.GRAY);
     }
 
-    private void save() {
+    private void save(final String service) {
         final JSONObject out = new JSONObject();
         try {
             for (Map.Entry<String, View> e : inputs.entrySet()) {
@@ -139,20 +155,52 @@ final class SettingsForm {
             message.setTextColor(Ui.ERROR);
             return;
         }
+        for (Button b : buttons) b.setEnabled(false);
         new Ui.Job<Hmgapid.Result>() {
             @Override
             Hmgapid.Result work() throws Exception {
-                return Hmgapid.call("setting-set", id, out.toString());
+                if (service != null) {
+                    JSONObject mod = new JSONObject(Hmgapid.call("mod-file", id, "mod.json").output);
+                    JSONArray services = mod.optJSONArray("services");
+                    boolean manual = false;
+                    for (int i = 0; services != null && i < services.length(); i++) {
+                        JSONObject s = services.getJSONObject(i);
+                        if (service.equals(s.optString("name")) && "manual".equals(s.optString("start"))) manual = true;
+                    }
+                    if (!manual) throw new Exception("Action must name a manual service of this mod.");
+                    boolean enabled = false;
+                    for (String line : Hmgapid.call("mods").output.split("\n")) {
+                        String[] fields = line.split("\t");
+                        if (fields.length >= 2 && id.equals(fields[0]) && "enabled".equals(fields[1].trim())) enabled = true;
+                    }
+                    if (!enabled) throw new Exception("Turn this mod on first.");
+                    for (String line : Hmgapid.call("services", id).output.split("\n")) {
+                        String[] fields = line.trim().split(" +");
+                        if (fields.length == 5 && service.equals(fields[1])
+                                && ("running".equals(fields[2]) || "waiting".equals(fields[2]))) {
+                            throw new Exception("This action is already running; wait for its result.");
+                        }
+                    }
+                }
+                Hmgapid.Result r = Hmgapid.call("setting-set", id, out.toString());
+                return r.code == 0 && service != null ? Hmgapid.call("service-start", id, service) : r;
             }
 
             @Override
             void done(Hmgapid.Result r, Exception e) {
+                // The supervisor consumes a start request on its next tick.
+                list.postDelayed(new Runnable() {
+                    @Override public void run() {
+                        for (Button b : buttons) b.setEnabled(true);
+                    }
+                }, service != null && e == null && r.code == 0 ? 2000 : 0);
                 if (e != null || r.code != 0) {
-                    message.setText("Not saved: " + (e != null ? e.getMessage() : r.output.trim()));
+                    message.setText("Couldn't save or run: " + (e != null ? e.getMessage() : r.output.trim()));
                     message.setTextColor(Ui.ERROR);
                     return;
                 }
-                message.setText("Saved. Apply changes to update the head unit.");
+                message.setText(service != null ? "Settings saved. Action requested; see the mod's log for its result."
+                        : "Saved. Live settings take effect immediately; apply changes for other settings.");
                 message.setTextColor(Ui.GREEN);
                 if (saved != null) saved.run();
             }

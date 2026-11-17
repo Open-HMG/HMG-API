@@ -2,9 +2,11 @@
 
 ## Unreleased
 
-- The Ioniq 6 on 260903 (USA and Canada) is checked on a car. `hmgapid engine verify-map`
-  passed all 351 points on a US car (`CEEV.USA.0000.V016.010.260903`), so the map runs
-  without "Try unchecked maps".
+- **Mods can add action buttons to their settings.** A button saves the current
+  selections and starts a manual service of the same enabled mod, so tasks such as
+  exporting logs need no separate launcher app. Actions already running or waiting
+  are refused. The mod's service reports its result through its log or a notice.
+
 - **The Ioniq 6 on 260903 has all 351 hook points, in Canada as well as the USA.** The
   shared `hyundai/ceev/usa/260903` map (products `CEEV.CAN.` and `CEEV.USA.`) listed the 4
   `btsettings.projection_helper` points missing: they were looked for in class `iP`, which

@@ -33,6 +33,14 @@ Every installed mod, with its state:
 Pick a mod for its switch, its settings, its log (HMG-API's lines for it and its
 services' output) and **Remove**.
 
+A mod can also offer action buttons in its settings, such as **Export logs to USB**.
+Pressing an action saves the current selections and starts that mod's task without
+a separate **Apply changes** or restart. Changing a setting alone does not save it:
+use **Save settings** or an action button. The mod must be on, and a task already
+running or waiting cannot be started again. The message confirms that the task was
+requested; its service reports the result in its log or a notice. Reopen the mod to
+refresh its log.
+
 ## Settings
 
 ![Settings](images/settings.png)
