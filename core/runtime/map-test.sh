@@ -10,6 +10,8 @@ javac --release 8 -cp "$CP" -d "$CP" core/runtime/test/hmgapi/engine/MapProbeTes
 java -cp "$CP" hmgapi.engine.MapProbeTest "$T/probe"
 javac --release 8 -cp "$CP" -d "$CP" core/runtime/test/hmgapi/engine/MapProbeMethodTest.java
 java -cp "$CP" hmgapi.engine.MapProbeMethodTest "$T/probe-method" "$(python3 -I -c 'import sys; sys.path.insert(0, "tools"); import dexsig; print(dexsig.SAMPLE_SIG)')"
+javac --release 8 -cp "$CP" -d "$CP" core/runtime/test/hmgapi/engine/ReportMapTest.java
+java -cp "$CP" hmgapi.engine.ReportMapTest
 R=$T/root
 fail=0
 check() { if [ "$2" = "$3" ]; then echo "ok    $1"; else echo "FAIL  $1: wanted [$2], got [$3]"; fail=1; fi; }

@@ -118,10 +118,11 @@
     }
   },
   "missing": {
-    "btsettings.projection_helper.device_connections_available": "0 methods match in com.android.settings2.bluetooth.iP",
-    "btsettings.projection_helper.open_device_connections": "0 methods match in com.android.settings2.bluetooth.iP",
-    "btsettings.projection_helper.open_other_page": "0 methods match in com.android.settings2.bluetooth.iP",
-    "btsettings.projection_helper.open_wireless_page": "0 methods match in com.android.settings2.bluetooth.iP",
+    "btsettings.projection_helper": "not kept from the Car Report: its by-reference class com.android.settings2.bluetooth.iP has none of its 4 members here, so it is likely a different class with the same name (stock files or a newer Car Report map it)",
+    "btsettings.projection_helper.device_connections_available": "not kept from the Car Report: its by-reference class com.android.settings2.bluetooth.iP has none of its 4 members here, so it is likely a different class with the same name (stock files or a newer Car Report map it)",
+    "btsettings.projection_helper.open_device_connections": "not kept from the Car Report: its by-reference class com.android.settings2.bluetooth.iP has none of its 4 members here, so it is likely a different class with the same name (stock files or a newer Car Report map it)",
+    "btsettings.projection_helper.open_other_page": "not kept from the Car Report: its by-reference class com.android.settings2.bluetooth.iP has none of its 4 members here, so it is likely a different class with the same name (stock files or a newer Car Report map it)",
+    "btsettings.projection_helper.open_wireless_page": "not kept from the Car Report: its by-reference class com.android.settings2.bluetooth.iP has none of its 4 members here, so it is likely a different class with the same name (stock files or a newer Car Report map it)",
     "buttonsettings.adapter": "0 classes match",
     "buttonsettings.adapter.set_boolean_list": "needs buttonsettings.adapter",
     "buttonsettings.adapter.set_list_items": "needs buttonsettings.adapter",
@@ -165,7 +166,6 @@
     "themesettings.split_item.type": "0 methods match in com.android.themesettings.splitscreensettings.SplitScreenItem"
   },
   "by_reference": [
-    "btsettings.projection_helper",
     "dipo.iap2.bt_address",
     "dipo.iap2.set_notify_on",
     "panel.home.build_views",

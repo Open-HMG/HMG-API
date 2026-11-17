@@ -1,0 +1,15 @@
+{
+  "id": "carplay-keys",
+  "name": "CarPlay Keys",
+  "description": "MAP, NAV and MEDIA open the CarPlay screen, NEMESIS Manager or the HMG-API app you pick for each, from the car's screens and inside CarPlay, or stay the car's own (Off). Hold a button for the car's own screen. Three presses of NAV within 1.5 s each open NEMESIS Manager.",
+  "authors": [
+    "DeFlight, LLC"
+  ],
+  "license": "MIT",
+  "uuid": "f1154a64-b4d2-81b9-b45c-e791b3200a46",
+  "version": "1.4.0",
+  "repo": "https://github.com/DeFlight/hmgapi-carplay-keys",
+  "download": "https://github.com/DeFlight/hmgapi-carplay-keys/releases/download/v1.4.0/carplay-keys-v1.4.0.zip",
+  "sha256": "09a68fa632cb657ea23415a6577586f45a520dc86239adc5e716524fd488cb88",
+  "hmgapi": ">=1.0.0"
+}
