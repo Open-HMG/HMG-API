@@ -157,6 +157,75 @@
       }
     },
     {
+      "id": "framework.network_management_service",
+      "kind": "class",
+      "find": {
+        "name": "com.android.server.NetworkManagementService"
+      },
+      "about": "Android's network management service (services.jar, in system_server): it tells netd how to run the hotspot"
+    },
+    {
+      "id": "framework.network_management_service.start_access_point",
+      "kind": "method",
+      "of": "framework.network_management_service",
+      "find": {
+        "name": "startAccessPoint",
+        "params": [
+          "android.net.wifi.WifiConfiguration",
+          "java.lang.String"
+        ],
+        "ret": "void"
+      },
+      "about": "the head unit's access point starts (config, interface). Some builds start the projection AP (apMode 2) with the hotspot's name and key instead of the connectivity ones the phone is given; HMG-API puts those in"
+    },
+    {
+      "id": "framework.wifi_configuration",
+      "kind": "class",
+      "find": {
+        "name": "android.net.wifi.WifiConfiguration"
+      }
+    },
+    {
+      "id": "framework.wifi_configuration.ap_mode",
+      "kind": "field",
+      "of": "framework.wifi_configuration",
+      "find": {
+        "name": "apMode",
+        "type": "int"
+      },
+      "about": "HKMC's access point mode: 2 is the AP for wireless CarPlay and Android Auto (setWifiApEnabledForConnectivity)"
+    },
+    {
+      "id": "framework.wifi_configuration.connectivity_ssid",
+      "kind": "field",
+      "of": "framework.wifi_configuration",
+      "find": {
+        "name": "ConnectivitySSID",
+        "type": "java.lang.String"
+      },
+      "about": "the projection AP's network name, the one the phone is given"
+    },
+    {
+      "id": "framework.wifi_configuration.connectivity_psk",
+      "kind": "field",
+      "of": "framework.wifi_configuration",
+      "find": {
+        "name": "ConnectivityPSK",
+        "type": "java.lang.String"
+      },
+      "about": "the projection AP's key, the one the phone is given"
+    },
+    {
+      "id": "framework.wifi_configuration.is_24ghz_band",
+      "kind": "field",
+      "of": "framework.wifi_configuration",
+      "find": {
+        "name": "is24GHzBand",
+        "type": "boolean"
+      },
+      "about": "the hotspot runs on 2.4 GHz (channel24GHzBand) instead of channel; newer builds ignore it for the projection AP"
+    },
+    {
       "id": "framework.navigation_cluster",
       "kind": "class",
       "find": {

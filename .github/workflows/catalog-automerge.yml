@@ -1,0 +1,93 @@
+# Merges a catalogue pull request that is only a version bump of one existing entry, once
+# the Catalogue check passed on it: same author key, a newer final version, a signed
+# release of the entry's own repo, nothing else changed (tools/catalog.py bump). Anything
+# else (a new mod, a key change, other files) waits for a maintainer as before.
+#
+# Runs from main's code (workflow_run), reads the pull request's files through git and
+# never runs them, and checks the download and signature again itself. It merges with
+# the Open-HMG catalogue app's token (vars.CATALOG_APP_CLIENT_ID,
+# secrets.CATALOG_APP_PRIVATE_KEY), the one bypass actor for the review rule on main's
+# ruleset; being an app's merge, it starts main's push workflows (wiki, Catalogue).
+name: Catalogue auto-merge
+
+on:
+  workflow_run:
+    workflows: [Catalogue]
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: catalog-automerge
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Find the pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          case "$SHA" in *[!0-9a-f]*|"") echo "odd head sha"; exit 1 ;; esac
+          prs=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&base=main&per_page=100" \
+            --jq ".[] | select(.head.sha == \"$SHA\" and .draft == false) | .number")
+          set -- $prs
+          if [ $# != 1 ]; then echo "open pull requests into main at $SHA: ${prs:-none}; nothing to do"; exit 0; fi
+          echo "number=$1" >> "$GITHUB_OUTPUT"
+
+      - name: Is it a version bump?
+        id: bump
+        if: steps.pr.outputs.number
+        env:
+          PR: ${{ steps.pr.outputs.number }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          git fetch -q origin "pull/$PR/head:refs/pr/head"
+          if [ "$(git rev-parse refs/pr/head)" != "$SHA" ]; then echo "#$PR moved past the checked commit; its next check decides"; exit 0; fi
+          set +e
+          python3 tools/catalog.py bump --base origin/main --head refs/pr/head > "$RUNNER_TEMP/bump.txt" 2>&1
+          rc=$?
+          set -e
+          cat "$RUNNER_TEMP/bump.txt"
+          { echo '```'; cat "$RUNNER_TEMP/bump.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          if [ $rc = 0 ]; then echo "ok=1" >> "$GITHUB_OUTPUT"; else echo "#$PR isn't only a version bump: left for a maintainer"; fi
+
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app
+        if: steps.bump.outputs.ok
+        with:
+          client-id: ${{ vars.CATALOG_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CATALOG_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Merge it
+        if: steps.bump.outputs.ok
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APP_TOKEN: ${{ steps.app.outputs.token }}
+          PR: ${{ steps.pr.outputs.number }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          { echo "Merged automatically: a version bump of an existing catalogue entry, checked again from main (\`tools/catalog.py bump\`):"
+            echo; echo '```'; grep '^ok' "$RUNNER_TEMP/bump.txt"; echo '```'; } > "$RUNNER_TEMP/comment.md"
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/comment.md"
+          GH_TOKEN=$APP_TOKEN gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --merge --admin --match-head-commit "$SHA"

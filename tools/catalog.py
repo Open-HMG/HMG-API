@@ -13,6 +13,10 @@ carries the list. The wiki's Community mods page is made from the entries.
         its SHA-256 and signature and that it is the mod and version the entry says;
         --base refuses an entry whose author key changed, a version that went back, and
         changes to authors who aren't the ones the changed entries name
+  tools/catalog.py bump --base <git ref> --head <git ref>
+        whether head is only a version bump of one existing entry (same author key, newer
+        version, a release of the entry's repo, signed; nothing else changed): the
+        Catalogue auto-merge workflow merges such a pull request
   tools/catalog.py fetch <dir> <id>... | --list tools/release-mods.txt
         each entry's download into <dir>/<id>-<version>.zip, after the same checks as
         check --download (the release bundles the mods tools/release-mods.txt names so).
@@ -307,6 +311,61 @@ def cmd_check(a):
     print(f'ok    {len(es)} catalogue entries, {len(au.get("authors", {}))} authors')
 
 
+BUMP = {'version', 'download', 'sha256', 'description'}   # what a version bump may change
+
+
+def cmd_bump(a):
+    """whether head, against base, is only a version bump of one existing entry: the same
+    author key, a newer final version, a download from the entry's own repo's releases,
+    signed by that key, and a description (if changed) as the package's mod.json says.
+    Run from trusted code (the base branch): reads head's files through git, never runs them."""
+    no = []
+    r = subprocess.run(['git', '-C', REPO, 'diff', '--name-only', f'{a.base}...{a.head}'], capture_output=True, text=True)
+    if r.returncode != 0:
+        die(f'git diff {a.base}...{a.head}: {r.stderr.strip()}')
+    files = r.stdout.split()
+    m = re.fullmatch(r'catalog/([a-z0-9][a-z0-9-]{0,63})\.json', files[0]) if len(files) == 1 else None
+    if not m:
+        no.append(f'changes {len(files)} files ({", ".join(files[:5])}), not one catalogue entry')
+    else:
+        n = m[1]
+        old, new = git_show(a.base, files[0]), git_show(a.head, files[0])
+        if old is None or new is None:
+            no.append(f'{files[0]}: a new or removed entry')
+        elif not isinstance(new, dict):
+            no.append(f'{files[0]}: not an object')
+        else:
+            changed = {k for k in set(old) | set(new) if old.get(k) != new.get(k)}
+            if changed - BUMP:
+                no.append(f'{files[0]}: changes {", ".join(sorted(changed - BUMP))} (a bump changes only {", ".join(sorted(BUMP))})')
+            if not {'version', 'sha256', 'download'} <= changed:
+                no.append(f'{files[0]}: not a new release (version, download and sha256 all change in one)')
+            no += check_entry(n, new, (git_show(a.base, 'maps/authors.json') or {}).get('authors', {}))
+            if not no and vkey(new['version']) <= vkey(old['version']):
+                no.append(f'{files[0]}: version {new["version"]} isn\'t newer than {old["version"]}')
+            base = str(new.get('repo', '')).rstrip('/') + '/releases/download/'
+            if not no and not new['download'].startswith(base):
+                no.append(f'{files[0]}: the download isn\'t a release of the mod\'s own repo ({base}...)')
+            if not no:
+                work = tempfile.mkdtemp(prefix='catalog-bump-')
+                try:
+                    z, why = download(n, new, work)
+                    if why:
+                        no.append(why)
+                    elif 'description' in changed:
+                        desc = load(os.path.join(unpack(z, os.path.join(work, 'mod')), 'mod.json')).get('description', '')
+                        if desc != new['description']:
+                            no.append(f'{files[0]}: the description isn\'t the package\'s mod.json description')
+                finally:
+                    shutil.rmtree(work, ignore_errors=True)
+    for x in no:
+        print('NO    ' + x)
+    if no:
+        sys.exit(1)
+    print(f'ok    {n} {old["version"]} to {new["version"]}: a version bump by the same author key ({new["uuid"]}), '
+          f'changes {", ".join(sorted(changed))}')
+
+
 def download(n, e, work):
     """an entry's download in work/: its SHA-256, signature (by the entry's author key), id
     and version checked. The zip's path, or None and why not."""
@@ -473,6 +532,9 @@ def main():
     s = sub.add_parser('check')
     s.add_argument('--download', action='store_true')
     s.add_argument('--base')
+    s = sub.add_parser('bump')
+    s.add_argument('--base', required=True)
+    s.add_argument('--head', required=True)
     s = sub.add_parser('fetch')
     s.add_argument('dir')
     s.add_argument('ids', nargs='*')
@@ -484,7 +546,7 @@ def main():
         die('--download is an https:// link')
     if a.cmd == 'add' and a.repo and not HTTPS.match(a.repo):
         die('--repo is an https:// link')
-    {'add': cmd_add, 'check': cmd_check, 'fetch': cmd_fetch, 'wiki': cmd_wiki}[a.cmd](a)
+    {'add': cmd_add, 'check': cmd_check, 'bump': cmd_bump, 'fetch': cmd_fetch, 'wiki': cmd_wiki}[a.cmd](a)
     if _engine and _engine != os.environ.get('HMGAPI_ENGINE_CLASSES'):   # ours, not the caller's
         shutil.rmtree(_engine, ignore_errors=True)
 

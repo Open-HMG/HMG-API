@@ -153,6 +153,13 @@
     "framework.hev_flag.other_ecu_power": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "framework.hev_flag.target_soc_ac": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "framework.hev_flag.target_soc_dc": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.network_management_service": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.network_management_service.start_access_point": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.wifi_configuration": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.wifi_configuration.ap_mode": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.wifi_configuration.connectivity_psk": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.wifi_configuration.connectivity_ssid": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.wifi_configuration.is_24ghz_band": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "gpm.sensor_source.report_diagnostics": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "gpm.sensor_source.shutdown": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)"
   }

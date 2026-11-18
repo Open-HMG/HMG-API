@@ -26,8 +26,9 @@ S keygen $T/b.key >/dev/null; UB=$(S uuid $T/b.key)
 pkg() {
     rm -rf $T/$1; cp -r mods/examples/hello $T/$1
     python3 - $T/$1/mod.json $2 <<'P'
-import json, sys
+import json, os, sys
 m = json.load(open(sys.argv[1])); m['version'] = sys.argv[2]; m['authors'] = ['Test Author']; m['repo'] = 'https://example.org/hello'
+if os.environ.get('DESC'): m['description'] = os.environ['DESC']
 json.dump(m, open(sys.argv[1], 'w'))
 P
     S sign $T/$1 $3 >/dev/null
@@ -143,6 +144,37 @@ G checkout -q -- .
 cp $R/catalog/hello.json $R/catalog/other.json
 C check; check "file name is the id" 1 $rc
 rm $R/catalog/other.json
+
+# bump (the auto-merge workflow): head against base, downloads served from $T/dl
+BD=https://example.org/hello/releases/download/v1.1.0/hello.zip
+B() { G -c user.name=t -c user.email=t@t commit -qam "$1"; F bump --base main --head HEAD; }
+G branch -q -M main
+bump_entry() {   # <zip> [python edit]: the entry pointing at that zip as $BD
+    cp $1 $T/dl/hello.zip
+    J $R/catalog/hello.json "d['version']='1.1.0'; d['download']='$BD'; d['sha256']='$(sha256sum $1 | cut -d' ' -f1)'; $2"
+}
+G checkout -qb pr1; bump_entry $T/h2.zip
+B bump; check "bump: a version bump" 0 $rc; has "says what" "hello 1.0.0 to 1.1.0: a version bump by the same author key ($UA)" "$out"
+G checkout -q main; G checkout -qb pr2; bump_entry $T/h2.zip "d['description']=d['description']"
+J $R/catalog/hello.json "d['name']='Hi'"
+B name; check "bump: another field changed refused" 1 $rc; has "says why" "changes name" "$out"
+G checkout -q main; G checkout -qb pr3; bump_entry $T/h2.zip "d['description']='Something else'"
+B desc; check "bump: a description not the package's refused" 1 $rc; has "says why" "the description isn't the package's" "$out"
+G checkout -q main; G checkout -qb pr4; DESC='Says hi, louder' pkg hd 1.1.0 $T/a.key $T/hd.zip; bump_entry $T/hd.zip "d['description']='Says hi, louder'"
+B desc-ok; check "bump: the package's description" 0 $rc
+G checkout -q main; G checkout -qb pr5; bump_entry $T/h2.zip "d['download']='https://example.org/fork/releases/download/v1.1.0/hello.zip'"
+B fork; check "bump: a download outside the repo's releases refused" 1 $rc; has "says why" "a release of the mod's own repo" "$out"
+G checkout -q main; G checkout -qb pr6; pkg hb2 1.1.0 $T/b.key $T/hb2.zip; bump_entry $T/hb2.zip
+B otherkey; check "bump: signed by another key refused" 1 $rc
+G checkout -q main; G checkout -qb pr7; bump_entry $T/h2.zip; echo x > $R/extra.txt; G add extra.txt
+B twofiles; check "bump: other files changed refused" 1 $rc; has "says why" "changes 2 files" "$out"
+G checkout -q main; G checkout -qb pr8; bump_entry $T/h2.zip "d['uuid']='$UB'"
+B key; check "bump: an author key change refused" 1 $rc; has "says why" "changes uuid" "$out"
+G checkout -q main; G checkout -qb pr9; cp $R/catalog/hello.json $R/catalog/hi.json; J $R/catalog/hi.json "d['id']='hi'"; G add catalog/hi.json
+B new; check "bump: a new entry refused" 1 $rc; has "says why" "a new or removed entry" "$out"
+G checkout -q main; G checkout -qb pr10; J $R/catalog/hello.json "d['description']='x'"
+B onlydesc; check "bump: no new release refused" 1 $rc; has "says why" "not a new release" "$out"
+G checkout -q main; cp $T/h1.zip $T/dl/hello.zip
 
 J $R/catalog/hello.json "d['description']='Says <b>hi</b> [x](https://evil)'"
 C wiki $T/page.md; check "wiki" 0 $rc

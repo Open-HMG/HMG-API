@@ -2,6 +2,46 @@
 
 ## Unreleased
 
+- **Wireless CarPlay and Android Auto on the older Hyundai and Kia builds: the
+  projection AP gets the name and key the phone is given.** On the US 260507, Canada
+  260206 and Korea 260902 `hmc`/`kmc` builds (Sonata, Santa Fe, Elantra, K5, Sorento, Niro...),
+  `NetworkManagementService.startAccessPoint` has no branch for the connectivity AP
+  (apMode 2), so it came up with the hotspot's own name and key, and the phone, told
+  `ConnectivitySSID`/`ConnectivityPSK`, never joined (#159; a Korean Palisade too).
+  HMG-API now hands it a copy of the config with those in it, and on the config's own
+  channel even when the hotspot is set to 2.4 GHz, as the newer builds do; the saved
+  hotspot settings aren't touched, and builds that have the branch see no change. New
+  hook points `framework.network_management_service.start_access_point` and
+  `framework.wifi_configuration.ap_mode`, `.connectivity_ssid`, `.connectivity_psk`,
+  `.is_24ghz_band`:
+  mapped on the 17 builds with stock files, missing on the Car Report maps until a
+  newer report maps them.
+
+## 1.1.0-rc.4 (2026-11-17)
+
+- **Catalogue updates merge themselves.** A pull request that only moves an existing
+  entry to the mod's next release (same author key, a newer final version, a signed
+  release of the mod's own repo, nothing else but the package's own description) is
+  merged once the Catalogue check passes (`tools/catalog.py bump`,
+  `catalog-automerge.yml`). New mods and anything else still wait for a maintainer.
+- **The vehicle service's per-drive guards reset on a new drive (#269, lemoyneiv).** With
+  QuickBoot the service lives across drives, so a dismissed startup notice, a manual stop
+  or a conditioning timeout from one drive blocked the next. A resume from suspend
+  (`elapsedRealtime` moving while `uptimeMillis` doesn't) or EV ready going off now
+  resets them, stops conditioning still running, and clears cached readings.
+- **Routed battery conditioning waits for the car to be 18 minutes out (#270,
+  lemoyneiv).** For a fast charger farther away, the battery accepts the route and waits;
+  the activation timeout now starts only within 18 minutes, instead of timing out while
+  the battery is still waiting.
+- **The vehicle service's socket and readings (#271, lemoyneiv):** a failed `accept()`
+  no longer spins, a connection is shut down both ways before its fd is closed, `speed`
+  and `moving` are at most 100 ms old (was 250 ms), and the startup notice's dismissal
+  is sent again a few times while parked, as the car can put it back.
+- **`outside_temp` ignores -40 (#180, zpoon):** climate control's raw zero right after
+  the car wakes, the same in °F and °C, was passed on as a reading.
+- **The Ioniq 5 `NEEV23SE` on US 260903 uses the Ioniq 5 2023 map (#268, lemoyneiv).**
+- **Catalogue:** CarPlay Keys (DeFlight, LLC; #249, now 1.5.0, #284) and Comfort &
+  Startup 1.1.1 (lemoyneiv; #272), with their author keys.
 - **Maps from Car Reports: Elantra `CN7PE` (USA 260507), Elantra N 2024 `CN7NPE` and
   Kona `OSPE` (USA 260903), Niro EV `SG225EV` (Canada 260206).** All 351 points each,
   from rc.3 reports with code signatures (#252, #254, #257, #261), in the base map's
