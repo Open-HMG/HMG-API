@@ -14,5 +14,11 @@
                 <action android:name="hmgapi.intent.action.PROJECTION" />
             </intent-filter>
         </receiver>
+        <!-- car events: only a sender with DEVICE_POWER (HMG-API, as root) reaches it -->
+        <receiver android:name=".CarEvent" android:permission="android.permission.DEVICE_POWER">
+            <intent-filter>
+                <action android:name="hmgapi.intent.action.CAR_EVENT" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

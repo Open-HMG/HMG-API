@@ -272,6 +272,17 @@ check "allow: block_ambient_light off by default" off "$(run root allow block_am
 check "allow: block_ambient_light on" on "$(run root allow block_ambient_light on)"
 run root allow block_ambient_light off >/dev/null
 check "allow: off again" no "$(run root allow startup_notice off >/dev/null; [ -f "$T/root/root/settings/allow/startup_notice" ] && echo yes || echo no)"
+check "park-rule: door by default" door "$(run root park-rule)"
+check "park-rule: closed" closed "$(run root park-rule closed)"
+check "... saved for the vehicle service" closed "$(cat "$T/root/root/settings/park_rule")"
+check "park-rule: seconds" 60 "$(run root park-rule 60)"
+check "park-rule: too short refused" 2 "$(code root park-rule 5)"
+check "park-rule: too long refused" 2 "$(code root park-rule 3600)"
+check "park-rule: odd refused" 2 "$(code root park-rule 'door;reboot')"
+check "... the rule kept" 60 "$(run root park-rule)"
+check "park-rule: a mod's app can't" 13 "$(code mod park-rule closed)"
+check "park-rule: the HMG-API app can" closed "$(run app park-rule closed)"
+check "park-rule: back to door" door "$(run root park-rule door)"
 kill $VP 2>/dev/null || true; wait $VP 2>/dev/null || true
 check "vehicle: nothing reached the service for refused asks" 5 "$(wc -l < "$T/vehicle.req" | tr -d ' ')"
 

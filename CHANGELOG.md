@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+- **Car events: mods can tidy up when you park and before the head unit shuts down.**
+  A mod asks for them in mod.json (`"car_events": {"parked": {"script": "bin/x.sh"},
+  "shutdown": {}}`): its script runs (as the user it gives, with its own log), its apps
+  hear `hmgapi.intent.action.CAR_EVENT`, and its hooks get them through
+  `ModContext.onCarEvent`.
+  - `parked`: the car is off, in P, and by the owner's rule (Settings > Vehicle >
+    "When the car is parked"; `hmgapid park-rule`) a door opened and then all four
+    closed (the default), all four are closed, or they've been closed for a minute or
+    five. The head unit stays on after you switch off, so the default waits for you to
+    get out.
+  - `unparked`: the car is switched on again after `parked`, before the head unit shut
+    down, so a mod can bring back what it put away.
+  - `shutdown`: the head unit is about to shut down. HMG-API answers the car's own
+    system-off (it registers as a responder only while a mod asks), gives scripts 6 s,
+    then lets the shutdown go on; the car never waits more than its own 10 s.
+  - `wake`: back from a QuickBoot suspend, where apps kept running through the off.
+
+  New readings `power`, `doors.closed` and `parked`. Car Check shows every car event.
+  New hook points: the power service (`framework.power_service.*`,
+  `framework.power_listener*`, `framework.car_services.power`), the door status
+  (`framework.bcm_listener_stub.doors`), and for Wireless CarPlay + Android Auto's
+  teardown GPM's ByeBye and wireless reconnect (`gpm.connection_manager.*`,
+  `gpm.receiver_service.connection_manager`, `.wireless_explorer`, `.on_create`,
+  `.connect_wireless_session`, `gpm.wireless_explorer.*`) and DiPO's
+  `dipo.carplay.disconnect` and `.restart_bonjour`: mapped on the 17 builds with stock
+  files, missing on the Car Report maps until a newer report maps them. Off-car only.
+
 - **Wireless CarPlay and Android Auto on the older Hyundai and Kia builds: the
   projection AP gets the name and key the phone is given.** On the US 260507, Canada
   260206 and Korea 260902 `hmc`/`kmc` builds (Sonata, Santa Fe, Elantra, K5, Sorento, Niro...),

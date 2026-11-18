@@ -137,5 +137,49 @@
     ],
     "ret": "void",
     "static": false
+  },
+  "gpm.connection_manager": {
+    "class": "com.google.android.projection.service.GalConnectionManager"
+  },
+  "gpm.connection_manager.send_byebye": {
+    "method": "sessionSendByeByeRequest",
+    "params": [
+      "int"
+    ],
+    "ret": "void",
+    "static": false
+  },
+  "gpm.receiver_service.connection_manager": {
+    "field": "mConnectionManager",
+    "type": "com.google.android.projection.service.GalConnectionManager",
+    "static": false
+  },
+  "gpm.receiver_service.on_create": {
+    "method": "onCreate",
+    "params": [],
+    "ret": "void",
+    "static": false
+  },
+  "gpm.wireless_explorer": {
+    "class": "com.google.android.projection.protocol.WirelessExplorer"
+  },
+  "gpm.receiver_service.wireless_explorer": {
+    "field": "mWirelessExplorer",
+    "type": "com.google.android.projection.protocol.WirelessExplorer",
+    "static": false
+  },
+  "gpm.wireless_explorer.connected_device": {
+    "method": "getConnectedDevice",
+    "params": [],
+    "ret": "java.lang.String",
+    "static": false
+  },
+  "gpm.receiver_service.connect_wireless_session": {
+    "method": "connectWirelessSession",
+    "params": [
+      "java.lang.String"
+    ],
+    "ret": "void",
+    "static": false
   }
 }

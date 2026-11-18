@@ -36,6 +36,9 @@ public final class Vehicle {
         Map<String, Reading> m = new LinkedHashMap<String, Reading>();
         add(m, "gear.park", "0/1", 500, "gear in P");
         add(m, "parking_brake", "0/1", 1000, "electronic parking brake engaged");
+        add(m, "power", "text", 500, "the car's power status (power service): on, logic_on (off, the head unit still up), adm, system_ready, delay_mode, preparing_off, off");
+        add(m, "doors.closed", "0/1", 200, "all four doors closed (body control, pushed; the trunk and hood don't count)");
+        add(m, "parked", "0/1", 200, "HMG-API's parked state, by the owner's rule (the car events \"parked\" and \"unparked\")");
         add(m, "speed", "km/h", 100, "vehicle speed");
         add(m, "moving", "0/1", 100, "the car is moving");
         add(m, "driving.restricted", "0/1", 500, "the car's own driving restriction is on (what stock video apps follow)");
@@ -108,6 +111,25 @@ public final class Vehicle {
         cmd(m, "rear_camera", "take|release", "one mod at a time (coordination: the car's reverse view always comes first); free again when the mod is turned off");
         cmd(m, "startup_notice", "dismiss", "only if the owner allowed it (HMG-API app, or hmgapid allow startup_notice on); gear in P; once per start; skips the notice the driver is meant to accept");
         COMMANDS = Collections.unmodifiableMap(m);
+    }
+
+    /**
+     * The car events a mod can ask for (mod.json "car_events"): its event scripts run, and its
+     * apps and hooks hear hmgapi.intent.action.CAR_EVENT. Sent by the vehicle service (Hub).
+     */
+    public static final Map<String, String> EVENTS;
+    /** how long a shutdown script may run (the car waits 10 s for HMG-API's answer, then shuts down anyway) */
+    public static final int SHUTDOWN_SECONDS = 6;
+    /** how long any other event script may run before it's stopped */
+    public static final int EVENT_SECONDS = 60;
+
+    static {
+        Map<String, String> m = new LinkedHashMap<String, String>();
+        m.put("parked", "the car is parked and the driver has left, by the owner's rule (Settings, Vehicle; default: off, in P, a door opened and then all four closed)");
+        m.put("unparked", "the car was switched on again after \"parked\", before the head unit shut down");
+        m.put("shutdown", "the head unit is about to shut down (the car's own system off); scripts get " + SHUTDOWN_SECONDS + " s, then the shutdown goes on");
+        m.put("wake", "the head unit came back from a QuickBoot suspend: apps kept running through the off");
+        EVENTS = Collections.unmodifiableMap(m);
     }
 
     private static void cmd(Map<String, Command> m, String name, String usage, String guard) {
