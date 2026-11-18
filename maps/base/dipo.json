@@ -189,5 +189,17 @@
     "params": [],
     "ret": "boolean",
     "static": false
+  },
+  "dipo.carplay.disconnect": {
+    "method": "disconnectCarPlay",
+    "params": [],
+    "ret": "com.daudio.app.dipo.telechips.CarPlayReturn",
+    "static": false
+  },
+  "dipo.carplay.restart_bonjour": {
+    "method": "restartBonjour",
+    "params": [],
+    "ret": "com.daudio.app.dipo.telechips.CarPlayReturn",
+    "static": false
   }
 }

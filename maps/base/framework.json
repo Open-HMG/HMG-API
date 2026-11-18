@@ -1348,5 +1348,86 @@
     "field": "is24GHzBand",
     "type": "boolean",
     "static": false
+  },
+  "framework.car_services.power": {
+    "field": "POWER_SERVICE",
+    "type": "java.lang.String",
+    "static": true
+  },
+  "framework.power_service": {
+    "class": "com.hkmc.power.IMicomPowerService"
+  },
+  "framework.power_service_stub": {
+    "class": "com.hkmc.power.IMicomPowerService$Stub"
+  },
+  "framework.power_service_stub.as_interface": {
+    "method": "asInterface",
+    "params": [
+      "android.os.IBinder"
+    ],
+    "ret": "com.hkmc.power.IMicomPowerService",
+    "static": true
+  },
+  "framework.power_service.power_status": {
+    "method": "getPowerStatus",
+    "params": [],
+    "ret": "int",
+    "static": false
+  },
+  "framework.power_service.register_system_off_responder": {
+    "method": "registerSystemOffResponder",
+    "params": [
+      "com.hkmc.power.IMicomPowerStatusListener",
+      "java.lang.String"
+    ],
+    "ret": "void",
+    "static": false
+  },
+  "framework.power_service.unregister_system_off_responder": {
+    "method": "unregisterSystemOffResponder",
+    "params": [
+      "com.hkmc.power.IMicomPowerStatusListener",
+      "java.lang.String"
+    ],
+    "ret": "void",
+    "static": false
+  },
+  "framework.power_service.confirm_system_off": {
+    "method": "confirmSystemOff",
+    "params": [
+      "com.hkmc.power.IMicomPowerStatusListener",
+      "java.lang.String"
+    ],
+    "ret": "void",
+    "static": false
+  },
+  "framework.power_listener": {
+    "class": "com.hkmc.power.IMicomPowerStatusListener"
+  },
+  "framework.power_listener_stub": {
+    "class": "com.hkmc.power.IMicomPowerStatusListener$Stub"
+  },
+  "framework.power_listener_stub.as_interface": {
+    "method": "asInterface",
+    "params": [
+      "android.os.IBinder"
+    ],
+    "ret": "com.hkmc.power.IMicomPowerStatusListener",
+    "static": true
+  },
+  "framework.power_listener_stub.power_status_changed": {
+    "field": "TRANSACTION_onPowerStatusChanged",
+    "type": "int",
+    "static": true
+  },
+  "framework.power_listener_stub.system_off": {
+    "field": "TRANSACTION_onSystemOff",
+    "type": "int",
+    "static": true
+  },
+  "framework.bcm_listener_stub.doors": {
+    "field": "TRANSACTION_onDoorAllStateChanged",
+    "type": "int",
+    "static": true
   }
 }

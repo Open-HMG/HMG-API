@@ -46,6 +46,15 @@ public final class HmgApi {
     public static final String ACTION_STATE_CHANGED = "hmgapi.intent.action.STATE_CHANGED";
     /** phone projection events (mod.json "projection": {"events": true}): extras "event", "value" or "type" + "data" */
     public static final String ACTION_PROJECTION = "hmgapi.intent.action.PROJECTION";
+    /**
+     * car events (mod.json "car_events"): extra EXTRA_EVENT, one of EVENT_*. An ordered broadcast:
+     * HMG-API waits for the receiver (goAsync() and finish() for longer work; a shutdown leaves a
+     * few seconds). Declare the receiver with android:permission="android.permission.DEVICE_POWER"
+     * so only HMG-API (or the system) can send it.
+     */
+    public static final String ACTION_CAR_EVENT = "hmgapi.intent.action.CAR_EVENT";
+    public static final String EXTRA_EVENT = "event";
+    public static final String EVENT_PARKED = "parked", EVENT_UNPARKED = "unparked", EVENT_SHUTDOWN = "shutdown", EVENT_WAKE = "wake";
     public static final String EXTRA_FOLDER = "folder", EXTRA_PATH = "path", EXTRA_MOUNTED = "mounted";
 
     /** hmgapid's answer that isn't a success */

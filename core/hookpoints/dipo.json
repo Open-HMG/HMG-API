@@ -387,6 +387,28 @@
         "ret": "boolean"
       },
       "about": "stop the phone's route guidance updates (DiPO: the car's navigation took turn-by-turn back)"
+    },
+    {
+      "id": "dipo.carplay.disconnect",
+      "kind": "method",
+      "of": "dipo.carplay",
+      "find": {
+        "name": "disconnectCarPlay",
+        "params": [],
+        "ret": "com.daudio.app.dipo.telechips.CarPlayReturn"
+      },
+      "about": "ends the CarPlay session; DiPO then doesn't advertise CarPlay again (restartBonjour off) until something does"
+    },
+    {
+      "id": "dipo.carplay.restart_bonjour",
+      "kind": "method",
+      "of": "dipo.carplay",
+      "find": {
+        "name": "restartBonjour",
+        "params": [],
+        "ret": "com.daudio.app.dipo.telechips.CarPlayReturn"
+      },
+      "about": "advertises CarPlay again (Bonjour), as DiPO does after a session it didn't end itself: the phone can come back"
     }
   ]
 }

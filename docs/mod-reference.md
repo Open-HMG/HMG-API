@@ -33,6 +33,7 @@ setting). It never edits your code.
 | a folder on a USB stick | `"usb": ["MyFolder"]`: your apps get `hmgapi.intent.action.USB_FOLDER`; services ask `hmgapid usb` |
 | to read the car | `"vehicle": {"read": ["battery12v.soc", "gear.park", "hv.soc"]}`, then `hmgapid vehicle <name>…` or `api.vehicle(…)`: no root, one read shared by every mod (see Vehicle readings) |
 | to send a car command | `"vehicle": {"commands": [...]}` and `hmgapid vehicle-do <command> <args>`: named, guarded, no root (see Vehicle commands) |
+| to tidy up when the car is parked, or before the head unit shuts down | `"car_events": {"parked": {"script": "bin/park.sh"}, "shutdown": {}}`: a script, your apps and your hooks hear it (see Car events) |
 | buttons | `"input": [{"key": "tune_enter", "press": "hold", "stock": "replace", "open": "<your app>/.Grid"}]`: one reader for every mod (see Buttons) |
 | a page in the right-hand split-screen panel | `"provides": {"panel": [{"title": "Battery", "widget": "<your app>/.MyWidget"}]}`: a standard Android app widget from your app (example: `mods/examples/side-panel`) |
 | Android Auto settings and events | `"projection"` (see Phone projection) |
@@ -159,6 +160,9 @@ Each entry is `"<id>"`, `"<id> <range>"` or `{"id": …, "version": <range>}`; r
 | `seat_state.<seat>` | raw | that step: 2 off, 3-5 ventilation, 6-8 heat |
 | `outside_temp`, `outside_temp_f` | °C, °F | climate control's outside temperature (pushed by the car; converted on a car that shows the other unit) |
 | `parking_brake` | 0/1 | the electronic parking brake engaged |
+| `power` | text | the power service's status: `on`, `logic_on` (the car is off, the head unit still up), `adm`, `system_ready`, `delay_mode`, `preparing_off`, `off` |
+| `doors.closed` | 0/1 | all four doors closed (body control, pushed; the trunk and hood don't count); `-` until the car has said |
+| `parked` | 0/1 | HMG-API's parked state, by the owner's rule (the `parked` / `unparked` car events) |
 
 Each value is read through the car's own interface, by method name from the car's
 hook map, and kept for a short time (100 ms for steering and pedals, up to 60 s
@@ -439,6 +443,51 @@ charge_door open` or `api.command("seat_heat", "driver", "low")`, without root. 
 review gave it (park only, one holder of the ambient light, conditioning stopped
 when its mod is turned off ...): the list, arguments and guards are in
 `vehicle-commands.md`.
+
+## Car events
+
+A mod that keeps something running (a phone session, a recording, a connection) can put
+it away when the driver parks and leaves, and before the head unit shuts down, instead of
+being cut off mid-way:
+
+```json
+"car_events": {
+  "parked":   {"script": "bin/park.sh"},
+  "unparked": {},
+  "shutdown": {"script": "bin/off.sh", "user": "system"},
+  "wake":     {}
+}
+```
+
+| Event | When |
+|---|---|
+| `parked` | the car is off, in P, and by the owner's rule: a door opened and then all four closed (the default: the driver got out), all four are closed, or they've been closed for a minute or five (Settings > Vehicle > "When the car is parked"; `hmgapid park-rule door\|closed\|<10-1800 s>`). Once per stop. No door status from the car: no `parked` |
+| `unparked` | the car is switched on again after `parked`, before the head unit shut down: bring back what you put away |
+| `shutdown` | the head unit is about to shut down (the car's own system off). Scripts get 6 s; the car goes on after 10 s whatever happens |
+| `wake` | the head unit came back from a QuickBoot suspend: apps and services kept running through the off, so bring back what `parked` or `shutdown` put away |
+
+Each event reaches the mod three ways, all at once:
+
+- **its script**, with the event as `$1`: a service of the mod's named `on-<event>` (start
+  `manual`, no restart), so it runs as its `"user"` (root by default; `system`, `app`),
+  with the services' environment, and its output is in `hmgapid service-log on-<event>`.
+  It gets 60 s (6 s for `shutdown`), then it's stopped. The mod can't have a service of
+  its own by that name.
+- **its apps**: an ordered broadcast `hmgapi.intent.action.CAR_EVENT`, extra `event`
+  (`HmgApi.ACTION_CAR_EVENT`, `EXTRA_EVENT`, `EVENT_*` in the client). Declare the receiver
+  with `android:permission="android.permission.DEVICE_POWER"` so only HMG-API can send it,
+  and use `goAsync()` for anything longer than a moment.
+- **its hooks**, in each app process they run in: `mod.onCarEvent(app, listener)` in
+  `appLoaded`. The listener runs off the app's main thread (post to the app's own thread
+  for its objects), only for the events the mod asked for and only while it's on; HMG-API
+  waits up to 5 s per process.
+
+HMG-API waits for all three to finish (or their time to run out) before it sends the
+next event (`shutdown` doesn't wait for a `parked` still running), and at `shutdown`
+before it tells the car it's done. It only holds a shutdown up while an
+enabled mod asks for `shutdown`. The vehicle service runs while any enabled mod asks for
+an event. `hmgapid service-log hmgapi vehicle` says what it saw (power, doors) and what
+each event did.
 
 ## Packaging
 

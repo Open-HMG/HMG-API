@@ -104,6 +104,68 @@ final class SettingsTab {
         owner("Ambient light", "Mods that change the ambient light put your colour or theme and brightness back when they let "
                 + "go; a change you make in the car's menu becomes the one they put back. Turn this on to keep every mod off the light.",
                 "Block mod light control", "block_ambient_light", false, null);
+        parkRule();
+    }
+
+    /** the owner's parked rule (hmgapid park-rule): when mods that asked for it put things away */
+    static final String[][] PARK_RULES = {
+        { "door", "A door opened, then all closed (you got out)" },
+        { "closed", "All doors closed" },
+        { "60", "All doors closed for 1 minute" },
+        { "300", "All doors closed for 5 minutes" },
+    };
+
+    void parkRule() {
+        Ui.text(page, "When the car is parked", 21, true, Ui.TEXT);
+        Ui.text(page, "Mods can tidy up when you park and leave: Wireless CarPlay + Android Auto ends the phone's session, "
+                + "so your phone lets go of the car. Each choice also needs the car off and in P. The head unit stays on for a while "
+                + "after you switch off, so \"All doors closed\" is already true while you sit in the car. Switching the car on again "
+                + "lets the mods bring things back.", 16, false, Ui.GREY);
+        final LinearLayout list = Ui.column(a);
+        page.addView(list);
+        Ui.line(page);
+        showParkRule(list, null);
+        new Ui.Job<Hmgapid.Result>() {
+            @Override
+            Hmgapid.Result work() throws Exception {
+                return Hmgapid.call("park-rule");
+            }
+
+            @Override
+            void done(Hmgapid.Result r, Exception e) {
+                showParkRule(list, e == null && r.code == 0 ? r.output.trim() : null);
+            }
+        }.start(a);
+    }
+
+    void showParkRule(final LinearLayout list, String current) {
+        list.removeAllViews();
+        for (final String[] c : PARK_RULES) {
+            boolean on = c[0].equals(current);
+            android.widget.Button b = Ui.button(list, (on ? "✓ " : "") + c[1], on, new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    new Ui.Job<Hmgapid.Result>() {
+                        @Override
+                        Hmgapid.Result work() throws Exception {
+                            return Hmgapid.call("park-rule", c[0]);
+                        }
+
+                        @Override
+                        void done(Hmgapid.Result r, Exception e) {
+                            if (e != null || r.code != 0) android.widget.Toast.makeText(a, "Couldn't save it", android.widget.Toast.LENGTH_SHORT).show();
+                            showParkRule(list, e == null && r.code == 0 ? r.output.trim() : null);
+                        }
+                    }.start(a);
+                }
+            });
+            b.setEnabled(current != null);
+        }
+        if (current != null) {
+            boolean known = false;
+            for (String[] c : PARK_RULES) known |= c[0].equals(current);
+            if (!known) Ui.text(list, "Now: all doors closed for " + current + " s (set with hmgapid park-rule)", 16, false, Ui.GREY);
+        }
     }
 
     /** Are HMG-API's hooks running on this car? The update block is one of them. */
