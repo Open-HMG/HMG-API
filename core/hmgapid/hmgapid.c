@@ -1669,6 +1669,40 @@ static int op_allow(int fd, int argc, char **argv)
     return 0;
 }
 
+/* The owner's rule for when the car counts as parked (the "parked" car event; read by the
+   vehicle service, hmgapi.vehicle.Parking): door (the default: off, in P, a door opened and
+   then all four closed), closed (off, in P, all four closed), or <seconds> (10-1800: closed
+   that long). settings/park_rule; no argument: the rule now. */
+static int op_park_rule(int fd, int argc, char **argv)
+{
+    char cur[16];
+    const char *r;
+    int n = 0, i;
+    if (argc == 1) {
+        if (read_small(ROOTDIR "/settings/park_rule", cur, sizeof cur) <= 0) mcpy(cur, "door", 5);
+        say(fd, cur);
+        say(fd, "\n");
+        return 0;
+    }
+    r = argv[1];
+    if (!seq(r, "door") && !seq(r, "closed")) {
+        for (i = 0; r[i]; i++) {
+            if (r[i] < '0' || r[i] > '9' || i >= 4) { n = -1; break; }
+            n = n * 10 + (r[i] - '0');
+        }
+        if (i == 0 || n < 10 || n > 1800) {
+            say(fd, "park-rule door|closed|<10-1800 seconds>\n");
+            return 2;
+        }
+    }
+    x_mkdir(ROOTDIR "/settings", 0700);
+    if (write_small(ROOTDIR "/settings/park_rule", r) < 0) { say(fd, "can't save it\n"); return 1; }
+    logline("owner's parked rule:", r, -1, 0);
+    say(fd, r);
+    say(fd, "\n");
+    return 0;
+}
+
 /* What a mod's own app may ask (its peer uid is the app of an enabled mod: g_mod). */
 static int handle_mod(int fd, int argc, char **argv)
 {
@@ -1716,6 +1750,7 @@ static int handle(int fd, int whoami, int argc, char **argv)
     if (seq(op, "vehicle") && argc >= 2) return op_vehicle(fd, 0, argc, argv);
     if (seq(op, "vehicle-do") && argc >= 2 && argc <= 5) return op_vehicle_do(fd, 0, argc, argv);
     if (seq(op, "allow") && (argc == 2 || argc == 3)) return op_allow(fd, argc, argv);
+    if (seq(op, "park-rule") && argc <= 2) return op_park_rule(fd, argc, argv);
     if (seq(op, "micom-watch") && argc <= 9) return op_micom_watch(fd, argc, argv);
     if (seq(op, "micom-log") && argc == 1) return op_svc_log(fd, "hmgapi", "micom");
     if (seq(op, "reboot") && argc == 1) {

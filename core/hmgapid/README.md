@@ -11,7 +11,7 @@ hmgapid <op> [args...]    # any user: asks the daemon, prints its output, exits 
 | Caller (SO_PEERCRED) | Ops |
 |---|---|
 | root (0), shell (2000: adb) | everything: `sh <command>`, `remount rw\|ro`, plus the HMG-API ops |
-| the `hmgapi.app` uid (from `/data/system/packages.list`) | `mods`, `enable <id>`, `disable <id>`, `setting-get <id>`, `setting-set <id> <json>`, `log`, `reboot`, `services [mod]`, `service-restart\|stop\|start <mod> <name>`, `service-log <mod> <name>`, `usb [mod]`, `vehicle <reading>…` |
+| the `hmgapi.app` uid (from `/data/system/packages.list`) | `mods`, `enable <id>`, `disable <id>`, `setting-get <id>`, `setting-set <id> <json>`, `log`, `reboot`, `allow`, `park-rule`, `services [mod]`, `service-restart\|stop\|start <mod> <name>`, `service-log <mod> <name>`, `usb [mod]`, `vehicle <reading>…` |
 | an enabled mod's app (its `apps`, `state/apps.txt`) or service (by session) | its own mod only: `whoami`, `setting-get`, `setting-set <json>`, `services`, `service-restart\|stop\|start <name>`, `service-log <name>`, `usb`, `vehicle <reading>…` (the readings its mod.json lists) |
 | anyone else | `ping`, `version` |
 
@@ -42,6 +42,15 @@ Tested on a US EV6 (260507), 2026-10-27, started through the NEMESIS daemon (no 
 answers `<name> <value>` lines. hmgapid runs that service (mod `hmgapi`, the only
 service allowed to run `/system/framework/hmgapi-hook.jar`) while any enabled mod
 declares readings.
+
+**Car events.** A mod's event script (`"car_events"`) is one of its services, `on-<event>`,
+start `manual`, no restart, the event as its argument; the vehicle service starts it
+through `state/ctl` when the event comes and watches it in `services.status` (it puts the
+service back to `stopped` after each run, so the next `exited` is the next run's), and stops
+it when its time is up. Which mods asked: `state/events.txt` (`<mod> <event> <service|->`).
+`park-rule [door|closed|<10-1800>]` (root, shell, the HMG-API app): the owner's rule for
+when the car counts as parked, in `settings/park_rule`; no argument: the rule now (`door`
+until the owner picks).
 
 **Network keeper.** HMG-API's other own service, `hmgapi net`, runs
 `state/net.sh` (the only script a `hmgapi` service may run; the engine writes it,

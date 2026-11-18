@@ -2319,6 +2319,157 @@
         "ret": "void"
       },
       "about": "asks the cluster for the battery info; answered through onHandleBatteryInfoResp"
+    },
+    {
+      "id": "framework.car_services.power",
+      "kind": "field",
+      "of": "framework.car_services",
+      "find": {
+        "name": "POWER_SERVICE",
+        "type": "java.lang.String",
+        "static": true
+      }
+    },
+    {
+      "id": "framework.power_service",
+      "kind": "class",
+      "find": {
+        "name": "com.hkmc.power.IMicomPowerService"
+      },
+      "about": "the head unit's power service (com.hkmc.micom.power): power status, and the system-off responders it waits for before it shuts down"
+    },
+    {
+      "id": "framework.power_service_stub",
+      "kind": "class",
+      "find": {
+        "name": "com.hkmc.power.IMicomPowerService$Stub"
+      }
+    },
+    {
+      "id": "framework.power_service_stub.as_interface",
+      "kind": "method",
+      "of": "framework.power_service_stub",
+      "find": {
+        "name": "asInterface",
+        "params": [
+          "android.os.IBinder"
+        ],
+        "ret": "@framework.power_service",
+        "static": true
+      }
+    },
+    {
+      "id": "framework.power_service.power_status",
+      "kind": "method",
+      "of": "framework.power_service",
+      "find": {
+        "name": "getPowerStatus",
+        "params": [],
+        "ret": "int"
+      },
+      "about": "0 ACC on (the car is on), 1 logic on (off, the head unit still up), 2 ADM, 5 system ready, 6 delay mode, 7 preparing system off, 255 off (MicomPowerConstants.AccStatus)"
+    },
+    {
+      "id": "framework.power_service.register_system_off_responder",
+      "kind": "method",
+      "of": "framework.power_service",
+      "find": {
+        "name": "registerSystemOffResponder",
+        "params": [
+          "@framework.power_listener",
+          "java.lang.String"
+        ],
+        "ret": "void"
+      },
+      "about": "the service then tells the listener onSystemOff and waits for its confirmSystemOff (10 s at most) before it shuts the system down; dropped when the listener's process dies"
+    },
+    {
+      "id": "framework.power_service.unregister_system_off_responder",
+      "kind": "method",
+      "of": "framework.power_service",
+      "find": {
+        "name": "unregisterSystemOffResponder",
+        "params": [
+          "@framework.power_listener",
+          "java.lang.String"
+        ],
+        "ret": "void"
+      }
+    },
+    {
+      "id": "framework.power_service.confirm_system_off",
+      "kind": "method",
+      "of": "framework.power_service",
+      "find": {
+        "name": "confirmSystemOff",
+        "params": [
+          "@framework.power_listener",
+          "java.lang.String"
+        ],
+        "ret": "void"
+      },
+      "about": "a responder is done: once every responder has confirmed, the shutdown starts"
+    },
+    {
+      "id": "framework.power_listener",
+      "kind": "class",
+      "find": {
+        "name": "com.hkmc.power.IMicomPowerStatusListener"
+      }
+    },
+    {
+      "id": "framework.power_listener_stub",
+      "kind": "class",
+      "find": {
+        "name": "com.hkmc.power.IMicomPowerStatusListener$Stub"
+      },
+      "about": "HMG-API answers its callbacks with a plain binder (only the ones it reads); every callback is one-way"
+    },
+    {
+      "id": "framework.power_listener_stub.as_interface",
+      "kind": "method",
+      "of": "framework.power_listener_stub",
+      "find": {
+        "name": "asInterface",
+        "params": [
+          "android.os.IBinder"
+        ],
+        "ret": "@framework.power_listener",
+        "static": true
+      }
+    },
+    {
+      "id": "framework.power_listener_stub.power_status_changed",
+      "kind": "field",
+      "of": "framework.power_listener_stub",
+      "find": {
+        "name": "TRANSACTION_onPowerStatusChanged",
+        "type": "int",
+        "static": true
+      },
+      "about": "onPowerStatusChanged(status): sent on registration and on every change"
+    },
+    {
+      "id": "framework.power_listener_stub.system_off",
+      "kind": "field",
+      "of": "framework.power_listener_stub",
+      "find": {
+        "name": "TRANSACTION_onSystemOff",
+        "type": "int",
+        "static": true
+      },
+      "about": "onSystemOff(): the head unit is about to shut down; responders confirm with confirmSystemOff"
+    },
+    {
+      "id": "framework.bcm_listener_stub.doors",
+      "kind": "field",
+      "of": "framework.bcm_listener_stub",
+      "find": {
+        "name": "TRANSACTION_onDoorAllStateChanged",
+        "type": "int",
+        "static": true
+      },
+      "about": "onDoorAllStateChanged(unlock: driver, passenger, rear left, rear right; open: driver, passenger, rear left, rear right, trunk; hood): open 1, closed 0, -1 unknown; sent on registration and on change"
     }
   ]
 }
