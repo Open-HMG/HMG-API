@@ -16,6 +16,11 @@
   off the car only, on stock CarPlay libraries and NEMESIS's `libautoreceiver_infobank.so`
   build: the Wireless CarPlay/AA and EGMP Android Auto EV recipes come out the same, and the
   matcher never matched once in a wrong place under fuzzing.
+- **Catalogue updates merge themselves.** A pull request that only moves an existing
+  entry to the mod's next release (same author key, a newer final version, a signed
+  release of the mod's own repo, nothing else but the package's own description) is
+  merged once the Catalogue check passes (`tools/catalog.py bump`,
+  `catalog-automerge.yml`). New mods and anything else still wait for a maintainer.
 - **Maps from Car Reports: Elantra `CN7PE` (USA 260507), Elantra N 2024 `CN7NPE` and
   Kona `OSPE` (USA 260903), Niro EV `SG225EV` (Canada 260206).** All 351 points each,
   from rc.3 reports with code signatures (#252, #254, #257, #261), in the base map's
