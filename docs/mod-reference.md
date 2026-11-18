@@ -417,10 +417,10 @@ ble.startScan();
   HMG-API; Classic Bluetooth handles, L2CAP packet credits and command credits pass
   through to stock Bluedroid, so HFP calls, A2DP music and CarPlay/Android Auto
   pairing aren't disturbed. Controller `LE_Host_Support` is enabled only while an
-  open BLE session is active and restored to `(0, 0)` when the last session closes,
-  and the native filter returns to a pass-through. Turning Bluetooth off closes open
-  `Ble` clients with `closeReason() == "BT_OFF"` and re-attaches cleanly on the next
-  session once Bluetooth is back on.
+  open BLE session is active and restored to its prior setting when the last session
+  closes, and the native filter returns to a pass-through. Turning Bluetooth off closes
+  open `Ble` clients with `closeReason() == "BT_OFF"` and re-attaches cleanly on the
+  next session once Bluetooth is back on.
 - **Shared across mods:** several mods can scan and hold connections at the same time
   (up to four peripherals at once on controllers with dedicated LE ACL buffers;
   active scan uses a 33% duty cycle for audio coexistence and pauses briefly while a

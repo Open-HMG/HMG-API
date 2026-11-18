@@ -37,7 +37,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   - {@link #onPacket} never blocks on client sockets, HCI commands, ATT requests, or
  *     session locks;
  *   - {@code HCI_Write_LE_Host_Support(1, 1)} and the LE event mask are enabled only while
- *     at least one BLE session or peripheral link is active, and restored to {@code (0, 0)}
+ *     at least one BLE session or peripheral link is active, after reading the controller's
+ *     prior {@code LE_Host_Support} via {@code 0x0C6C}, and restored to that prior value
  *     as soon as the last session and link close;
  *   - if {@code HCI_LE_Read_Buffer_Size} reports {@code 0} (shared LE/Classic ACL buffers),
  *     scanning stays available while {@code CONNECT} is refused with
@@ -52,6 +53,7 @@ public final class BleCentral implements BleTransport.Receiver, BleGatt.HciComma
     public static final int HCI_DISCONNECT            = 0x0406;
     public static final int HCI_SET_EVENT_MASK        = 0x0C01;
     public static final int HCI_RESET                 = 0x0C03;
+    public static final int HCI_READ_LE_HOST_SUPPORT  = 0x0C6C;
     public static final int HCI_WRITE_LE_HOST_SUPPORT = 0x0C6D;
     public static final int HCI_LE_SET_EVENT_MASK     = 0x2001;
     public static final int HCI_LE_READ_BUFFER_SIZE   = 0x2002;
@@ -83,6 +85,7 @@ public final class BleCentral implements BleTransport.Receiver, BleGatt.HciComma
     });
 
     private volatile boolean leStackInitialized = false;
+    private volatile byte[] savedLeHostSupport = null;
 
     private volatile int waitingCmdOpcode = -1;
     private volatile byte[] waitingCmdResult = null;
@@ -155,6 +158,7 @@ public final class BleCentral implements BleTransport.Receiver, BleGatt.HciComma
             hardwareScanEnabled = false;
             pausedScanForConnect = false;
             leStackInitialized = false;
+            savedLeHostSupport = null;
             gatt.configureLeBuffers(0, 0);
             links = new ArrayList<BleGatt.Link>(linksByHandle.values());
             linksByHandle.clear();
@@ -200,6 +204,7 @@ public final class BleCentral implements BleTransport.Receiver, BleGatt.HciComma
         boolean needRestore;
         synchronized (stateLock) {
             leStackInitialized = false;
+            savedLeHostSupport = null;
             hardwareScanEnabled = false;
             pausedScanForConnect = false;
             needRestore = !activeSessions.isEmpty() || !scanSubscribers.isEmpty();
@@ -440,6 +445,7 @@ public final class BleCentral implements BleTransport.Receiver, BleGatt.HciComma
             }
             if (!transport.isReady()) {
                 leStackInitialized = false;
+                savedLeHostSupport = null;
                 hardwareScanEnabled = false;
                 pausedScanForConnect = false;
             }
@@ -474,7 +480,17 @@ public final class BleCentral implements BleTransport.Receiver, BleGatt.HciComma
     private void initControllerLeStack(BleSession session) throws IOException {
         gatt.configureLeBuffers(0, 0);
 
-        // 1. HCI_Set_Event_Mask: enable all defined Classic BR/EDR, PIN, SCO/eSCO, EIR, and SSP
+        // 1. HCI_Read_LE_Host_Support (0x0C6C): record the controller's prior setting once
+        //    before enabling LE host support so idle teardown restores what the car had.
+        if (savedLeHostSupport == null) {
+            byte[] prevHostRsp = sendHciCommandSync(HCI_READ_LE_HOST_SUPPORT, new byte[0], 2000);
+            if (prevHostRsp == null || prevHostRsp.length < 3 || prevHostRsp[0] != 0x00) {
+                throw new IOException("HCI_Read_LE_Host_Support failed");
+            }
+            savedLeHostSupport = new byte[] { prevHostRsp[1], prevHostRsp[2] };
+        }
+
+        // 2. HCI_Set_Event_Mask: enable all defined Classic BR/EDR, PIN, SCO/eSCO, EIR, and SSP
         //    events (AOSP HCI_DEFAULT_EVENT_MASK 0x1DBFF807_FFFFFFFF) + bit 61 (0x3E LE Meta Event).
         byte[] evtMask = new byte[] {
             (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
@@ -485,13 +501,13 @@ public final class BleCentral implements BleTransport.Receiver, BleGatt.HciComma
             throw new IOException("HCI_Set_Event_Mask failed");
         }
 
-        // 2. HCI_Write_LE_Host_Support(LE_Supported_Host=1, Simultaneous_LE_Host=1)
+        // 3. HCI_Write_LE_Host_Support(LE_Supported_Host=1, Simultaneous_LE_Host=1)
         byte[] hostRsp = sendHciCommandSync(HCI_WRITE_LE_HOST_SUPPORT, new byte[] { 0x01, 0x01 }, 2000);
         if (hostRsp == null || hostRsp.length < 1 || hostRsp[0] != 0x00) {
             throw new IOException("HCI_Write_LE_Host_Support failed");
         }
 
-        // 3. HCI_LE_Set_Event_Mask: try BT 4.2 mask (subevents 0x01..0x07 + 0x0A) first,
+        // 4. HCI_LE_Set_Event_Mask: try BT 4.2 mask (subevents 0x01..0x07 + 0x0A) first,
         //    falling back to BT 4.0 baseline (subevents 0x01..0x05) if rejected by controller.
         byte[] leMask42 = new byte[] { 0x7F, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
         byte[] maskRsp = sendHciCommandSync(HCI_LE_SET_EVENT_MASK, leMask42, 2000);
@@ -503,7 +519,7 @@ public final class BleCentral implements BleTransport.Receiver, BleGatt.HciComma
             }
         }
 
-        // 4. HCI_LE_Read_Buffer_Size (0x2002): require dedicated LE ACL buffers for GATT connections
+        // 5. HCI_LE_Read_Buffer_Size (0x2002): require dedicated LE ACL buffers for GATT connections
         byte[] bufRsp = sendHciCommandSync(HCI_LE_READ_BUFFER_SIZE, new byte[0], 2000);
         if (bufRsp == null || bufRsp.length < 4 || bufRsp[0] != 0x00) {
             throw new IOException("HCI_LE_Read_Buffer_Size failed");
@@ -525,16 +541,22 @@ public final class BleCentral implements BleTransport.Receiver, BleGatt.HciComma
     private void deinitControllerLeStack() {
         leStackInitialized = false;
         gatt.configureLeBuffers(0, 0);
+        byte[] restoreHost = savedLeHostSupport;
+        savedLeHostSupport = null;
         if (!transport.isReady()) return;
+        byte[] hostParams = (restoreHost != null && restoreHost.length >= 2)
+                ? new byte[] { restoreHost[0], restoreHost[1] }
+                : new byte[] { 0x00, 0x00 };
         try {
             sendHciCommandSync(HCI_LE_SET_EVENT_MASK, new byte[8], 1500);
-            sendHciCommandSync(HCI_WRITE_LE_HOST_SUPPORT, new byte[] { 0x00, 0x00 }, 1500);
+            sendHciCommandSync(HCI_WRITE_LE_HOST_SUPPORT, hostParams, 1500);
             byte[] classicEvtMask = new byte[] {
                 (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
                 (byte) 0x07, (byte) 0xF8, (byte) 0xBF, (byte) 0x1D
             };
             sendHciCommandSync(HCI_SET_EVENT_MASK, classicEvtMask, 1500);
-            info("LE host support restored to idle (0, 0)");
+            info("LE host support restored to idle ("
+                    + (hostParams[0] & 0xFF) + ", " + (hostParams[1] & 0xFF) + ")");
         } catch (IOException e) {
             warn("failed restoring LE host support on idle: " + e.getMessage());
         }
@@ -1221,6 +1243,9 @@ public final class BleCentral implements BleTransport.Receiver, BleGatt.HciComma
                 if (opcode == HCI_RESET) {
                     hardwareScanEnabled = false;
                     pausedScanForConnect = false;
+                }
+                if (opcode == HCI_RESET || opcode == HCI_WRITE_LE_HOST_SUPPORT) {
+                    savedLeHostSupport = null;
                 }
                 if (leStackInitialized) {
                     info(String.format(Locale.US,

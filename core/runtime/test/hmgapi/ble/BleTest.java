@@ -55,6 +55,7 @@ public final class BleTest {
         testColdBootResetAndAddrTypeFallback();
         testRealtekVeepeakGattSmpL2capAndPaddedAdv();
         testDiscoveryFailureCleansUpZombieLink();
+        testPriorLeHostSupportRestoredOnIdle();
         System.exit(fail);
     }
 
@@ -269,6 +270,8 @@ public final class BleTest {
             }
         });
 
+        check("init: HCI_Read_LE_Host_Support (0x0C6C) read before first session",
+                Integer.valueOf(1), Integer.valueOf(ctl.readLeHostSupportCount.get()));
         check("init: HCI_Write_LE_Host_Support(1, 1) enabled on active session",
                 Boolean.TRUE, Boolean.valueOf(ctl.leHostSupportEnabled.get()));
         check("init: HCI_Set_Event_Mask preserves Classic bits + enables bit 61",
@@ -628,7 +631,7 @@ public final class BleTest {
         });
 
         // Simulate stock Bluedroid cold-boot HCI_Reset (0x0C03) + HCI_Set_Event_Mask wiping bit 61 & LE Host Support
-        ctl.leHostSupportEnabled.set(false);
+        ctl.setLeHostSupport(0, 0);
         ctl.lastEventMaskHex = "ffffffff07f8bf1d";
         ctl.emitCommandComplete(BleCentral.HCI_RESET, new byte[] { 0x00 });
         ctl.emitCommandComplete(BleCentral.HCI_SET_EVENT_MASK, new byte[] { 0x00 });
@@ -642,7 +645,7 @@ public final class BleTest {
                 "ffffffff07f8bf3d", ctl.lastEventMaskHex);
 
         // Also test onAdapterOn() + 0x0C Command Disallowed healing + addrType 0 -> 1 fallback
-        ctl.leHostSupportEnabled.set(false);
+        ctl.setLeHostSupport(0, 0);
         central.onAdapterOn();
         check("cold-boot: onAdapterOn() re-enables LE_Host_Support for active session",
                 Boolean.TRUE, Boolean.valueOf(ctl.leHostSupportEnabled.get()));
@@ -655,7 +658,9 @@ public final class BleTest {
         check("fallback: connected using peerAddrType=1", Integer.valueOf(1), Integer.valueOf(ctl.lastConnectedAddrType.get()));
 
         ble.close();
-        for (int i = 0; i < 60 && ctl.listening.get(); i++) Thread.sleep(25);
+        for (int i = 0; i < 60 && (ctl.listening.get() || ctl.leHostSupportEnabled.get()); i++) Thread.sleep(25);
+        check("fallback: prior (0, 0) LE_Host_Support preserved across 0x0C re-init and restored on idle",
+                Boolean.FALSE, Boolean.valueOf(ctl.leHostSupportEnabled.get()));
         sp.closeAll();
     }
 
@@ -813,6 +818,53 @@ public final class BleTest {
         ble.close();
         for (int i = 0; i < 60 && ctl.listening.get(); i++) Thread.sleep(25);
         sp.closeAll();
+    }
+
+    // -------------------------------------------------------------------------
+    // 11. Prior LE_Host_Support (0x0C6C) preserved when stock stack already had LE on
+    // -------------------------------------------------------------------------
+    private static void testPriorLeHostSupportRestoredOnIdle() throws Exception {
+        // 11a. Stock stack started with LE_Host_Support = (1, 0): active session sets (1, 1),
+        //      and idle teardown restores exact (1, 0) read via 0x0C6C.
+        {
+            final FakeController ctl = new FakeController();
+            ctl.setLeHostSupport(1, 0);
+            final BleCentral central = new BleCentral(ctl);
+
+            StreamPair sp = new StreamPair(16384);
+            startServerWorker(central, sp, "batt");
+            Ble ble = Ble.attach(sp.clientIn, sp.clientOut, sp.clientClose, new Ble.SimpleListener());
+
+            check("prior-le: 0x0C6C read once before writing (1, 1)",
+                    Integer.valueOf(1), Integer.valueOf(ctl.readLeHostSupportCount.get()));
+            check("prior-le: active session enables (1, 1)",
+                    "1,1", ctl.leSupportedHost + "," + ctl.simultaneousLeHost);
+
+            ble.close();
+            for (int i = 0; i < 60 && ctl.listening.get(); i++) Thread.sleep(25);
+            check("prior-le: idle restores exact prior (1, 0) from 0x0C6C",
+                    "1,0", ctl.leSupportedHost + "," + ctl.simultaneousLeHost);
+            check("prior-le: LE_Supported_Host stays enabled on car that had it on",
+                    Boolean.TRUE, Boolean.valueOf(ctl.leHostSupportEnabled.get()));
+            sp.closeAll();
+        }
+
+        // 11b. Stock stack started with LE_Host_Support = (1, 1): idle teardown leaves (1, 1) on.
+        {
+            final FakeController ctl = new FakeController();
+            ctl.setLeHostSupport(1, 1);
+            final BleCentral central = new BleCentral(ctl);
+
+            StreamPair sp = new StreamPair(16384);
+            startServerWorker(central, sp, "batt");
+            Ble ble = Ble.attach(sp.clientIn, sp.clientOut, sp.clientClose, new Ble.SimpleListener());
+
+            ble.close();
+            for (int i = 0; i < 60 && ctl.listening.get(); i++) Thread.sleep(25);
+            check("prior-le: idle keeps (1, 1) when controller started with (1, 1)",
+                    "1,1", ctl.leSupportedHost + "," + ctl.simultaneousLeHost);
+            sp.closeAll();
+        }
     }
 
     private static void waitUntilScanState(FakeController ctl, boolean want) throws InterruptedException {
@@ -981,11 +1033,20 @@ public final class BleTest {
         volatile String lastLeEventMaskHex = "";
         final AtomicBoolean ready = new AtomicBoolean(false);
         final AtomicBoolean listening = new AtomicBoolean(false);
+        volatile int leSupportedHost = 0;
+        volatile int simultaneousLeHost = 0;
         final AtomicBoolean leHostSupportEnabled = new AtomicBoolean(false);
+        final AtomicInteger readLeHostSupportCount = new AtomicInteger(0);
         final AtomicBoolean leEventMaskCleared = new AtomicBoolean(false);
         final AtomicBoolean rejectNextCreateConnWith0C = new AtomicBoolean(false);
         final AtomicBoolean failDiscoveryReads = new AtomicBoolean(false);
         final AtomicInteger initCount = new AtomicInteger(0);
+
+        void setLeHostSupport(int leSupported, int simultaneous) {
+            this.leSupportedHost = leSupported & 0xFF;
+            this.simultaneousLeHost = simultaneous & 0xFF;
+            this.leHostSupportEnabled.set(this.leSupportedHost != 0);
+        }
         final AtomicInteger shutdownCount = new AtomicInteger(0);
         final AtomicInteger createConnCount = new AtomicInteger(0);
         final AtomicInteger lastConnectedAddrType = new AtomicInteger(-1);
@@ -1190,8 +1251,17 @@ public final class BleTest {
                 emitCommandComplete(opcode, new byte[] { 0x00 });
                 return;
             }
+            if (opcode == BleCentral.HCI_READ_LE_HOST_SUPPORT) {
+                readLeHostSupportCount.incrementAndGet();
+                emitCommandComplete(opcode, new byte[] {
+                    0x00,
+                    (byte) (leSupportedHost & 0xFF),
+                    (byte) (simultaneousLeHost & 0xFF)
+                });
+                return;
+            }
             if (opcode == BleCentral.HCI_WRITE_LE_HOST_SUPPORT && params.length >= 2) {
-                leHostSupportEnabled.set(params[0] != 0);
+                setLeHostSupport(params[0] & 0xFF, params[1] & 0xFF);
                 emitCommandComplete(opcode, new byte[] { 0x00 });
                 return;
             }
