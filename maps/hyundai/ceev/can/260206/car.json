@@ -158,5 +158,14 @@
     "panel.home.build_views",
     "panel.test_gate.on",
     "themesettings.split_item.type"
-  ]
+  ],
+  "missing": {
+    "framework.network_management_service": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.network_management_service.start_access_point": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.wifi_configuration": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.wifi_configuration.ap_mode": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.wifi_configuration.connectivity_psk": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.wifi_configuration.connectivity_ssid": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.wifi_configuration.is_24ghz_band": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)"
+  }
 }

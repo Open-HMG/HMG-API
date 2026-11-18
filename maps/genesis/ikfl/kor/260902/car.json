@@ -126,6 +126,13 @@
     "framework.hscan_service.battery_12v_sensor_error": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "framework.hscan_service.battery_12v_sensor_invalid": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "framework.hscan_service.battery_12v_sensor_state": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.network_management_service": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.network_management_service.start_access_point": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.wifi_configuration": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.wifi_configuration.ap_mode": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.wifi_configuration.connectivity_psk": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.wifi_configuration.connectivity_ssid": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.wifi_configuration.is_24ghz_band": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "panel.test_gate.on": "not confirmed: this map's name (py) was borrowed from the US maps, and on the Korean 260902 builds read from stock files that name is another method (the gate is pB there); a Car Report from HMG-API with code signatures maps it",
     "themesettings.split_item.type": "0 methods match in com.android.themesettings.splitscreensettings.SplitScreenItem"
   },

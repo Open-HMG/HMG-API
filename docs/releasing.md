@@ -61,7 +61,16 @@ without new features is still a PATCH.
 The release PR for each (branch `release/v<version>`, as for 1.0.2): `HMGAPI_VERSION`,
 the CHANGELOG ("Unreleased" becomes "<version> (date)"), and
 `.github/release-notes/v<version>.md`. A maintainer merges it and pushes the tag; the
-release workflow builds a **draft**; a maintainer checks it on a car and publishes.
+release workflow builds a **draft** once its `release` environment is approved. A
+maintainer checks the draft off-car: every file in `SHA256SUMS`, the version in the
+update package, and the bundled mods as `tools/release-mods.txt` pins them. Then:
+
+- **an alpha, beta or rc is published right away**, as a pre-release. Owners testing it
+  on their cars is what it's for, so it doesn't wait for a maintainer's own car;
+- **a final** is checked on a car first, then published.
+
+A core pre-release that bundles a mod's pre-release needs that mod's release published
+first: `tools/release-mods.txt` pins its download, which a draft doesn't serve.
 
 ## Hotfixes
 
