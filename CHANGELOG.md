@@ -16,6 +16,18 @@
   off the car only, on stock CarPlay libraries and NEMESIS's `libautoreceiver_infobank.so`
   build: the Wireless CarPlay/AA and EGMP Android Auto EV recipes come out the same, and the
   matcher never matched once in a wrong place under fuzzing.
+- **A swapped voice button no longer leaves the car's voice assistant to start by
+  itself.** A binding's `send` injected the key with scan code 0. For a sent hold of
+  the voice button, the car makes the long press itself
+  (`ModeKeyDispatcher.generateLongKeyEventForPtt`: device 5, the real button's scan
+  code), and Android pairs a key's up with its down by device, source, key code and
+  scan code, so HMG-API's up never ended that down: the button stayed down in the
+  window on screen (Android Auto). The next key the car or HMG-API consumed, or the
+  reversing camera taking the screen, made Android cancel it there, and GPM took the
+  cancelled up for a release and started the car's own assistant, minutes later and
+  with no press. A sent key now carries the press's scan code when it is the same
+  button; for another button, a car repeat with a different scan code is logged, and
+  the input log line says the scan code sent (#301).
 - **Car events: mods can tidy up when you park and before the head unit shuts down.**
   A mod asks for them in mod.json (`"car_events": {"parked": {"script": "bin/x.sh"},
   "shutdown": {}}`): its script runs (as the user it gives, with its own log), its apps
