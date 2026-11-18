@@ -1297,5 +1297,40 @@
     ],
     "ret": "int",
     "static": false
+  },
+  "framework.network_management_service": {
+    "class": "com.android.server.NetworkManagementService"
+  },
+  "framework.network_management_service.start_access_point": {
+    "method": "startAccessPoint",
+    "params": [
+      "android.net.wifi.WifiConfiguration",
+      "java.lang.String"
+    ],
+    "ret": "void",
+    "static": false
+  },
+  "framework.wifi_configuration": {
+    "class": "android.net.wifi.WifiConfiguration"
+  },
+  "framework.wifi_configuration.ap_mode": {
+    "field": "apMode",
+    "type": "int",
+    "static": false
+  },
+  "framework.wifi_configuration.connectivity_ssid": {
+    "field": "ConnectivitySSID",
+    "type": "java.lang.String",
+    "static": false
+  },
+  "framework.wifi_configuration.connectivity_psk": {
+    "field": "ConnectivityPSK",
+    "type": "java.lang.String",
+    "static": false
+  },
+  "framework.wifi_configuration.is_24ghz_band": {
+    "field": "is24GHzBand",
+    "type": "boolean",
+    "static": false
   }
 }
