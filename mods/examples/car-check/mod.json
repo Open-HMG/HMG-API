@@ -5,7 +5,7 @@
   "hmgapi": ">=1.0.0",
   "authors": ["VysseCodes"],
   "license": "AGPL-3.0",
-  "description": "For test sessions: shows a notice for every button binding and projection event it gets, sets Android Auto to 200 DPI without the tap limit, and may use every vehicle reading and command. Remove it after testing.",
+  "description": "For test sessions: shows a notice for every button binding, projection event and car event it gets (and logs each car event from a script), sets Android Auto to 200 DPI without the tap limit, and may use every vehicle reading and command. Remove it after testing.",
   "live": true,
   "apps": [
     { "apk": "app/CarCheck.apk", "package": "dev.hmgapi.example.carcheck" }
@@ -30,7 +30,7 @@
     "events": true
   },
   "vehicle": {
-    "read": ["gear.park", "parking_brake", "speed", "moving", "driving.restricted", "steering.angle", "pedal.accel",
+    "read": ["gear.park", "parking_brake", "power", "doors.closed", "parked", "speed", "moving", "driving.restricted", "steering.angle", "pedal.accel",
              "brake.pressure", "battery12v.soc", "hv.soc", "hv.health", "hv.ready", "hv.conditioning", "hv.conditioning_active",
              "hv.battery_temp_min", "hv.conditioning_failure", "conditioning.state", "charging",
              "odometer", "seat_heat.driver", "seat_heat.passenger", "seat_heat.rear_left", "seat_heat.rear_right",
@@ -39,5 +39,11 @@
              "hv.energy", "hv.capacity_nominal", "range", "charge.target_ac", "charge.target_dc", "charge.minutes_dc",
              "aux.climate_power", "aux.other_ecu_power", "aux.battery_conditioning_power", "aux.power", "drive_mode"],
     "commands": ["charge_door", "seat_heat", "seat_vent", "wheel_heat", "conditioning", "ambient_light", "guide_lines", "rear_camera"]
+  },
+  "car_events": {
+    "parked": { "script": "bin/event.sh" },
+    "unparked": { "script": "bin/event.sh" },
+    "shutdown": { "script": "bin/event.sh" },
+    "wake": { "script": "bin/event.sh" }
   }
 }

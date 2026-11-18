@@ -268,6 +268,88 @@
         "static": true
       },
       "about": "the speed sensor (offered: the phone limits taps while moving)"
+    },
+    {
+      "id": "gpm.connection_manager",
+      "kind": "class",
+      "find": {
+        "name": "com.google.android.projection.service.GalConnectionManager"
+      },
+      "about": "GPM's Android Auto session manager"
+    },
+    {
+      "id": "gpm.connection_manager.send_byebye",
+      "kind": "method",
+      "of": "gpm.connection_manager",
+      "find": {
+        "name": "sessionSendByeByeRequest",
+        "params": [
+          "int"
+        ],
+        "ret": "void"
+      },
+      "about": "ends the session the way the protocol does (ByeByeRequest, reason: 1 user selection; this GPM knows 1-5)"
+    },
+    {
+      "id": "gpm.receiver_service.connection_manager",
+      "kind": "field",
+      "of": "gpm.receiver_service",
+      "find": {
+        "name": "mConnectionManager",
+        "type": "@gpm.connection_manager"
+      }
+    },
+    {
+      "id": "gpm.receiver_service.on_create",
+      "kind": "method",
+      "of": "gpm.receiver_service",
+      "find": {
+        "name": "onCreate",
+        "params": [],
+        "ret": "void"
+      },
+      "about": "GPM's service starts (once per GPM process)"
+    },
+    {
+      "id": "gpm.wireless_explorer",
+      "kind": "class",
+      "find": {
+        "name": "com.google.android.projection.protocol.WirelessExplorer"
+      },
+      "about": "GPM's wireless Android Auto (Bluetooth start, Wi-Fi session)"
+    },
+    {
+      "id": "gpm.receiver_service.wireless_explorer",
+      "kind": "field",
+      "of": "gpm.receiver_service",
+      "find": {
+        "name": "mWirelessExplorer",
+        "type": "@gpm.wireless_explorer"
+      }
+    },
+    {
+      "id": "gpm.wireless_explorer.connected_device",
+      "kind": "method",
+      "of": "gpm.wireless_explorer",
+      "find": {
+        "name": "getConnectedDevice",
+        "params": [],
+        "ret": "java.lang.String"
+      },
+      "about": "the Bluetooth address of the phone on wireless Android Auto, or null"
+    },
+    {
+      "id": "gpm.receiver_service.connect_wireless_session",
+      "kind": "method",
+      "of": "gpm.receiver_service",
+      "find": {
+        "name": "connectWirelessSession",
+        "params": [
+          "java.lang.String"
+        ],
+        "ret": "void"
+      },
+      "about": "starts wireless Android Auto with the phone at this Bluetooth address (what Phone Projection's connect does)"
     }
   ]
 }
