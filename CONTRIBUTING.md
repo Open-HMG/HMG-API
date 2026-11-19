@@ -32,8 +32,9 @@ Thanks for helping. Bug reports, Car Reports and ideas go in
 - The wiki lives in `wiki/`; changes there are published when merged.
 - Who reviews what (`.github/CODEOWNERS`): VysseCodes reviews root, signing, `/system`
   writes and CI (`.github/`, `core/hmgapid/`, `core/zygote/`, `core/loader/`,
-  `install/`, `tools/lpatch/`, `SECURITY.md`, `CLAUDE.md`); everything else needs one
-  of the Open-HMG maintainers.
+  `install/`, `tools/lpatch/`, `SECURITY.md`, `CLAUDE.md`) and every new mod in the
+  catalogue (`catalog/`, `maps/authors.json`; a listed mod's version bump merges by
+  itself); everything else needs one of the Open-HMG maintainers.
 
 ## Rules
 

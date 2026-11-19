@@ -11,3 +11,9 @@
 /tools/lpatch/      @VysseCodes
 /SECURITY.md        @VysseCodes
 /CLAUDE.md          @VysseCodes
+
+# The mod catalogue: every new mod is reviewed before it is listed, whoever its author
+# (wiki/Making-mods.md, "Listing your mod"). Version bumps of a listed mod merge by
+# themselves (catalog-automerge.yml).
+/catalog/           @VysseCodes
+/maps/authors.json  @VysseCodes

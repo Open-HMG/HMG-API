@@ -78,9 +78,24 @@ a HMG-API release carries the list).
 
 A new version is the same steps with the new zip: the entry's author key can't
 change (only your key updates your mod), and its version can't go back. A pull
-request changes only its own author's entry in the trusted list. Listing means the
-package is whole and signed by you; the maintainer reviews each new author before
-merging.
+request changes only its own author's entry in the trusted list. A new version of a
+listed mod is merged automatically once those checks pass.
+
+**Each new mod is reviewed before it's listed**, also when its author already has one
+listed. The review looks at what the mod does on the car:
+
+- **Hooks go through HMG-API's hook points**, not app classes or methods by name. If
+  the mod needs a point that isn't in the catalogue, open a pull request (or a hook
+  request issue) for it in HMG-API first; once it's merged, the mod uses it.
+- **Car commands go through HMG-API** (`hmgapi-client.jar`'s `command(...)`), so the
+  owner's consent, their switches (such as *Block mod light control*) and the leases
+  apply. A command HMG-API doesn't have yet is added there first, and each new one is
+  reviewed on its own ([vehicle commands](https://github.com/Open-HMG/HMG-API/blob/main/docs/vehicle-commands.md)).
+  No CAN frames of the mod's own.
+- **A `"system"` list** in `mod.json` when the mod works only on some cars or
+  software versions, so owners see that before installing.
+- `/system` changes only through the engine (stock check, backup, exact restore),
+  and no manufacturer apps or libraries in the package.
 
 ## Scripts on the head unit
 
