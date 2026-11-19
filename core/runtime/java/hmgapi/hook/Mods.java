@@ -230,6 +230,7 @@ final class Mods {
             if (f.isFile()) hmgapiSettings = new JSONObject(read(f));
             // the owner's switch from the HMG-API app (hmgapid allow ota_updates): read here, in the zygote (root)
             if (new File(SETTINGS, "allow/ota_updates").isFile()) hmgapiSettings.put("updates", true);
+            if (new File(SETTINGS, "allow/home_wifi").isFile()) hmgapiSettings.put("home_wifi", true);
         } catch (Exception e) {
             HmgApi.e("mods: hmgapi.json", e);
         }
@@ -296,7 +297,8 @@ final class Mods {
         info.description = mod.optString("description", "");
         if (mod.has("system")) {
             Map<String, Object> hmgapi = hmgapiRaw();
-            String why = SystemCheck.check(Json.object(read(new File(dir, "mod.json"))).get("system"), facts(hmgapi));
+            Map<String, Object> mj = Json.object(read(new File(dir, "mod.json")));
+            String why = SystemCheck.check(mj.get("system"), facts(hmgapi), SystemCheck.asksHotspot(mj));
             if (why != null && !SystemCheck.ignored(hmgapi, id)) {
                 info.state = "unsupported";
                 info.error = why;

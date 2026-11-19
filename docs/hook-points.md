@@ -17,21 +17,47 @@ Every point and map lives here, in HMG-API, including the ones only a mod in its
 uses (the wireless mod's, for one): a mod gets new points through an HMG-API release and its
 mod SDK ([mod-repos.md](mod-repos.md), section 4).
 
-351 hook points. **Cars** (`maps/`):
+391 hook points. **Cars** (`maps/`):
 
 | Car | Map | Points |
 |---|---|---|
-| Hyundai Ioniq 6 CAN 260206 | checked on a car | 351 of 351 |
-| Hyundai Palisade USA 260903 | mapped on cars by HMG-API's own mapper | 343 of 351 |
-| Hyundai Ioniq 5 CAN 260206 | mapped from stock files | 351 of 351 |
-| Hyundai Ioniq 5 USA 260507 | mapped from stock files | 351 of 351 |
-| Hyundai Ioniq 5 USA 260903 | mapped on cars by HMG-API's own mapper | 351 of 351 |
-| Kia EV6 CAN 260206 | mapped from stock files | 351 of 351 |
-| Kia EV6 USA 260507 | checked on a car | 351 of 351 |
-| Kia Carnival USA 260507 | mapped on cars by HMG-API's own mapper | 343 of 351 |
-| Kia Sportage USA 260507 | mapped on cars by HMG-API's own mapper | 351 of 351 |
-| Kia Telluride USA 260507 | mapped on cars by HMG-API's own mapper | 351 of 351 |
-| Kia Niro EV USA 260507 | mapped on cars by HMG-API's own mapper | 343 of 351 |
+| Genesis G70 CAN 260903 | mapped on cars by HMG-API's own mapper | 351 of 391 |
+| Genesis G70 KOR 260902 | mapped on cars by HMG-API's own mapper | 341 of 391 |
+| Genesis G70 USA 260507 | mapped on cars by HMG-API's own mapper | 325 of 391 |
+| Hyundai Ioniq 6 CAN 260206 | checked on a car | 351 of 391 |
+| Hyundai Ioniq 6 KOR 260902 | mapped on cars by HMG-API's own mapper | 333 of 391 |
+| Hyundai Ioniq 6 SGP 260907 | mapped on cars by HMG-API's own mapper | 312 of 391 |
+| Hyundai Ioniq 6 USA 260507 | mapped from stock files | 351 of 391 |
+| Hyundai Ioniq 6 USA 260903 | checked on a car | 391 of 391 |
+| Hyundai Elantra N USA 260903 | mapped on cars by HMG-API's own mapper | 351 of 391 |
+| Hyundai Avante KOR 260902 | mapped on cars by HMG-API's own mapper | 351 of 391 |
+| Hyundai Elantra USA 260507 | mapped on cars by HMG-API's own mapper | 351 of 391 |
+| Hyundai Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N, Palisade 2020-22 CAN 260206 | mapped from stock files | 391 of 391 |
+| Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902 | mapped on cars by HMG-API's own mapper | 351 of 391 |
+| Hyundai Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N, Palisade 2020-22 USA 260507 | mapped from stock files | 391 of 391 |
+| Hyundai Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N, Palisade 2020-22 USA 260903 | mapped from stock files | 391 of 391 |
+| Hyundai Palisade USA 260903 | mapped on cars by HMG-API's own mapper | 343 of 391 |
+| Hyundai Ioniq 5 CAN 260206 | mapped from stock files | 391 of 391 |
+| Hyundai Ioniq 5 KOR 260902 | mapped from stock files | 391 of 391 |
+| Hyundai Ioniq 5 USA 260507 | mapped from stock files | 391 of 391 |
+| Hyundai Ioniq 5 USA 260903 | mapped from stock files | 391 of 391 |
+| Hyundai Kona USA 260903 | mapped on cars by HMG-API's own mapper | 351 of 391 |
+| Hyundai Creta Electric IND 260430 | mapped on cars by HMG-API's own mapper | 352 of 391 |
+| Hyundai Creta IND 260430 | mapped on cars by HMG-API's own mapper | 338 of 391 |
+| Kia K3 KOR 260902 | mapped on cars by HMG-API's own mapper | 323 of 391 |
+| Kia EV6 CAN 260206 | mapped from stock files | 391 of 391 |
+| Kia EV6 IND 260430 | mapped on cars by HMG-API's own mapper | 351 of 391 |
+| Kia EV6 KOR 260902 | mapped on cars by HMG-API's own mapper | 318 of 391 |
+| Kia EV6 USA 260507 | checked on a car | 391 of 391 |
+| Kia Carnival USA 260507 | mapped from stock files | 391 of 391 |
+| Kia K5, Sorento, Stinger, Soul, Seltos 2021, Niro 2020-21, Telluride 2020-21 CAN 260206 | mapped from stock files | 391 of 391 |
+| Kia K5, Sorento, Stinger, Seltos, Soul, Niro, Mohave, K7, Morning, Ray KOR 260902 | mapped from stock files | 391 of 391 |
+| Kia K5, Sorento, Stinger, Soul, Seltos 2021, Niro 2020-22, Cadenza, Telluride 2020-21 USA 260507 | mapped from stock files | 391 of 391 |
+| Kia Sportage (and Hybrid, Plug-in Hybrid), Forte, Carnival 2022, Niro Hybrid and Plug-in Hybrid, Soul, Seltos 2024 USA 260507 | mapped from stock files | 391 of 391 |
+| Kia Telluride USA 260507 | mapped from stock files | 391 of 391 |
+| Kia Niro EV CAN 260206 | mapped on cars by HMG-API's own mapper | 351 of 391 |
+| Kia Niro, Sportage, Carnival, Telluride, Forte, Soul, Seltos 2024 CAN 260206 | mapped from stock files | 391 of 391 |
+| Kia Niro EV USA 260507 | mapped from stock files | 391 of 391 |
 
 In the tables, **Cars** is "all" when every car above has the point, otherwise the cars without it.
 
@@ -55,6 +81,13 @@ Android framework and the car's service interfaces (any process).
 | `framework.io_bridge` | class | `libcore.io.IoBridge` |  | all |
 | `framework.io_bridge.connect` | method | `static connect(java.io.FileDescriptor, java.net.InetAddress, int)` → boolean | a socket connects (HMG-API's over-the-air update block) | all |
 | `framework.io_bridge.connect_timeout` | method | `static connect(java.io.FileDescriptor, java.net.InetAddress, int, int)` → boolean |  | all |
+| `framework.network_management_service` | class | `com.android.server.NetworkManagementService` | Android's network management service (services.jar, in system_server): it tells netd how to run the hotspot | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.network_management_service.start_access_point` | method | `startAccessPoint(android.net.wifi.WifiConfiguration, String)` → void | the head unit's access point starts (config, interface). Some builds start the projection AP (apMode 2) with the hotspot's name and key instead of the connectivity ones the phone is given; HMG-API puts those in | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.wifi_configuration` | class | `android.net.wifi.WifiConfiguration` |  | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.wifi_configuration.ap_mode` | field | `apMode`: int | HKMC's access point mode: 2 is the AP for wireless CarPlay and Android Auto (setWifiApEnabledForConnectivity) | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.wifi_configuration.connectivity_ssid` | field | `ConnectivitySSID`: String | the projection AP's network name, the one the phone is given | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.wifi_configuration.connectivity_psk` | field | `ConnectivityPSK`: String | the projection AP's key, the one the phone is given | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.wifi_configuration.is_24ghz_band` | field | `is24GHzBand`: boolean | the hotspot runs on 2.4 GHz (channel24GHzBand) instead of channel; newer builds ignore it for the projection AP | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
 | `framework.navigation_cluster` | class | `com.hkmc.cluster.NavigationCluster` | Hyundai/Kia's API to the instrument cluster and HUD (navigation data) | all |
 | `framework.gpm_manager` | class | `com.hkmc.gpm.GpmManager` | the Android Auto (GPM) service's API | all |
 | `framework.gpm_manager.new` | ctor | `new (android.content.Context)` |  | all |
@@ -141,10 +174,10 @@ Android framework and the car's service interfaces (any process).
 | `framework.hscan_service.battery_12v_soc` | method | `getBatSoc()` → int | 12V battery state of charge, % | all |
 | `framework.hscan_service.hv_health` | method | `getXEV_Bms_GDS_SOH()` → int |  | all |
 | `framework.hscan_service.charging_status` | method | `getChargingStatus()` → int |  | all |
-| `framework.hscan_service.battery_12v_sensor_state` | method | `getBATSNSRState()` → byte | 12V battery sensor's state (raw) | not on Hyundai Palisade USA 260903, Kia Carnival USA 260507, Kia Niro EV USA 260507 |
-| `framework.hscan_service.battery_12v_sensor_invalid` | method | `getBATSNSRInvalid()` → byte | 12V battery sensor's invalid flag (raw) | not on Hyundai Palisade USA 260903, Kia Carnival USA 260507, Kia Niro EV USA 260507 |
-| `framework.hscan_service.battery_12v_sensor_error` | method | `getBATSNSRError()` → byte | 12V battery sensor's error flag (raw) | not on Hyundai Palisade USA 260903, Kia Carnival USA 260507, Kia Niro EV USA 260507 |
-| `framework.hscan_service.battery_12v_saver` | method | `get_BAT_AuxBattOpt()` → byte | the Auxiliary Battery Saver option (raw) | not on Hyundai Palisade USA 260903, Kia Carnival USA 260507, Kia Niro EV USA 260507 |
+| `framework.hscan_service.battery_12v_sensor_state` | method | `getBATSNSRState()` → byte | 12V battery sensor's state (raw) | not on Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 KOR 260902, Hyundai Palisade USA 260903, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `framework.hscan_service.battery_12v_sensor_invalid` | method | `getBATSNSRInvalid()` → byte | 12V battery sensor's invalid flag (raw) | not on Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 KOR 260902, Hyundai Palisade USA 260903, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `framework.hscan_service.battery_12v_sensor_error` | method | `getBATSNSRError()` → byte | 12V battery sensor's error flag (raw) | not on Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 KOR 260902, Hyundai Palisade USA 260903, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `framework.hscan_service.battery_12v_saver` | method | `get_BAT_AuxBattOpt()` → byte | the Auxiliary Battery Saver option (raw) | not on Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 KOR 260902, Hyundai Palisade USA 260903, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
 | `framework.car_services` | class | `com.hkmc.Service` | the car services' registered names | all |
 | `framework.car_services.system` | field | `static SYSTEM_SERVICE`: String |  | all |
 | `framework.car_services.hev` | field | `static HEV_SERVICE`: String |  | all |
@@ -238,18 +271,41 @@ Android framework and the car's service interfaces (any process).
 | `framework.bcm_service.ast_seat_heat_option` | method | `getAstSeatHeatOption()` → int |  | all |
 | `framework.bcm_service.rl_seat_heat_option` | method | `getRLSeatHeatOption()` → int | 1 on the EV6: 2 levels, no ventilation | all |
 | `framework.bcm_service.rr_seat_heat_option` | method | `getRRSeatHeatOption()` → int |  | all |
-| `framework.bcm_service.batt_cond_indicator` | method | `getBattCondIndSta()` → int | battery conditioning indicator: 1 conditioning, 0 not (as Launchpad reads it) | all |
-| `framework.hev_flag.batt_cond_failure` | field | `static BMS_BATTCONDFAILPOPUP`: int | battery conditioning failure popup (raw; -1 seen when nothing's wrong) | all |
-| `framework.car_services.cluster` | field | `static CLUSTER_SERVICE`: String |  | all |
-| `framework.cluster_service` | class | `com.hkmc.cluster.IClusterService` |  | all |
-| `framework.cluster_service_stub` | class | `com.hkmc.cluster.IClusterService$Stub` |  | all |
-| `framework.cluster_service_stub.as_interface` | method | `static asInterface(android.os.IBinder)` → framework.cluster_service |  | all |
-| `framework.cluster_listener` | class | `com.hkmc.cluster.INavigationClusterListener` |  | all |
-| `framework.cluster_listener_stub` | class | `com.hkmc.cluster.INavigationClusterListener$Stub` | HMG-API answers its callbacks with a plain binder (only the ones it reads) | all |
-| `framework.cluster_listener_stub.as_interface` | method | `static asInterface(android.os.IBinder)` → framework.cluster_listener |  | all |
-| `framework.cluster_listener_stub.battery_info` | field | `static TRANSACTION_onHandleBatteryInfoResp`: int | onHandleBatteryInfoResp(int[8]): [1] minimum pack temperature (whole C), [5] conditioning indicator; the answer to requestBatteryInfoReq, sent to every listener | all |
-| `framework.cluster_service.add_listener` | method | `addNavigationClusterListener(framework.cluster_listener)` → void | the service keeps a list and calls every listener: the navigation's own stays registered | all |
-| `framework.cluster_service.battery_info` | method | `requestBatteryInfoReq()` → void | asks the cluster for the battery info; answered through onHandleBatteryInfoResp | all |
+| `framework.bcm_service.batt_cond_indicator` | method | `getBattCondIndSta()` → int | battery conditioning indicator: 1 conditioning, 0 not (as Launchpad reads it) | not on Genesis G70 USA 260507, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `framework.hev_flag.batt_cond_failure` | field | `static BMS_BATTCONDFAILPOPUP`: int | battery conditioning failure popup (raw; -1 seen when nothing's wrong) | not on Genesis G70 USA 260507, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `framework.car_services.cluster` | field | `static CLUSTER_SERVICE`: String |  | not on Genesis G70 USA 260507, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `framework.cluster_service` | class | `com.hkmc.cluster.IClusterService` |  | not on Genesis G70 USA 260507, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `framework.cluster_service_stub` | class | `com.hkmc.cluster.IClusterService$Stub` |  | not on Genesis G70 USA 260507, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `framework.cluster_service_stub.as_interface` | method | `static asInterface(android.os.IBinder)` → framework.cluster_service |  | not on Genesis G70 USA 260507, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `framework.cluster_listener` | class | `com.hkmc.cluster.INavigationClusterListener` |  | not on Genesis G70 USA 260507, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `framework.cluster_listener_stub` | class | `com.hkmc.cluster.INavigationClusterListener$Stub` | HMG-API answers its callbacks with a plain binder (only the ones it reads) | not on Genesis G70 USA 260507, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `framework.cluster_listener_stub.as_interface` | method | `static asInterface(android.os.IBinder)` → framework.cluster_listener |  | not on Genesis G70 USA 260507, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `framework.cluster_listener_stub.battery_info` | field | `static TRANSACTION_onHandleBatteryInfoResp`: int | onHandleBatteryInfoResp(int[8]): [1] minimum pack temperature (whole C), [5] conditioning indicator; the answer to requestBatteryInfoReq, sent to every listener | not on Genesis G70 USA 260507, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `framework.cluster_service.add_listener` | method | `addNavigationClusterListener(framework.cluster_listener)` → void | the service keeps a list and calls every listener: the navigation's own stays registered | not on Genesis G70 USA 260507, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `framework.cluster_service.battery_info` | method | `requestBatteryInfoReq()` → void | asks the cluster for the battery info; answered through onHandleBatteryInfoResp | not on Genesis G70 USA 260507, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `framework.car_services.power` | field | `static POWER_SERVICE`: String |  | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.power_service` | class | `com.hkmc.power.IMicomPowerService` | the head unit's power service (com.hkmc.micom.power): power status, and the system-off responders it waits for before it shuts down | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.power_service_stub` | class | `com.hkmc.power.IMicomPowerService$Stub` |  | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.power_service_stub.as_interface` | method | `static asInterface(android.os.IBinder)` → framework.power_service |  | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.power_service.power_status` | method | `getPowerStatus()` → int | 0 ACC on (the car is on), 1 logic on (off, the head unit still up), 2 ADM, 5 system ready, 6 delay mode, 7 preparing system off, 255 off (MicomPowerConstants.AccStatus) | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.power_service.register_system_off_responder` | method | `registerSystemOffResponder(framework.power_listener, String)` → void | the service then tells the listener onSystemOff and waits for its confirmSystemOff (10 s at most) before it shuts the system down; dropped when the listener's process dies | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.power_service.unregister_system_off_responder` | method | `unregisterSystemOffResponder(framework.power_listener, String)` → void |  | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.power_service.confirm_system_off` | method | `confirmSystemOff(framework.power_listener, String)` → void | a responder is done: once every responder has confirmed, the shutdown starts | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.power_listener` | class | `com.hkmc.power.IMicomPowerStatusListener` |  | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.power_listener_stub` | class | `com.hkmc.power.IMicomPowerStatusListener$Stub` | HMG-API answers its callbacks with a plain binder (only the ones it reads); every callback is one-way | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.power_listener_stub.as_interface` | method | `static asInterface(android.os.IBinder)` → framework.power_listener |  | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.power_listener_stub.power_status_changed` | field | `static TRANSACTION_onPowerStatusChanged`: int | onPowerStatusChanged(status): sent on registration and on every change | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.power_listener_stub.system_off` | field | `static TRANSACTION_onSystemOff`: int | onSystemOff(): the head unit is about to shut down; responders confirm with confirmSystemOff | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.bcm_listener_stub.doors` | field | `static TRANSACTION_onDoorAllStateChanged`: int | onDoorAllStateChanged(unlock: driver, passenger, rear left, rear right; open: driver, passenger, rear left, rear right, trunk; hood): open 1, closed 0, -1 unknown; sent on registration and on change | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.pp_service` | class | `com.android.server.phoneprojection.PPService` | Phone Projection's service (services.jar, in system_server, binder "phoneprojection"): every CarPlay / Android Auto connect, disconnect and session report goes through it | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.pp_service.connect_pp` | method | `connectPP(int, String, String, int)` → void | a projection connect: (type 1 CarPlay / 2 Android Auto, Bluetooth address, name, connection 0 USB / 1 wireless), from any app (Device Connections, Phone Projection, auto connection) | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.pp_service.disconnect_pp` | method | `disconnectPP(int, String, String, int)` → void |  | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.pp_service.cancel_connection_pp` | method | `cancelConnectionPP(int, String, String, int)` → void |  | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.pp_service.send_connect_pp_from_bt` | method | `sendConnectPPFromBT(String, String)` → void | Bluetooth settings' Device Connections connects a phone for projection (address, type) | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.pp_service.on_wireless_connected` | method | `onWirelessConnected(int, String)` → void | a wireless session is up (type, Bluetooth address) | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.pp_service.on_wireless_disconnected` | method | `onWirelessDisconnected(int, String)` → void | a wireless session ended (type, Bluetooth address) | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.pp_service.aa_connected_address` | method | `getAAConnectedBTAddress()` → String |  | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `framework.pp_service.cp_connected_address` | method | `getCPConnectedBTAddress()` → String |  | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
 
 ## btsettings
 
@@ -257,11 +313,11 @@ App `com.android.btsettings`.
 
 | Point | Kind | Looks for | About | Cars |
 |---|---|---|---|---|
-| `btsettings.projection_helper` | class | a class in `com.android.settings2.bluetooth` (no fixed name) | BtSettings' static helper that opens the Phone Projection pages | all |
-| `btsettings.projection_helper.open_wireless_page` | method | `static ?(android.content.Context)` → void | opens the wireless projection page (its only caller is the Phone Projection menu) | all |
-| `btsettings.projection_helper.device_connections_available` | method | `static ?()` → boolean |  | all |
-| `btsettings.projection_helper.open_device_connections` | method | `static ?(android.content.Context, int)` → void |  | all |
-| `btsettings.projection_helper.open_other_page` | method | `static ?(android.content.Context)` → void |  | all |
+| `btsettings.projection_helper` | class | a class in `com.android.settings2.bluetooth` (no fixed name) | BtSettings' static helper that opens the Phone Projection pages | not on Hyundai Ioniq 6 KOR 260902, Hyundai Creta IND 260430, Kia EV6 KOR 260902 |
+| `btsettings.projection_helper.open_wireless_page` | method | `static ?(android.content.Context)` → void | opens the wireless projection page (its only caller is the Phone Projection menu) | not on Hyundai Ioniq 6 KOR 260902, Hyundai Creta IND 260430, Kia EV6 KOR 260902 |
+| `btsettings.projection_helper.device_connections_available` | method | `static ?()` → boolean |  | not on Hyundai Ioniq 6 KOR 260902, Hyundai Creta IND 260430, Kia EV6 KOR 260902 |
+| `btsettings.projection_helper.open_device_connections` | method | `static ?(android.content.Context, int)` → void |  | not on Hyundai Ioniq 6 KOR 260902, Hyundai Creta IND 260430, Kia EV6 KOR 260902 |
+| `btsettings.projection_helper.open_other_page` | method | `static ?(android.content.Context)` → void |  | not on Hyundai Ioniq 6 KOR 260902, Hyundai Creta IND 260430, Kia EV6 KOR 260902 |
 
 ## buttonsettings
 
@@ -269,37 +325,37 @@ App `com.android.buttonsettings`.
 
 | Point | Kind | Looks for | About | Cars |
 |---|---|---|---|---|
-| `buttonsettings.item` | class | `com.android.buttonsettings.customviews.CustomItem` | one ★ key choice: title, summary and icon resource ids, and the action it stores | all |
-| `buttonsettings.item.new` | ctor | `new (int, int, int, String)` |  | all |
-| `buttonsettings.item.get_shortcut` | method | `getShortCut()` → String |  | all |
-| `buttonsettings.row` | class | `com.android.buttonsettings.util.IconTextItem` |  | all |
-| `buttonsettings.row.set_check` | method | `setCheck(boolean)` → void |  | all |
-| `buttonsettings.row.is_check` | method | `isCheck()` → boolean |  | all |
-| `buttonsettings.adapter` | class | `com.android.buttonsettings.util.IconTextListAdapter` |  | all |
-| `buttonsettings.adapter.set_boolean_list` | method | `setBooleanList(boolean[])` → void |  | all |
-| `buttonsettings.adapter.set_list_items` | method | `setListItems(java.util.List)` → void |  | all |
+| `buttonsettings.item` | class | `com.android.buttonsettings.customviews.CustomItem` | one ★ key choice: title, summary and icon resource ids, and the action it stores | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.item.new` | ctor | `new (int, int, int, String)` |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.item.get_shortcut` | method | `getShortCut()` → String |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.row` | class | `com.android.buttonsettings.util.IconTextItem` |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.row.set_check` | method | `setCheck(boolean)` → void |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.row.is_check` | method | `isCheck()` → boolean |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.adapter` | class | `com.android.buttonsettings.util.IconTextListAdapter` |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.adapter.set_boolean_list` | method | `setBooleanList(boolean[])` → void |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.adapter.set_list_items` | method | `setListItems(java.util.List)` → void |  | not on Hyundai Ioniq 6 SGP 260907 |
 | `buttonsettings.head_screen` | class | `com.android.buttonsettings.CustomButtonSetting` | the head unit ★ key's list of choices | all |
-| `buttonsettings.head_screen.menu_list` | field | `mMenuList`: java.util.ArrayList |  | all |
-| `buttonsettings.head_screen.cur_list` | field | `mCurList`: java.util.List |  | all |
-| `buttonsettings.head_screen.title_list` | field | `mCustomKeyTitleList`: int[] |  | all |
-| `buttonsettings.head_screen.checked_list` | field | `mCheckedList`: boolean[] |  | all |
-| `buttonsettings.head_screen.adapter` | field | `adapter`: buttonsettings.adapter |  | all |
-| `buttonsettings.head_screen.keycode` | field | `static mKeycode`: String |  | all |
+| `buttonsettings.head_screen.menu_list` | field | `mMenuList`: java.util.ArrayList |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.head_screen.cur_list` | field | `mCurList`: java.util.List |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.head_screen.title_list` | field | `mCustomKeyTitleList`: int[] |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.head_screen.checked_list` | field | `mCheckedList`: boolean[] |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.head_screen.adapter` | field | `adapter`: buttonsettings.adapter |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.head_screen.keycode` | field | `static mKeycode`: String |  | not on Hyundai Ioniq 6 SGP 260907 |
 | `buttonsettings.head_screen.init_list` | method | `initList()` → void |  | all |
-| `buttonsettings.head_screen.init_custom_key` | method | `initCustomKey()` → void |  | all |
-| `buttonsettings.head_screen.list_item` | method | `getListItem(int, String, int)` → buttonsettings.row |  | all |
-| `buttonsettings.head_screen.set_selected` | method | `setSelectedIdem(int)` → void |  | all |
+| `buttonsettings.head_screen.init_custom_key` | method | `initCustomKey()` → void |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.head_screen.list_item` | method | `getListItem(int, String, int)` → buttonsettings.row |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.head_screen.set_selected` | method | `setSelectedIdem(int)` → void |  | not on Hyundai Ioniq 6 SGP 260907 |
 | `buttonsettings.wheel_screen` | class | `com.android.buttonsettings.CustomButtonSettingSWRC` | the steering wheel ★ key's list of choices | all |
-| `buttonsettings.wheel_screen.menu_list` | field | `mMenuList`: java.util.ArrayList |  | all |
-| `buttonsettings.wheel_screen.cur_list` | field | `mCurList`: java.util.List |  | all |
-| `buttonsettings.wheel_screen.title_list` | field | `mCustomKeyTitleList`: int[] |  | all |
-| `buttonsettings.wheel_screen.checked_list` | field | `mCheckedList`: boolean[] |  | all |
-| `buttonsettings.wheel_screen.adapter` | field | `adapter`: buttonsettings.adapter |  | all |
-| `buttonsettings.wheel_screen.keycode` | field | `static mKeycode`: String |  | all |
+| `buttonsettings.wheel_screen.menu_list` | field | `mMenuList`: java.util.ArrayList |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.wheel_screen.cur_list` | field | `mCurList`: java.util.List |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.wheel_screen.title_list` | field | `mCustomKeyTitleList`: int[] |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.wheel_screen.checked_list` | field | `mCheckedList`: boolean[] |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.wheel_screen.adapter` | field | `adapter`: buttonsettings.adapter |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.wheel_screen.keycode` | field | `static mKeycode`: String |  | not on Hyundai Ioniq 6 SGP 260907 |
 | `buttonsettings.wheel_screen.init_list` | method | `initList()` → void |  | all |
-| `buttonsettings.wheel_screen.init_custom_key` | method | `initCustomKey()` → void |  | all |
-| `buttonsettings.wheel_screen.list_item` | method | `getListItem(int, String, int)` → buttonsettings.row |  | all |
-| `buttonsettings.wheel_screen.set_selected` | method | `setSelectedIdem(int)` → void |  | all |
+| `buttonsettings.wheel_screen.init_custom_key` | method | `initCustomKey()` → void |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.wheel_screen.list_item` | method | `getListItem(int, String, int)` → buttonsettings.row |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `buttonsettings.wheel_screen.set_selected` | method | `setSelectedIdem(int)` → void |  | not on Hyundai Ioniq 6 SGP 260907 |
 
 ## dipo
 
@@ -313,10 +369,10 @@ App `com.daudio.app.dipo`.
 | `dipo.carplay.session_finalized` | method | `onSessionFinalized(int)` → void | a CarPlay session ended | all |
 | `dipo.carplay.iap_message` | method | `oniAPSendMessage(byte[], int)` → void | iAP2 bytes the phone sent over the CarPlay session's own channel | all |
 | `dipo.carplay.native_iap_send` | method | `TccCarPlayNativeMethod_iAPSendMessage(byte[], int)` → int | sends iAP2 bytes to the phone over the CarPlay session's channel (0: sent) | all |
-| `dipo.carplay.disable_bluetooth` | method | `onDisableBluetooth(String)` → void | the CarPlay library's disableBluetooth, about 80 ms into a session: DiPO then disconnects the phone's Bluetooth (wired CarPlay's way) | not on Hyundai Palisade USA 260903, Kia Carnival USA 260507, Kia Niro EV USA 260507 |
-| `dipo.carplay.decode_failure` | method | `onNotifyDecodeFailure(int)` → void | the CarPlay video decoder reported a failure (1 no output frame, 2 sequence header failed, 3 black screen; 0 resets the black-screen count). Stock DiPO only logs it | not on Hyundai Palisade USA 260903, Kia Carnival USA 260507, Kia Niro EV USA 260507 |
-| `dipo.carplay.screen_timeout` | method | `onScreenTimeout()` → void | the CarPlay screen stream got no data for the library's timeout (10 s on these units). Stock DiPO only sets a flag | not on Hyundai Palisade USA 260903, Kia Carnival USA 260507, Kia Niro EV USA 260507 |
-| `dipo.carplay.force_key_frame` | method | `forceKeyFrame()` → com.daudio.app.dipo.telechips.CarPlayReturn | asks the phone for a new key frame (IDR) on the CarPlay screen stream. Stock DiPO never calls it | not on Hyundai Palisade USA 260903, Kia Carnival USA 260507, Kia Niro EV USA 260507 |
+| `dipo.carplay.disable_bluetooth` | method | `onDisableBluetooth(String)` → void | the CarPlay library's disableBluetooth, about 80 ms into a session: DiPO then disconnects the phone's Bluetooth (wired CarPlay's way) | not on Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 KOR 260902, Hyundai Palisade USA 260903, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `dipo.carplay.decode_failure` | method | `onNotifyDecodeFailure(int)` → void | the CarPlay video decoder reported a failure (1 no output frame, 2 sequence header failed, 3 black screen; 0 resets the black-screen count). Stock DiPO only logs it | not on Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 KOR 260902, Hyundai Palisade USA 260903, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `dipo.carplay.screen_timeout` | method | `onScreenTimeout()` → void | the CarPlay screen stream got no data for the library's timeout (10 s on these units). Stock DiPO only sets a flag | not on Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 KOR 260902, Hyundai Palisade USA 260903, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `dipo.carplay.force_key_frame` | method | `forceKeyFrame()` → com.daudio.app.dipo.telechips.CarPlayReturn | asks the phone for a new key frame (IDR) on the CarPlay screen stream. Stock DiPO never calls it | not on Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 KOR 260902, Hyundai Palisade USA 260903, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
 | `dipo.iap2_listener` | class | a class in `com.daudio.app.dipo` (no fixed name) | DiPO's own iAP2 listener (connected, disconnected, notify from the iAP2 server) | all |
 | `dipo.iap2_listener.connected` | method | `connected(int, String)` → void | an iAP2 session is up (component: 1 USB, 4 Bluetooth CarPlay, 5 the CarPlay session's channel) | all |
 | `dipo.iap2_listener.disconnected` | method | `disconnected(int)` → void | an iAP2 session ended (component) | all |
@@ -337,6 +393,8 @@ App `com.daudio.app.dipo`.
 | `dipo.btcm.register_listener` | method | `registerHfDeviceStatusListener(com.broadcom.bt.hfdevice.hfbtcm.HfDeviceStatusListener)` → void | a status listener is registered (DiPO does once the Bluetooth service is connected) | all |
 | `dipo.iap2_proxy` | class | `com.tcc.iap2.IIap2Service$Stub$Proxy` | the iAP2 server's binder proxy (library com.tcc.iap2) | all |
 | `dipo.iap2_proxy.stop_route_guidance` | method | `Iap2SvcStopRouteGuidanceUpdate(String[])` → boolean | stop the phone's route guidance updates (DiPO: the car's navigation took turn-by-turn back) | all |
+| `dipo.carplay.disconnect` | method | `disconnectCarPlay()` → com.daudio.app.dipo.telechips.CarPlayReturn | ends the CarPlay session; DiPO then doesn't advertise CarPlay again (restartBonjour off) until something does | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `dipo.carplay.restart_bonjour` | method | `restartBonjour()` → com.daudio.app.dipo.telechips.CarPlayReturn | advertises CarPlay again (Bonjour), as DiPO does after a session it didn't end itself: the phone can come back | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
 
 ## gpm
 
@@ -364,6 +422,14 @@ App `com.google.android.projection.sink`.
 | `gpm.sensor_source` | class | `com.google.android.projection.protocol.SensorSource` | Android Auto's sensor service | all |
 | `gpm.sensor_source.init` | method | `init(int, long, int[], int, int[], int[])` → boolean | (type, native, sensors offered to the phone, location, fuel types, EV connector types): once per connection | all |
 | `gpm.sensor_source.speed` | field | `static SENSOR_TYPE_SPEED`: int | the speed sensor (offered: the phone limits taps while moving) | all |
+| `gpm.connection_manager` | class | `com.google.android.projection.service.GalConnectionManager` | GPM's Android Auto session manager | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `gpm.connection_manager.send_byebye` | method | `sessionSendByeByeRequest(int)` → void | ends the session the way the protocol does (ByeByeRequest, reason: 1 user selection; this GPM knows 1-5) | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `gpm.receiver_service.connection_manager` | field | `mConnectionManager`: gpm.connection_manager |  | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `gpm.receiver_service.on_create` | method | `onCreate()` → void | GPM's service starts (once per GPM process) | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `gpm.wireless_explorer` | class | `com.google.android.projection.protocol.WirelessExplorer` | GPM's wireless Android Auto (Bluetooth start, Wi-Fi session) | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `gpm.receiver_service.wireless_explorer` | field | `mWirelessExplorer`: gpm.wireless_explorer |  | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `gpm.wireless_explorer.connected_device` | method | `getConnectedDevice()` → String | the Bluetooth address of the phone on wireless Android Auto, or null | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `gpm.receiver_service.connect_wireless_session` | method | `connectWirelessSession(String)` → void | starts wireless Android Auto with the phone at this Bluetooth address (what Phone Projection's connect does) | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 CAN 260206, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Elantra USA 260507, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
 
 ## homesetting
 
@@ -385,25 +451,25 @@ App `com.tcc.iap2server`.
 
 | Point | Kind | Looks for | About | Cars |
 |---|---|---|---|---|
-| `iap2.init_info` | class | `com.tcc.iap2server.Iap2InitInformationMsg` | what the head unit tells an iPhone it supports (iAP2 identification) | all |
-| `iap2.init_info.check_supports_features` | method | `checkSupportsFeatures()` → void | sets the supported-feature flags; route guidance only if stepofspec >= 999 (US/Canada: 105) | all |
-| `iap2.init_info.route_guidance` | field | `static iAP2UsedRouteGuidance`: int | 1: offer RouteGuidance (CarPlay turn-by-turn) to the iPhone | all |
+| `iap2.init_info` | class | `com.tcc.iap2server.Iap2InitInformationMsg` | what the head unit tells an iPhone it supports (iAP2 identification) | not on Hyundai Ioniq 6 SGP 260907 |
+| `iap2.init_info.check_supports_features` | method | `checkSupportsFeatures()` → void | sets the supported-feature flags; route guidance only if stepofspec >= 999 (US/Canada: 105) | not on Hyundai Ioniq 6 SGP 260907 |
+| `iap2.init_info.route_guidance` | field | `static iAP2UsedRouteGuidance`: int | 1: offer RouteGuidance (CarPlay turn-by-turn) to the iPhone | not on Hyundai Ioniq 6 SGP 260907 |
 | `iap2.service` | class | `com.tcc.iap2server.Iap2Service` | the iAP2 server (CarPlay's control link) | all |
 | `iap2.service.on_create` | method | `onCreate()` → void |  | all |
 | `iap2.service.is_connected` | method | `static isConnected()` → boolean |  | all |
-| `iap2.service.get_component` | method | `static getComponent()` → int |  | all |
-| `iap2.service.set_device_serial` | method | `setDeviceSerial(String)` → void |  | all |
-| `iap2.service.receive_connect` | method | `receiveConnect(int)` → void | start an iAP2 session on a transport component (3..5: Bluetooth) | all |
-| `iap2.service.receive_disconnect` | method | `receiveDisconnect(int)` → void |  | all |
+| `iap2.service.get_component` | method | `static getComponent()` → int |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `iap2.service.set_device_serial` | method | `setDeviceSerial(String)` → void |  | not on Hyundai Ioniq 6 SGP 260907 |
+| `iap2.service.receive_connect` | method | `receiveConnect(int)` → void | start an iAP2 session on a transport component (3..5: Bluetooth) | not on Hyundai Ioniq 6 SGP 260907 |
+| `iap2.service.receive_disconnect` | method | `receiveDisconnect(int)` → void |  | not on Hyundai Ioniq 6 SGP 260907 |
 | `iap2.service_receiver` | class | a class in `com.tcc.iap2server` (no fixed name) | the iAP2 service's own broadcast receiver (USB CarPlay attach and more); an inner class, so its number can differ | all |
 | `iap2.service_receiver.on_receive` | method | `onReceive(android.content.Context, android.content.Intent)` → void |  | all |
 | `iap2.service_receiver.service` | field | `?`: iap2.service |  | all |
-| `iap2.service.on_destroy` | method | `onDestroy()` → void |  | all |
-| `iap2.service.on_bind` | method | `onBind(android.content.Intent)` → android.os.IBinder |  | all |
-| `iap2.service.native_handle` | field | `static mHandleIap2`: long |  | all |
-| `iap2.service.native_lock` | field | `static mLock`: Object |  | all |
-| `iap2.init_info.use_vehicle_information` | field | `static iAP2UsedVehicelInformation`: int |  | all |
-| `iap2.init_info.use_vehicle_status` | field | `static iAP2UsedVehicleStatus`: int |  | all |
+| `iap2.service.on_destroy` | method | `onDestroy()` → void |  | not on Genesis G70 USA 260507, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `iap2.service.on_bind` | method | `onBind(android.content.Intent)` → android.os.IBinder |  | not on Genesis G70 USA 260507, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `iap2.service.native_handle` | field | `static mHandleIap2`: long |  | not on Genesis G70 USA 260507, Hyundai Ioniq 6 SGP 260907, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `iap2.service.native_lock` | field | `static mLock`: Object |  | not on Genesis G70 USA 260507, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `iap2.init_info.use_vehicle_information` | field | `static iAP2UsedVehicelInformation`: int |  | not on Genesis G70 USA 260507, Hyundai Ioniq 6 SGP 260907, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
+| `iap2.init_info.use_vehicle_status` | field | `static iAP2UsedVehicleStatus`: int |  | not on Genesis G70 USA 260507, Hyundai Ioniq 6 SGP 260907, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
 
 ## launcher
 
@@ -433,11 +499,11 @@ App `com.mobis.splitscreen.right`.
 | `panel.page.handler` | field | `mHandler`: android.os.Handler |  | all |
 | `panel.home.page_for_id` | method | `?(int)` → panel.page | the page for a view id | all |
 | `panel.home.build_views` | method | `?(int, boolean, int)` → void | builds the panel's view list by id (slot 22 is the test page's) | all |
-| `panel.test_page` | class | a class in `com.mobis.splitscreen.right` (no fixed name) | Mobis' unused test page (slot 22, getView returns null): HMG-API's page | all |
-| `panel.test_page.get_view` | method | `getView()` → android.view.View |  | all |
-| `panel.home.test_page` | field | `?`: panel.test_page | never set by stock code | all |
-| `panel.test_gate` | class | a class in `com.mobis.splitscreen.right` (no fixed name) |  | all |
-| `panel.test_gate.on` | method | `static ?()` → boolean | Mobis' test switch for slot 22 (always off on a car; HMG-API answers true only inside page_for_id and build_views) | all |
+| `panel.test_page` | class | a class in `com.mobis.splitscreen.right` (no fixed name) | Mobis' unused test page (slot 22, getView returns null): HMG-API's page | not on Hyundai Ioniq 6 KOR 260902 |
+| `panel.test_page.get_view` | method | `getView()` → android.view.View |  | not on Hyundai Ioniq 6 KOR 260902 |
+| `panel.home.test_page` | field | `?`: panel.test_page | never set by stock code | not on Hyundai Ioniq 6 SGP 260907 |
+| `panel.test_gate` | class | a class in `com.mobis.splitscreen.right` (no fixed name) |  | not on Hyundai Ioniq 6 KOR 260902 |
+| `panel.test_gate.on` | method | `static ?()` → boolean | Mobis' test switch for slot 22 (always off on a car; HMG-API answers true only inside page_for_id and build_views) | not on Genesis G70 KOR 260902, Hyundai Ioniq 6 KOR 260902, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
 
 ## settings
 
@@ -446,7 +512,7 @@ App `com.android.settings`.
 | Point | Kind | Looks for | About | Cars |
 |---|---|---|---|---|
 | `settings.split_screen` | class | `com.android.settings.util.SplitScreenUtils` | Settings' split-screen page list helpers | all |
-| `settings.split_screen.supported` | method | `static isSupportViewId(android.content.Context, int)` → boolean | is a panel view id supported here (unsupported ones are dropped from the page lists) | all |
+| `settings.split_screen.supported` | method | `static isSupportViewId(android.content.Context, int)` → boolean | is a panel view id supported here (unsupported ones are dropped from the page lists) | not on Hyundai Ioniq 6 SGP 260907 |
 
 ## themesettings
 
@@ -456,7 +522,7 @@ App `com.android.themesettings`.
 |---|---|---|---|---|
 | `themesettings.split_item` | class | `com.android.themesettings.splitscreensettings.SplitScreenItem` | one page in the split-screen page editor | all |
 | `themesettings.split_item.new` | ctor | `new (int, String, boolean)` | (view id, title, on) | all |
-| `themesettings.split_item.type` | method | `?()` → int |  | all |
+| `themesettings.split_item.type` | method | `?()` → int |  | not on Genesis G70 KOR 260902, Hyundai Ioniq 6 KOR 260902, Kia K3 KOR 260902, Kia EV6 KOR 260902 |
 | `themesettings.split_items` | class | a class in `com.android.themesettings.splitscreensettings` (no fixed name) | the editor's page list helpers | all |
 | `themesettings.split_items.make` | method | `static ?(android.content.Context, java.util.LinkedHashMap)` → java.util.ArrayList | the editor's items from {view id: on/off}; unknown ids are skipped | all |
 | `themesettings.split_items.view_name` | method | `static ?(android.content.Context, int)` → String |  | all |

@@ -24,6 +24,13 @@ import java.util.Set;
  *   "input":    [{"key": "map", "press": "x3", "broadcast": "dev.example.cam.SAVE"}]
  *   "projection": {"aa_density": 200, "aa_sensors": {"remove": ["speed"]}, "events": true}
  *   "network":  {"rules": [{"chain": "input", "in": "hotspot", "proto": "tcp", "ports": [7000], "action": "accept"}]}
+ *   "car_events": {"parked": {"script": "bin/park.sh", "user": "root"}, "shutdown": {}}
+ *
+ * car_events: the events (Vehicle.EVENTS) the vehicle service sends the mod (state/events.txt);
+ * a script is a manual service "on-<event>" with the event as its argument, started by the
+ * vehicle service when the event comes (hmgapi.vehicle.EventRun); the mod's apps and hooks
+ * hear hmgapi.intent.action.CAR_EVENT. While any enabled mod asks for one, hmgapid runs the
+ * vehicle service.
  *
  * apps: installed, turned off and removed with the mod (ModApps, `engine apps`).
  * services: run and watched by hmgapid (state/services.txt): "jar" runs app_process
@@ -80,7 +87,27 @@ final class ModRuntime {
         final List<Keys.Binding> input = new ArrayList<Keys.Binding>();
         Projection.Ask projection;
         Network.Ask network;
+        final List<Event> events = new ArrayList<Event>();
         final List<String> errors = new ArrayList<String>();
+    }
+
+    /** a car event the mod asked for; service: its event script (a manual service "on-<event>"), or null */
+    static final class Event {
+        String event;
+        Service service;
+    }
+
+    /** "user" as a service has it: root, system, app (the mod's first app), app:<package>; null when it isn't one */
+    @SuppressWarnings("unchecked")
+    static String user(Map<String, Object> s, Object apps) {
+        String user = s.containsKey("user") ? str(s.get("user")) : "root";
+        if ("app".equals(user)) {
+            if (!(apps instanceof List) || ((List<Object>) apps).isEmpty() || !(((List<Object>) apps).get(0) instanceof Map)) return "app";
+            String first = str(((Map<String, Object>) ((List<Object>) apps).get(0)).get("package"));
+            return first == null ? "app" : "app:" + first;
+        }
+        if ("root".equals(user) || "system".equals(user) || (user != null && user.startsWith("app:") && user.substring(4).matches(PKG))) return user;
+        return null;
     }
 
     static final String PKG = "[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+";
@@ -175,6 +202,62 @@ final class ModRuntime {
                     continue;
                 }
                 d.services.add(v);
+            }
+        }
+        Object ev = mod.get("car_events");
+        if (ev != null && !(ev instanceof Map)) d.errors.add(id + ": car_events: {\"<event>\": {} or {\"script\": \"<file>\", \"user\": …}, …}");
+        if (ev instanceof Map) {
+            for (Map.Entry<String, Object> e : ((Map<String, Object>) ev).entrySet()) {
+                String name = e.getKey(), what = id + ": car event " + name;
+                Map<String, Object> o = e.getValue() instanceof Map ? (Map<String, Object>) e.getValue()
+                        : Boolean.TRUE.equals(e.getValue()) ? new LinkedHashMap<String, Object>() : null;
+                if (!Vehicle.EVENTS.containsKey(name)) {
+                    d.errors.add(what + " isn't one HMG-API sends (" + join(new ArrayList<String>(Vehicle.EVENTS.keySet())) + ")");
+                    continue;
+                }
+                if (o == null) {
+                    d.errors.add(what + ": {} (its apps and hooks hear it) or {\"script\": \"<file>\"}");
+                    continue;
+                }
+                boolean odd = false;
+                for (String k : o.keySet()) odd |= !"script".equals(k) && !"user".equals(k);
+                if (odd) {
+                    d.errors.add(what + ": only \"script\" and \"user\"");
+                    continue;
+                }
+                Event x = new Event();
+                x.event = name;
+                String script = str(o.get("script"));
+                if (script != null) {
+                    Service v = new Service();
+                    v.mod = id;
+                    v.name = "on-" + name;
+                    v.kind = "script";
+                    v.path = script;
+                    v.start = "manual";
+                    v.restart = false;
+                    v.args.add(name);
+                    v.user = user(o, apps);
+                    boolean clash = false;
+                    for (Service s : d.services) clash |= s.name.equals(v.name);
+                    if (!script.matches(REL) || script.contains("..")) d.errors.add(what + ": " + script + " must be a file in the mod");
+                    else if (dir != null && !new File(dir, script).isFile()) d.errors.add(what + ": no " + script + " in the mod");
+                    else if ("app".equals(v.user)) d.errors.add(what + ": user \"app\" needs an app in \"apps\"");
+                    else if (v.user == null) d.errors.add(what + ": user must be root, system, app or app:<package>");
+                    else if (clash) d.errors.add(what + ": the mod has a service named " + v.name + " already (event scripts are services by that name)");
+                    else {
+                        x.service = v;
+                        d.services.add(v);
+                    }
+                    if (x.service == null) continue;
+                } else if (o.containsKey("user")) {
+                    d.errors.add(what + ": \"user\" is for a script");
+                    continue;
+                } else if (!(apps instanceof List && !((List<Object>) apps).isEmpty()) && mod.get("hooks") == null) {
+                    d.errors.add(what + ": the mod has no app, hooks or script to tell (\"script\")");
+                    continue;
+                }
+                d.events.add(x);
             }
         }
         Object usb = mod.get("usb");
@@ -334,7 +417,7 @@ final class ModRuntime {
 
     /** state/apps.txt, services.txt, usb.txt for hmgapid; the service files made readable by their user. */
     static void publish(Engine e, Map<String, Map<String, Object>> json, Set<String> on) throws Exception {
-        StringBuilder apps = new StringBuilder(), svcs = new StringBuilder(), usb = new StringBuilder(), veh = new StringBuilder(), cmd = new StringBuilder();
+        StringBuilder apps = new StringBuilder(), svcs = new StringBuilder(), usb = new StringBuilder(), veh = new StringBuilder(), cmd = new StringBuilder(), evs = new StringBuilder();
         Map<String, String> owner = new LinkedHashMap<String, String>();
         for (String id : on) {
             File dir = new File(e.data, "mods/" + id);
@@ -355,18 +438,22 @@ final class ModRuntime {
             for (String f : d.usb) usb.append(id).append(' ').append(f).append('\n');
             for (String r : d.readings) veh.append(id).append(' ').append(r).append('\n');
             for (String c : d.commands) cmd.append(id).append(' ').append(c).append('\n');
+            for (Event x : d.events) evs.append(id).append(' ').append(x.event).append(' ').append(x.service == null ? "-" : x.service.name).append('\n');
         }
         boolean watch = new File(e.stateDir, "micom-watch.txt").isFile();   // the owner's MICOM recorder (hmgapid micom-watch)
-        if (veh.length() > 0 || cmd.length() > 0 || watch) svcs.append(VEHICLE_SERVICE).append('\n');
+        if (veh.length() > 0 || cmd.length() > 0 || evs.length() > 0 || watch || HomeWifi.on(e)) svcs.append(VEHICLE_SERVICE).append('\n');   // home Wi-Fi reads parked and power
         svcs.append(LOG_SERVICE).append('\n');
         e.stateDir.mkdirs();
         String net = Network.publish(e, json, on);   // the network keeper, while a mod has network asks (or some are still in)
         if (net != null) svcs.append(net).append('\n');
+        String wifi = HomeWifi.service(e);   // home Wi-Fi's keeper, while the owner has it on
+        if (wifi != null) svcs.append(wifi).append('\n');
         writeIfChanged(new File(e.stateDir, "apps.txt"), apps.toString());
         writeIfChanged(new File(e.stateDir, "services.txt"), svcs.toString());
         writeIfChanged(new File(e.stateDir, "usb.txt"), usb.toString());
         writeIfChanged(new File(e.stateDir, "vehicle.txt"), veh.toString());
         writeIfChanged(new File(e.stateDir, "commands.txt"), cmd.toString());
+        writeIfChanged(new File(e.stateDir, "events.txt"), evs.toString());
     }
 
     /** what the plan shows the owner: each mod's apps, services and USB folders */
@@ -376,8 +463,14 @@ final class ModRuntime {
             Decl d = of(id, json.get(id), new File(e.data, "mods/" + id));
             for (App a : d.apps) out.add("app      " + a.pkg + " (" + a.apk + ") [" + id + "]");
             for (Service s : d.services) {
+                if (s.name.startsWith("on-") && "manual".equals(s.start) && s.args.size() == 1 && Vehicle.EVENTS.containsKey(s.args.get(0))) continue;   // an event script: below
                 out.add("service  " + id + "/" + s.name + " as " + s.user + ", at " + s.start
                         + (s.restart ? ", restarted if it stops" : "") + " [" + id + "]");
+            }
+            for (Event x : d.events) {
+                int secs = "shutdown".equals(x.event) ? Vehicle.SHUTDOWN_SECONDS : Vehicle.EVENT_SECONDS;
+                out.add("event    " + x.event + " -> " + (x.service == null ? "" : "runs " + x.service.path + " as " + x.service.user + " (" + secs + " s at most); ")
+                        + "its apps and hooks hear it [" + id + "]");
             }
             for (String f : d.usb) out.add("usb      " + f + "/ on a stick [" + id + "]");
             if (!d.readings.isEmpty()) out.add("vehicle  reads " + join(d.readings) + " [" + id + "]");

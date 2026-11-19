@@ -124,7 +124,10 @@ final class Input {
                 final int code = e.getKeyCode(), action = e.getAction(), repeat = e.getRepeatCount();
                 if (passOnce(code)) return;   // one HMG-API put back
                 if (debug) HmgApi.i("input: key " + code + " action " + action + " repeat " + repeat);
-                if (sent(code)) return;   // Android's long press repeat of a press HMG-API sent: the car's
+                if (sent(code)) {   // Android's long press repeat of a press HMG-API sent: the car's
+                    sentRepeat(e);
+                    return;
+                }
                 final Key k = keys.get(code);
                 if (k == null) return;
                 handler.post(new Runnable() {
@@ -262,21 +265,60 @@ final class Input {
         }
     }
 
+    /** scan codes of the car's own repeats of keys HMG-API is sending, by key code (see send) */
+    static final Map<Integer, Integer> repeatScan = new HashMap<Integer, Integer>();
+
+    static void sentRepeat(KeyEvent e) {
+        if (e.getAction() != KeyEvent.ACTION_DOWN) return;
+        synchronized (repeatScan) {
+            repeatScan.put(e.getKeyCode(), e.getScanCode());
+        }
+    }
+
+    /**
+     * The scan code a sent key carries: the press's own when it's the same button (a
+     * binding that swaps a button's short and held presses), else none. Android pairs a
+     * key's up with its down by device, source, key code and scan code. The car makes the
+     * long press of a held voice button itself (ModeKeyDispatcher.generateLongKeyEventForPtt:
+     * device 5, scan code 40, the real button's); with scan code 0 on our up, that down
+     * never got its up, so Android kept the voice button down in the window on screen
+     * (Android Auto) after every swapped short press. The next key the car or HMG-API
+     * consumed, or the camera taking the screen, made Android cancel it there: GPM took
+     * the cancelled up for a release and started the car's own voice assistant (the
+     * Creta, 4 and 10 Nov).
+     */
+    static int scanFor(int code, KeyEvent from) {
+        return from != null && from.getKeyCode() == code ? from.getScanCode() : 0;
+    }
+
     /**
      * Makes the car see a press of another button (a binding's "send"): down, then up
      * at once (short) or after SEND_HOLD_MS (hold), from the device of the press that
-     * asked (the car's key dispatcher only takes keys from a real device).
+     * asked (the car's key dispatcher only takes keys from a real device), with its scan
+     * code when it's the same button (scanFor).
      */
     static void send(final int code, boolean hold, KeyEvent from) {
         final int device = from == null ? 0 : from.getDeviceId(), source = from == null ? android.view.InputDevice.SOURCE_KEYBOARD : from.getSource();
+        final int scan = scanFor(code, from);
         final long t = android.os.SystemClock.uptimeMillis();
+        synchronized (repeatScan) {
+            repeatScan.remove(code);
+        }
         sending(code, 1);
-        inject(new KeyEvent(t, t, KeyEvent.ACTION_DOWN, code, 0, 0, device, 0, 0, source));
+        inject(new KeyEvent(t, t, KeyEvent.ACTION_DOWN, code, 0, 0, device, scan, 0, source));
         handler.postDelayed(new Runnable() {
             @Override
             public void run() {
-                inject(new KeyEvent(t, android.os.SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, code, 0, 0, device, 0, 0, source));
+                inject(new KeyEvent(t, android.os.SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, code, 0, 0, device, scan, 0, source));
                 sending(code, -1);
+                Integer r;
+                synchronized (repeatScan) {
+                    r = repeatScan.remove(code);
+                }
+                if (r != null && r != scan) {
+                    HmgApi.i("input: the car's long press of " + KeyEvent.keyCodeToString(code) + " came with scan code " + r
+                            + ", ours " + scan + ": Android may keep it down until the screen changes");
+                }
             }
         }, hold ? SEND_HOLD_MS : 50);
     }
@@ -294,7 +336,8 @@ final class Input {
         // a sent voice button hold while the phone's assistant is open would start it again;
         // the car's own short press ends it, as without HMG-API
         boolean hold = b.sendHold && !(b.sendCode == code("KEYCODE_SHORTCUT_PTT") && Car.phoneAssistantOpen(context));
-        HmgApi.i("input: " + b.key + " " + press + " -> " + b.mod + (b.sendCode != 0 ? " (the car gets " + KeyEvent.keyCodeToString(b.sendCode) + (hold ? " hold)" : " short)") : ""));
+        HmgApi.i("input: " + b.key + " " + press + " -> " + b.mod + (b.sendCode != 0 ? " (the car gets " + KeyEvent.keyCodeToString(b.sendCode) + (hold ? " hold" : " short")
+                + ", scan code " + scanFor(b.sendCode, from) + ")" : ""));
         try {
             if (b.sendCode != 0) send(b.sendCode, hold, from);
             if (b.open != null) {

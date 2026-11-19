@@ -17,9 +17,8 @@ RUNTIME = ['core/runtime/*-test.sh']
 # Java (hook, vehicle) is only compiled by the build and the SDK, and its own tests
 ENGINE = ['core/runtime/engine-test.sh', 'core/runtime/signing-test.sh', 'core/runtime/system-test.sh', 'core/runtime/safety-test.sh',
           'core/runtime/packages-test.sh', 'core/runtime/map-test.sh', 'core/runtime/local-map-test.sh', 'core/runtime/usb-test.sh', 'core/runtime/hooks-test.sh',
-          'core/runtime/live-test.sh', 'core/runtime/native-test.sh', 'core/runtime/runtime-test.sh', 'core/runtime/net-test.sh',
-          'core/runtime/overlap-test.sh', 'core/runtime/scriptcheck-test.sh', 'core/runtime/sitefind-test.sh', 'core/runtime/selftest-test.sh',
-          'install/nemesis/mod-test.sh', 'install/nemesis/sync-test.sh',
+          'core/runtime/live-test.sh', 'core/runtime/native-test.sh', 'core/runtime/runtime-test.sh', 'core/runtime/net-test.sh', 'core/runtime/homewifi-test.sh',
+          'core/runtime/overlap-test.sh', 'core/runtime/scriptcheck-test.sh', 'core/runtime/sitefind-test.sh', 'core/runtime/selftest-test.sh', 'install/nemesis/mod-test.sh', 'install/nemesis/sync-test.sh',
           'tools/catalog-test.sh', 'tools/version-test.sh', 'tools/check-scripts.sh']
 INSTALL = ['install/common/test.sh', 'install/common/install-test.sh', 'install/usb/test.sh', 'install/nemesis/mod-test.sh', 'install/nemesis/sync-test.sh']
 MODS = ['tools/check-scripts.sh']   # the example mods' scripts (their tests run in sdk-test)
@@ -46,7 +45,8 @@ RULES = [
     (['core/runtime/*-test.sh'], []),   # a test itself: it runs (select() adds every changed test)
     (['core/hookpoints/*'], SDK),   # the SDK's points.txt and catalogue
     (['core/hookpoints/*', 'maps/*', 'tools/map-car.py', 'tools/check-maps.py', 'tools/mkhookdoc.py', 'docs/hook-points.md', 'tools/test-hooks.py', 'tools/probe-test.py'], HOOKS),
-    (['tools/dexsig.py'], ['core/runtime/map-test.sh'] + HOOKS),   # MapProbeMethodTest checks Dex.walk against it
+    (['tools/dexsig.py'], ['core/runtime/map-test.sh'] + HOOKS),
+    (['tools/maplib.py'], HOOKS + INSTALL),   # every map reader and the payload's maps (build.sh expand)   # MapProbeMethodTest checks Dex.walk against it
     # the stock car trees: the finder every suite above uses, and cars.py
     (['tools/cartrees.py', 'tools/cars.py', 'tools/cars-test.sh'], ['tools/cars-test.sh'] + HOOKS),
     (['core/app/*'], ['core/app/qr-test.sh']),
@@ -65,6 +65,7 @@ RULES = [
     (['tools/mark-verified.py', 'tools/report-map.py', 'tools/report-map-test.py'], HOOKS),   # they write or read the maps
     (['catalog/*', 'tools/catalog*', 'maps/authors.json', '.github/workflows/catalog.yml'], ['tools/catalog-test.sh']),
     (['tools/micom-*'], ['tools/micom-decode-test.sh']),
+    (['tools/car-triage*', '.github/workflows/car-triage.yml'], ['tools/car-triage-test.sh']),
     (['tools/check-scripts.sh'], ['tools/check-scripts.sh']),
     (['tools/requirements.txt'], ALL),
     (['.github/workflows/release.yml', '.github/workflows/wiki.yml', '.github/CODEOWNERS', '.github/FUNDING.yml', '.github/dependabot.yml'], []),

@@ -43,11 +43,13 @@ final class Report {
         r.put("report", "hmgapi car report 1");
         r.put("date", stamp);
         r.put("hmgapi", Engine.HMGAPI_VERSION);
+        r.put("build", installedBuild(e));   // test builds share a version: which commit this is
         Map<String, Object> unit = new LinkedHashMap<String, Object>();
         for (String k : new String[] {"product", "make", "name", "model", "region", "firmware", "platform", "android", "onebin"}) {
             unit.put(k, e.facts.get(k));
         }
         unit.put("wifi_chip", e.facts.features().contains("hmgapi.wifi"));
+        unit.put("wifi", e.facts.wifi());   // seen, stock hotspot, unpowered (the hotspot feature off) or none
         unit.put("features", new ArrayList<Object>(e.facts.features()));
         r.put("unit", unit);
 
@@ -66,7 +68,7 @@ final class Report {
         Map<String, Object> pj = new LinkedHashMap<String, Object>();
         try {
             File maps = new File(e.root + "/data/hmgapi/maps");
-            MapProbe p = new MapProbe(e.root + "/system", e.root + "/data/hmgapi/stock", maps);
+            MapProbe p = new MapProbe(e.root + "/system", e.root + "/data/hmgapi/stock", maps, new File(maps, "catalogue"));
             p.run(new File(maps, "catalogue"));
             pj.put("found", (long) p.points.size());
             pj.put("by_reference", new ArrayList<Object>(p.byReference));
@@ -86,6 +88,10 @@ final class Report {
                     if (have != null && !String.valueOf(have).equals(String.valueOf(en.getValue()))) differs.add(en.getKey());
                 }
                 pj.put("differs_from_map", differs);
+                // points HMG-API's map itself lists as missing (car.json "missing") that this
+                // unit finds: the map is likely wrong there (#47), a maintainer should look
+                pj.put("found_here_missing_in_map", foundHereMissingInMap(
+                        map.carJson == null ? null : (Map<String, Object>) map.carJson.get("missing"), p.points, map.points));
             }
         } catch (Throwable t) {
             pj.put("error", scrub(String.valueOf(t)));
@@ -115,7 +121,7 @@ final class Report {
                     m.put("id", raw.get("id"));
                     m.put("version", raw.get("version"));
                     m.put("on", !new File(d, ".disabled").exists());
-                    String sys = raw.containsKey("system") ? SystemCheck.check(raw.get("system"), e.facts) : null;
+                    String sys = raw.containsKey("system") ? SystemCheck.check(raw.get("system"), e.facts, SystemCheck.asksHotspot(raw)) : null;
                     m.put("supports_this_car", sys == null);
                     if (sys != null) m.put("why_not", sys);
                     if (plan.refused.containsKey(d.getName())) m.put("hooks_not_loaded", plan.refused.get(d.getName()));
@@ -167,6 +173,8 @@ final class Report {
         e.out.add(map.describe());
         e.out.add("map-car: " + pj.get("found") + " hook point(s) found, " + ((Map<?, ?>) pj.get("not_found") == null ? 0
                 : ((Map<?, ?>) pj.get("not_found")).size()) + " not found");
+        String dis = disagreement(pj);
+        if (dis != null) e.out.add("check the map: " + dis);
         e.out.add("saved: " + dir.getPath() + "/" + name + ".json");
         if (net.get("summary") != null) e.out.add("network: " + net.get("summary"));
         for (String s : sticks) e.out.add("usb: " + s + "/" + name + ".json");
@@ -183,6 +191,23 @@ final class Report {
 
     static String safe(String s) {
         return s == null ? "unknown" : s.replaceAll("[^A-Za-z0-9.]", "").toLowerCase();
+    }
+
+    /** the installed build (installed.txt "build": commit and date, + if built with changes), or null */
+    static String installedBuild(Engine e) {
+        try {
+            for (String l : Engine.read(new File(e.data, "installed.txt")).split("\n")) {
+                // build.sh's stamp: a commit, + if built with changes, a date. Our own text, not
+                // scrubbed (its date looks like a phone number), but nothing else kept
+                if (l.startsWith("build ") && l.length() > 6) {
+                    String b = l.substring(6).trim().replaceAll("[^0-9A-Za-z +.-]", "");
+                    return b.isEmpty() ? null : b.length() > 40 ? b.substring(0, 40) : b;
+                }
+            }
+        } catch (Exception ignored) {
+            // not installed by the installer (dev setup)
+        }
+        return null;
     }
 
     /** HMG-API's recent warnings and errors: hmgapid's log and the log keeper's (scrubbed, last 60) */
@@ -211,6 +236,15 @@ final class Report {
         }
         List<Object> out = new ArrayList<Object>();
         for (int i = Math.max(0, lines.size() - 60); i < lines.size(); i++) out.add(scrub(lines.get(i)));
+        // the engine's last error, where it happened (Engine.failedAt): first 30 lines
+        try {
+            if (e.errorFile.isFile()) {
+                String[] t = Engine.read(e.errorFile).split("\n");
+                for (int i = 0; i < t.length && i < 30; i++) out.add(scrub(t[i]));
+            }
+        } catch (Exception ignored) {
+            // unreadable: left out
+        }
         return out;
     }
 
@@ -241,13 +275,26 @@ final class Report {
         StringBuilder s = new StringBuilder();
         s.append("# Car Report: ").append(carName(unit)).append(' ').append(unit.get("region")).append(' ').append(unit.get("firmware")).append("\n\n");
         s.append("- File: `").append(name).append(".json` (attach it to the issue)\n");
-        s.append("- HMG-API ").append(r.get("hmgapi")).append(", product `").append(unit.get("product")).append("`, platform ")
+        s.append("- HMG-API ").append(r.get("hmgapi")).append(r.get("build") != null ? " (build " + r.get("build") + ")" : "").append(", product `").append(unit.get("product")).append("`, platform ")
                 .append(unit.get("platform")).append(", Android ").append(unit.get("android")).append(", Wi-Fi chip: ")
                 .append(Boolean.TRUE.equals(unit.get("wifi_chip")) ? "yes" : "no").append("\n");
         s.append("- ").append(map.get("summary")).append("\n");
         Map<String, Object> nf = (Map<String, Object>) pj.get("not_found");
         s.append("- Mapped from this car's files: ").append(pj.get("found")).append(" points found, ")
-                .append(nf == null ? 0 : nf.size()).append(" not found\n\n");
+                .append(nf == null ? 0 : nf.size()).append(" not found\n");
+        String dis = disagreement(pj);
+        if (dis != null) s.append("- **Check the map:** ").append(dis).append("\n");
+        s.append("\n");
+        Map<String, Object> fh = (Map<String, Object>) pj.get("found_here_missing_in_map");
+        List<Object> df = (List<Object>) pj.get("differs_from_map");
+        if (dis != null) {
+            s.append("## This unit's mapper and HMG-API's map disagree\n\n");
+            if (fh != null) for (Map.Entry<String, Object> x : fh.entrySet()) {
+                s.append("- `").append(x.getKey()).append("`: found here; the map says missing (").append(x.getValue()).append(")\n");
+            }
+            if (df != null) for (Object x : df) s.append("- `").append(x).append("`: found here under another name than the map's\n");
+            s.append("\n");
+        }
         if (nf != null && !nf.isEmpty()) {
             s.append("## Hook points not found\n\n");
             for (Map.Entry<String, Object> x : nf.entrySet()) s.append("- `").append(x.getKey()).append("`: ").append(x.getValue()).append("\n");
@@ -280,6 +327,32 @@ final class Report {
         return s.toString();
     }
 
+    /** the points the map's car.json lists as missing (said) that this unit found and the map still lacks, with the map's why */
+    static Map<String, Object> foundHereMissingInMap(Map<String, Object> said, Map<String, ?> foundHere, Map<String, ?> inMap) {
+        Map<String, Object> out = new TreeMap<String, Object>();
+        if (said == null) return out;
+        for (Map.Entry<String, Object> ms : said.entrySet()) {
+            if (foundHere.containsKey(ms.getKey()) && !inMap.containsKey(ms.getKey())) out.put(ms.getKey(), ms.getValue());
+        }
+        return out;
+    }
+
+    /**
+     * One line when this unit's own mapper and HMG-API's map disagree (map_car
+     * found_here_missing_in_map, differs_from_map), else null: a sign the map is wrong.
+     */
+    @SuppressWarnings("unchecked")
+    static String disagreement(Map<String, Object> pj) {
+        Map<String, Object> fh = (Map<String, Object>) pj.get("found_here_missing_in_map");
+        List<Object> df = (List<Object>) pj.get("differs_from_map");
+        int a = fh == null ? 0 : fh.size(), b = df == null ? 0 : df.size();
+        if (a + b == 0) return null;
+        StringBuilder s = new StringBuilder("this unit's mapper and HMG-API's map disagree on " + (a + b) + " point(s)");
+        if (a > 0) s.append(", ").append(a).append(" found here that the map lists as missing");
+        if (b > 0) s.append(", ").append(b).append(" found here under other names");
+        return s.toString();
+    }
+
     /** A link that opens a new GitHub issue with the summary filled in (short: it goes in a QR code). */
     @SuppressWarnings("unchecked")
     static String issueUrl(Map<String, Object> r, String name) throws Exception {
@@ -287,7 +360,8 @@ final class Report {
                 pj = (Map<String, Object>) r.get("map_car");
         Map<String, Object> nf = (Map<String, Object>) pj.get("not_found");
         String title = "Car Report: " + carName(unit) + " " + unit.get("region") + " " + unit.get("firmware");
-        String body = "Product: " + unit.get("product") + "\nHMG-API: " + r.get("hmgapi") + "\nMap: " + map.get("status")
+        String body = "Product: " + unit.get("product") + "\nHMG-API: " + r.get("hmgapi")
+                + (r.get("build") != null ? "\nBuild: " + r.get("build") : "") + "\nMap: " + map.get("status")
                 + (Boolean.TRUE.equals(map.get("hooks_on")) ? " (hooks on)" : " (hooks off)")
                 + "\nFound on this car: " + pj.get("found") + " points, " + (nf == null ? 0 : nf.size()) + " not found"
                 + (r.get("network") instanceof Map && ((Map<String, Object>) r.get("network")).get("summary") != null

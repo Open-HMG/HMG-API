@@ -142,7 +142,7 @@ final class Commands {
      * never came on in time: stopped). ended and timed_out stay until the next start.
      */
     String conditioningState = "off";
-    long conditioningAt;
+    long conditioningAt, conditioningCloseAt;
     boolean timedOut;   // automatic starts wait for a manual one after a timeout (no retry loop)
     int linesBefore;
     int[] lightSaved;   // the owner's light, taken when a mod first changes it
@@ -155,6 +155,19 @@ final class Commands {
 
     Commands(Car car) {
         this.car = car;
+    }
+
+    /** resets per-start / per-drive latches across QuickBoot STR resume or EV_RDY shutoff */
+    synchronized void onNewSession() {
+        if (conditioningBy != null) {
+            car.log("conditioning: drive ended; stopping (" + conditioningBy + ")");
+            stopConditioning();
+        } else if ("ended".equals(conditioningState) || "timed_out".equals(conditioningState)) {
+            conditioningState = "off";
+        }
+        noticeDone = false;
+        manualStop = false;
+        timedOut = false;
     }
 
     /** when each (mod, command) question last went on screen: asked again after ASK_MS */
@@ -346,6 +359,10 @@ final class Commands {
             }
             conditioningKm = route[0];
             conditioningMin = route[1];
+            if (conditioningAuto && !"active".equals(conditioningState)) {
+                if (conditioningMin <= ROUTE_MIN && conditioningCloseAt == 0) conditioningCloseAt = car.now();
+                else if (conditioningMin > ROUTE_MIN) conditioningCloseAt = 0;
+            }
             car.conditioningRoute(conditioningKm);
             car.conditioningTime(conditioningMin);
             keptAt = car.now();
@@ -366,6 +383,7 @@ final class Commands {
         conditioningMin = route[1];
         startConditioning();
         conditioningAt = car.now();
+        conditioningCloseAt = !auto || conditioningMin <= ROUTE_MIN ? conditioningAt : 0;
         conditioningState = car.conditioningIndicator() < 0 ? "requested" : "waiting";
         return "ok conditioning started";
     }
@@ -407,6 +425,7 @@ final class Commands {
     void stopConditioning() {
         conditioningBy = null;
         conditioningAuto = false;
+        conditioningCloseAt = 0;
         conditioningKm = ROUTE_KM;
         conditioningMin = ROUTE_MIN;
         car.conditioningRoute(2047);
@@ -565,7 +584,7 @@ final class Commands {
             car.log("conditioning: the car ended it (indicator off); stopping (" + conditioningBy + ")");
             stopConditioning();
             conditioningState = "ended";
-        } else if (ind == 0 && car.now() - conditioningAt >= activationMs(car.model())) {
+        } else if (ind == 0 && conditioningCloseAt > 0 && car.now() - conditioningCloseAt >= activationMs(car.model())) {
             car.log("conditioning: the car's indicator didn't come on within " + activationMs(car.model()) / 60000 + " min; stopping (" + conditioningBy + ")");
             stopConditioning();
             conditioningState = "timed_out";

@@ -1,7 +1,252 @@
 # Changelog
 
-## Unreleased
+## 1.1.0-rc.5 (2026-11-19)
 
+- **The older Hyundai models on 260903, US and Canada: a hook map from stock files**
+  (`maps/hyundai/hmc/usa/260903`, all 391 points with code signatures). One system image
+  serves 25 models in both countries: Elantra (and Hybrid), Sonata (and Hybrid), Santa Fe
+  (and Hybrid, Plug-in Hybrid), Kona, Kona Electric 2020-21, Ioniq (Electric, Hybrid,
+  Plug-in Hybrid), Venue 2020-22, Veloster N and Palisade 2020-22 (#320). Their maps for
+  260507 (US) and 260206 (Canada) stay for cars not yet updated. Waiting for a check on a car.
+- **Maps for five more cars, from Car Reports.**
+  - The Korean Avante (`CN7`, #275) has the same 18 stock files as the Korean Hyundai
+    260902 map, and a US Ioniq 6 on 260206 (#319) has the same files as the Canadian
+    Ioniq 6 260206 map: `CN7.KOR.` and `CEEV.USA.` join those maps' products. #319's
+    report also confirms the Canadian map's 9 points that were mapped before code
+    signatures, so none are unconfirmed now.
+  - New maps: the facelifted Avante in Korea (`CN7PE.KOR` 260902, all 351 rc.4
+    points, #297), the Creta Electric in India (`SU2IEV.IND` 260430, all 351, #325)
+    and the Ioniq 6 in Korea (`CEEV.KOR` 260902, 333 of 351 from a 1.0.2 report, #310).
+    Each one is waiting for a check on a car.
+  - `tools/report-map.py` leaves out points that aren't in the catalogue, from a fork
+    or a local build (#325's report carried 127 of them), and says how many.
+  - The EV6 India map (#295) lists the 9 Phone Projection service points (#331) as
+    missing, like the other maps made from Car Reports; it claimed all 391 before.
+- **Kia EV6, India 260430 (`CVEV.IND`): a hook map** (`maps/kia/ev6/ind/260430`): 283
+  points from stock files plus 68 from two agreeing Car Reports from one car, all 351
+  of rc.4's points. The 283 pass the check on that car; the full map waits for one.
+  The 31 points newer than the reports are listed as missing (#295).
+- **Hook points for Phone Projection's service** (`framework.pp_service.*`: `PPService` in
+  system_server, binder `phoneprojection`): `connect_pp`, `disconnect_pp`,
+  `cancel_connection_pp`, `send_connect_pp_from_bt` (Device Connections), `on_wireless_connected`,
+  `on_wireless_disconnected`, `aa_connected_address`, `cp_connected_address`. Every CarPlay and
+  Android Auto connect, from any screen, and every wireless session report goes through it;
+  the Wireless mod's projection manager (which phone projects) uses them. Mapped on the 17
+  builds with stock files, missing on the Car Report maps until a newer report maps them.
+  Off-car only.
+
+- **The `parked` reading works without a mod asking for car events.** The vehicle service
+  only followed the power and gear for the parking rule when a mod declared
+  `"car_events"`, so on a car where none did, `parked` stayed 0 (a US EV6: switched off,
+  door closed, no "car off" in the vehicle log). It now follows them whenever the map is
+  ready; an event no mod asked for is still only logged. A door already open when the car
+  goes off counts as "opened" (a test for that order).
+
+- **A swapped voice button no longer leaves the car's voice assistant to start by
+  itself.** A binding's `send` injected the key with scan code 0. For a sent hold of
+  the voice button, the car makes the long press itself
+  (`ModeKeyDispatcher.generateLongKeyEventForPtt`: device 5, the real button's scan
+  code), and Android pairs a key's up with its down by device, source, key code and
+  scan code, so HMG-API's up never ended that down: the button stayed down in the
+  window on screen (Android Auto). The next key the car or HMG-API consumed, or the
+  reversing camera taking the screen, made Android cancel it there, and GPM took the
+  cancelled up for a release and started the car's own assistant, minutes later and
+  with no press. A sent key now carries the press's scan code when it is the same
+  button; for another button, a car repeat with a different scan code is logged, and
+  the input log line says the scan code sent (#301).
+- **Car events: mods can tidy up when you park and before the head unit shuts down.**
+  A mod asks for them in mod.json (`"car_events": {"parked": {"script": "bin/x.sh"},
+  "shutdown": {}}`): its script runs (as the user it gives, with its own log), its apps
+  hear `hmgapi.intent.action.CAR_EVENT`, and its hooks get them through
+  `ModContext.onCarEvent`.
+  - `parked`: the car is off, in P, and by the owner's rule (Settings > Vehicle >
+    "When the car is parked"; `hmgapid park-rule`) a door opened and then all four
+    closed (the default), all four are closed, or they've been closed for a minute or
+    five. The head unit stays on after you switch off, so the default waits for you to
+    get out.
+  - `unparked`: the car is switched on again after `parked`, before the head unit shut
+    down, so a mod can bring back what it put away.
+  - `shutdown`: the head unit is about to shut down. HMG-API answers the car's own
+    system-off (it registers as a responder only while a mod asks), gives scripts 6 s,
+    then lets the shutdown go on; the car never waits more than its own 10 s.
+  - `wake`: back from a QuickBoot suspend, where apps kept running through the off.
+
+  New readings `power`, `doors.closed` and `parked`. Car Check shows every car event.
+  New hook points: the power service (`framework.power_service.*`,
+  `framework.power_listener*`, `framework.car_services.power`), the door status
+  (`framework.bcm_listener_stub.doors`), and for Wireless CarPlay + Android Auto's
+  teardown GPM's ByeBye and wireless reconnect (`gpm.connection_manager.*`,
+  `gpm.receiver_service.connection_manager`, `.wireless_explorer`, `.on_create`,
+  `.connect_wireless_session`, `gpm.wireless_explorer.*`) and DiPO's
+  `dipo.carplay.disconnect` and `.restart_bonjour`: mapped on the 17 builds with stock
+  files, missing on the Car Report maps until a newer report maps them. Off-car only.
+- **Home Wi-Fi while the car is off.** A new owner switch (HMG-API app, Settings > Home Wi-Fi,
+  off by default; it turns the car's own Wi-Fi client feature on, one file and a restart): when
+  the car has been off for 30 s (its screen goes dark with it, and the stock apps end projection
+  then) or is parked (car events), the projection hotspot goes off and the car's own Wi-Fi
+  client joins your home network; the moment you switch on, it's the other way round, the
+  hotspot as it was. "Connect now" on the page (`hmgapid wifi now [minutes]`, `back`) does the
+  same with the car on, in P only, until back, out of P or the time is up (30 minutes by
+  default). While joined, the car's own traffic stays on mobile data
+  (HKMC's `mobile_hipri` keeps its services there; HMG-API puts the default route and DNS
+  back); only HMG-API and mods that ask (`"wifi": {"home": true}`) use home Wi-Fi. The page
+  adds and forgets networks (in Android's own Wi-Fi config; a key needs P) and lists what home
+  Wi-Fi saw. The client library has `homeWifi()` / `homeWifiUp()`. Tried on a US EV6. (A
+  client next to the hotspot, on a second interface, was tried first and dropped: on these
+  units' driver the hotspot's channel moved whenever it scanned, and any hotspot restart left
+  it unusable until a restart.)
+- **Mods never use the car's mobile data**, DNS included: every enabled mod's apps (by
+  uid) and services (now run with HMG-API's group 2950/2951) are refused on `rmnet`, and
+  their lookups can't reach the car's DNS servers. Internet for mods is home Wi-Fi only;
+  `overrides.allow_cellular` lets the owner allow one mod, with a warning in the plan.
+  This changes mods that used mobile data until now.
+- `hmgapid wpa` (the keeper's helper: a `wpa_supplicant` control command), and `hmgapid wifi
+  saved|seen|join|forget|now|back` for HMG-API's app (a key only ever in the keeper's
+  environment).
+
+- **Wireless CarPlay and Android Auto on the older Hyundai and Kia builds: the
+  projection AP gets the name and key the phone is given.** On the US 260507, Canada
+  260206 and Korea 260902 `hmc`/`kmc` builds (Sonata, Santa Fe, Elantra, K5, Sorento, Niro...),
+  `NetworkManagementService.startAccessPoint` has no branch for the connectivity AP
+  (apMode 2), so it came up with the hotspot's own name and key, and the phone, told
+  `ConnectivitySSID`/`ConnectivityPSK`, never joined (#159; a Korean Palisade too).
+  HMG-API now hands it a copy of the config with those in it, and on the config's own
+  channel even when the hotspot is set to 2.4 GHz, as the newer builds do; the saved
+  hotspot settings aren't touched, and builds that have the branch see no change. New
+  hook points `framework.network_management_service.start_access_point` and
+  `framework.wifi_configuration.ap_mode`, `.connectivity_ssid`, `.connectivity_psk`,
+  `.is_24ghz_band`:
+  mapped on the 17 builds with stock files, missing on the Car Report maps until a
+  newer report maps them.
+
+## 1.1.0-rc.4 (2026-11-17)
+
+- **Catalogue updates merge themselves.** A pull request that only moves an existing
+  entry to the mod's next release (same author key, a newer final version, a signed
+  release of the mod's own repo, nothing else but the package's own description) is
+  merged once the Catalogue check passes (`tools/catalog.py bump`,
+  `catalog-automerge.yml`). New mods and anything else still wait for a maintainer.
+- **The vehicle service's per-drive guards reset on a new drive (#269, lemoyneiv).** With
+  QuickBoot the service lives across drives, so a dismissed startup notice, a manual stop
+  or a conditioning timeout from one drive blocked the next. A resume from suspend
+  (`elapsedRealtime` moving while `uptimeMillis` doesn't) or EV ready going off now
+  resets them, stops conditioning still running, and clears cached readings.
+- **Routed battery conditioning waits for the car to be 18 minutes out (#270,
+  lemoyneiv).** For a fast charger farther away, the battery accepts the route and waits;
+  the activation timeout now starts only within 18 minutes, instead of timing out while
+  the battery is still waiting.
+- **The vehicle service's socket and readings (#271, lemoyneiv):** a failed `accept()`
+  no longer spins, a connection is shut down both ways before its fd is closed, `speed`
+  and `moving` are at most 100 ms old (was 250 ms), and the startup notice's dismissal
+  is sent again a few times while parked, as the car can put it back.
+- **`outside_temp` ignores -40 (#180, zpoon):** climate control's raw zero right after
+  the car wakes, the same in °F and °C, was passed on as a reading.
+- **The Ioniq 5 `NEEV23SE` on US 260903 uses the Ioniq 5 2023 map (#268, lemoyneiv).**
+- **Catalogue:** CarPlay Keys (DeFlight, LLC; #249, now 1.5.0, #284) and Comfort &
+  Startup 1.1.1 (lemoyneiv; #272), with their author keys.
+- **Maps from Car Reports: Elantra `CN7PE` (USA 260507), Elantra N 2024 `CN7NPE` and
+  Kona `OSPE` (USA 260903), Niro EV `SG225EV` (Canada 260206).** All 351 points each,
+  from rc.3 reports with code signatures (#252, #254, #257, #261), in the base map's
+  form: each differs from the base map in 1 to 4 points. Their builds' stock files
+  match no other map's. `SystemCheck` knows the three new model codes (`CN7PE`,
+  `CN7NPE`, `SG225EV`).
+- **Ioniq 6 Singapore 260907: 312 points, up from 305**, from two rc.3 Car Reports
+  (#265): the Phone Projection helper, the panel's test switch and the split-screen
+  item type, every smali-only point with its code signature. The 39 still missing are
+  in this build's button settings and iAP2 server, whose code differs.
+- **Genesis G70 Canada 260903 and the Korean Hyundai build (Sonata, Santa Fe,
+  Palisade, 260902): all 351 points**, from rc.3 Car Reports (#231, #276) with the
+  same stock files as their maps: the G70 up from 277 (3 apps weren't in the first
+  report), the Korean build up from 341 with its 7 unconfirmed points confirmed by code
+  signature. Both maps keep their folder and products.
+- **The Canadian Ioniq 5 on 260903 uses the US Ioniq 5 2023 map.** Its 18 stock files
+  are the same as that map's (Car Report #274), so `NEEV.CAN.` joins its products.
+- **Hyundai Ioniq 6 (`CEEV`), USA 260507: a hook map** (`maps/hyundai/ceev/usa/260507`),
+  made with `tools/map-car.py` from the car's stock files, with the 4 newest 12 V battery
+  points (`framework.hscan_service.battery_12v_*`) and the smali-only points' code
+  signatures from an rc.3 Car Report (#253): all 351 points. Its apps are the same files as
+  the Canadian 260206 build's. `verify-map` passed on the car (343 of 343 with 1.0.2, and
+  351 of 351 against the car's own map with rc.3); it waits for a check on a car with this
+  map.
+- **A file a mod added, deleted by something else, no longer blocks uninstall and apply
+  (#226).** The file wasn't there before HMG-API added it, so gone is its stock state:
+  restore and uninstall go through, and apply puts it back. Seen with the wireless mod's
+  `libleafiaaac.so` after an old package's uninstall deleted it.
+- **`engine apply --force` writes back owned files that were deleted or changed outside
+  HMG-API (#103),** as its hint says. Before, a file whose rebuilt bytes matched HMG-API's
+  record was "same" and never written, so `--force` ended with "nothing to do".
+- The Ioniq 6 on 260903 (USA and Canada) is checked on a car. `hmgapid engine verify-map`
+  passed all 351 points on a US car (`CEEV.USA.0000.V016.010.260903`), so the map runs
+  without "Try unchecked maps".
+- **The Ioniq 6 on 260903 has all 351 hook points, in Canada as well as the USA.** The
+  shared `hyundai/ceev/usa/260903` map (products `CEEV.CAN.` and `CEEV.USA.`) listed the 4
+  `btsettings.projection_helper` points missing: they were looked for in class `iP`, which
+  has none of them. The cars' own mapper found them in `iO` (Canadian Car Reports, same 18
+  stock file md5s as the map's), so the map now names `iO` and the four methods are the
+  base map's. A Canadian car needs no map of its own and no mapping to the USA: its product
+  `CEEV.CAN.0000.V016.010.260903` already picks this build's map.
+  The panel's test switch (`panel.test_gate.on`) is `pB`, as the three newest Canadian
+  reports find it by code signature; the map had the older report's `py`, matched by name
+  only. With that, none of this build's points are unconfirmed.
+- **Kia Canada 260206 (Niro, Sportage, Carnival, Telluride, Forte, Soul, Seltos 2024):
+  the Phone Projection hook points.** The map, from an rc.1 Car Report, had borrowed the
+  helper class name `iP`, a different class on this build (it's `iO`), so all four
+  points were missing and Wireless CarPlay + Android Auto's hooks stayed off
+  (hmgapi-wireless-cp-aa#47). The map is now made from the build's stock files.
+- **Maps that look wrong fail the map check.** A class mapped while every one of its
+  members is missing is almost always a borrowed name that a different class has on
+  that build; `check-maps.py` fails on it.
+- **Maps from Car Reports don't keep doubtful by-reference classes.** `report-map.py`
+  lists a by-reference class and its members as missing ("not kept from the Car Report")
+  when the report's mapper is older than 1.1.0-rc.3 (it didn't check a reference class's
+  members), or when none of the class's members were found: stock files or a newer Car
+  Report map them.
+- **The Car Report says when the unit's mapper and HMG-API's map disagree:** points the
+  map lists as missing that the unit finds, and points found under other names ("Check
+  the map", with each point).
+- **Six more maps from their builds' stock files:** the Ioniq 5 2023 (USA 260903), the
+  Ioniq 6 260903 (USA and Canada; the same points as above, now confirmed from stock) and
+  the newer Kia build in the USA (260507: Sportage, Telluride, Carnival, Niro). All 351
+  points each, every smali-only point with its code signature. On the Ioniq 5 2023 the
+  panel's test switch is `pB`, not the borrowed `py`; the Kia maps gain the 8 points
+  their Car Reports predated.
+- **Four maps list the Phone Projection helper as missing** instead of the borrowed `iP`,
+  which has none of its members there: the Ioniq 6 Singapore 260907, the G70 Canada
+  260903, the Creta India 260430 and the Korean EV6 260902. Stock files or a Car Report
+  from 1.1.0-rc.3 on will map them.
+
+## 1.1.0-rc.3 (2026-11-16)
+
+The third release candidate: hook maps for many more cars (one map per system build), the
+Wi-Fi hotspot for cars without one, and a mapper that can map a car with no map from its own
+files. It comes with Wireless CarPlay + Android Auto 2.2.0-rc.4 and ADB 1.0.1-rc.1, and
+NEMESIS in the app menu.
+
+- **`check-points.py`: a floor that is the SDK's own version uses its own points.** A mod
+  and the core release it needs can now be built before that release is tagged (wireless
+  2.2.0-rc.4's `">=1.1.0-rc.3"` on the rc.3 SDK); before, it fetched the floor's points
+  from a release that wasn't there yet.
+- **`"wifi": {"hotspot": true}`: HMG-API turns on the Wi-Fi hotspot feature** for mods
+  that need the Wi-Fi chip. Without the stock hotspot feature the unit never powers its
+  chip, so it was never seen and HMG-API said "no Wi-Fi chip" (Korean units, and US cars
+  such as the 2023 Santa Fe, #112, #170). Where the stock file is there, only its
+  `featurexml.cfg` line is commented out; otherwise HMG-API's own file goes in, shared by
+  every mod that asks, back to stock when none does. The older Hyundai and Kia builds and
+  the Korean ones mapped in this release have no stock hotspot file.
+- **A chip that isn't powered yet counts for the mod that powers it.** The driver,
+  firmware and `wifi.module` feature without the stock hotspot are now
+  `hmgapi.wifi.unpowered`; for a mod that asks for the hotspot, that meets `hmgapi.wifi`.
+  HMG-API's own hotspot file doesn't count as the car's, so `hmgapi.wifi` still means a
+  chip that showed on SDIO or a car whose stock software has the hotspot. The Car Report
+  says which (`unit.wifi`).
+- **The repo keeps one base map and each build's differences** (#236). The names a hook point
+  resolves to hardly change between builds, so `maps/base/<app>.json` holds each point's
+  entry on most builds, and a build's `car.json` lists only what's its own: `"names"` (0 to
+  3 per build today), `"unconfirmed"` (methods mapped before code signatures) and
+  `"missing"`. 326 map files become 40. `build.sh` expands them into the same per-app files
+  as before (byte for byte), so the unit, the mod SDK and local maps read what they read;
+  `map-car.py`, `report-map.py`, `check-maps.py`, `mkhookdoc.py` and `probe-test.py` read
+  and write through `tools/maplib.py`.
 - **A unit maps the points HMG-API's map lacks only because the map is older than them.**
   This happens after each HMG-API install or update (a boot step), or from Settings ("Map the
   points HMG-API's map lacks"). Only points found by name are mapped, in apps whose stock
@@ -26,6 +271,14 @@
   older reports and preserves their unresolved points and absent apps.
 - The on-car mapper checks a reference class's members together, so an unrelated
   class reusing another build's name does not hide the correct projection helper.
+- **The on-car mapper finds every hook point on a car with no map.** The 3 methods it left
+  for a Car Report share their code with others (25 identical flag getters for the panel's
+  test switch), so the code signature alone couldn't pick one. A catalogue `"site"` now
+  says how the smali pattern calls each, in terms the dex still shows after odex
+  quickening: the calling class and the instructions after an `invoke-static`, the method
+  called next, or that the call is virtual (`core/hookpoints/README.md`). On every stock
+  tree `engine map-car` now matches `map-car.py` on all 351 points, Korea included (the
+  test switch is `pB` there, not the US `py`).
 - **The on-car mapper takes another car's method name only for the same code.** For the
   methods only a smali pattern finds, it used to keep another map's name if this car had a
   method of that name and signature. On the Korean 260902 builds that picks the wrong
@@ -40,10 +293,69 @@
   Telluride and Niro EV maps are one build).
 ### Cars
 
+- **Six more maps from Car Reports** (status probed: hooks run after `verify-map` passes on
+  the car, or with "Try unchecked maps"):
+  - `hyundai/ceev/usa/260903`: the Ioniq 6 on 260903, in the USA **and** Canada. The US
+    (#208) and Canadian (#234) reports have the same files and points (347);
+  - `kia/ev6/kor/260902` (#9, 319 points) and `kia/bdpe/kor/260902`, the K3 (#17, 323);
+  - `genesis/ikfl/can/260903`: the Canadian G70 (#231, 278 points: three apps weren't in
+    the report);
+  - `hyundai/ceev/sgp/260907`: the Ioniq 6 in Singapore (#228, 306 points);
+  - `hyundai/su2ifl/ind/260430`: the Creta in India (#191, 339 points).
+  On the EV6 and K3 Korea and Singapore maps the panel's test switch is left out: there the
+  borrowed `split_item.type` didn't fit either, as on the Korean builds read from stock
+  files, where the borrowed `py` is another method. `SystemCheck` knows `SU2IFL` (Creta).
+- **The newer Kia build in the US covers more cars.** The Sportage map
+  (`kia/nq5/usa/260507`) now also lists the Sportage Hybrid and Plug-in Hybrid, Forte,
+  2022 Carnival, Niro Hybrid and Plug-in Hybrid, Soul and 2024 Seltos: the US packages
+  that install the same build as the Sportage, Telluride, Carnival and Niro EV maps (their
+  Car Reports have the same files). Before, those cars had no map.
+- **The older Hyundai and Kia builds in Canada (260206), from stock files** (351 of 351
+  hook points each, status mapped: waiting for a check on a car):
+  - `hyundai/hmc/can/260206`: Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N
+    and the 2020-22 Palisade, with their hybrids and EVs (25 products);
+  - `kia/kmc/can/260206`: K5, Sorento, Stinger, Soul, the 2021 Seltos, the 2020-21 Niro
+    and Telluride (23 products).
+  Every `onebin` folder in these builds is a product: no Canadian package of another build
+  has one there. The Kia build's names differ from its US build in the same two fields as
+  the Canadian Ioniq 5's (`homesetting.edit_list.items`, `dipo.iap2_client.manager`), and
+  the Hyundai build's projection helper is the EV6's `iP`, not its US build's `iO`. Neither
+  build has the Wi-Fi hotspot feature file.
+- **Four maps from Car Reports** (status probed: hooks run after `verify-map` passes on
+  the car, or with "Try unchecked maps"):
+  - `hyundai/hmc/kor/260902`: the Korean Sonata, Sonata Hybrid, Santa Fe and Palisade, 341
+    points. Five reports from three of them (#89, #91, #160) have the same files and points;
+  - `kia/sg2ev/can/260206`: the newer Kia build in Canada, 347 points, from a Niro EV's
+    report (#205). Its products are the Canadian packages that install that build: Niro,
+    Sportage, Carnival, Telluride, Forte, Soul and the 2024 Seltos. On the US build, the
+    products its Car Reports show (`NQ5`, `ONPE`, `SG2EV`, `KA423`) are all among the codes
+    that rule gives;
+  - `genesis/ikfl/usa/260507` (#2, 325 points) and `genesis/ikfl/kor/260902` (#93, 341
+    points): the G70. The points newer than each report are listed as missing.
+  These reports predate #233, so their smali-only methods were borrowed by name;
+  `check-maps.py` lists them as unconfirmed. On the two Korean maps the panel's test switch
+  (`panel.test_gate.on`) is left out: its borrowed name `py` is another method on the
+  Korean builds read from stock files (the switch is `pB` there). `SystemCheck` knows the new model codes.
 - **The 2022 Ioniq 5 (`NEEV`) on US 260903 uses the 260903 map**, as the 2023-on
   (`NEEV23`) does. Its 18 mapped files are the same bytes, and its owner's check found all
   351 hook points (#192; also #72, #186). Before, it had no map there: hooks were off
   unless the owner made one on the car.
+- **Four maps from stock files, for the older Hyundai and Kia builds and Korea** (351 of
+  351 hook points each, status mapped: waiting for a check on a car). One map per build,
+  so each covers every model on it:
+  - `hyundai/hmc/usa/260507`: Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N
+    and the 2020-22 Palisade, with their hybrids and EVs (25 products);
+  - `kia/kmc/usa/260507`: K5, Sorento, Stinger, Soul, the 2021 Seltos, the 2020-22 Niro,
+    Cadenza and the 2020-21 Telluride (24 products);
+  - `kia/kmc/kor/260902`: the Korean K5, Sorento, Stinger, Seltos, Soul, Niro, Mohave,
+    K7, Morning and Ray (33 products). The K5 Hybrid owner's files from a Car Report are
+    the same bytes;
+  - `hyundai/neev/kor/260902`: the Korean Ioniq 5.
+  A map lists the cars whose `onebin` folder is in that build, less those known to
+  install another build (the Korean 2021 Mohave and the Carnival). For a car on another
+  build, the stock-file md5s give `mismatch`, never another build's names.
+  `SystemCheck` knows the new model codes. None of the four builds has the Wi-Fi hotspot
+  feature file, so the wireless mods can't use the hotspot there yet.
 ### Fixes
 
 - **The USB install puts the HMG-API app in right away** (#187). With Android up, the
@@ -171,6 +483,12 @@ The release candidate: feature freeze. 1.1.0 will be this code unless a blocker 
 
 ### Fixes
 
+- **`outside_temp` no longer reads -40 before climate control has a value.** Right
+  after the car wakes, climate control can report -40 (the raw zero of its signal, the
+  same in °F and °C), and `outside_temp`/`outside_temp_f` passed it on as a reading (seen
+  on an Ioniq 5 through Battery Watchdog). Such a -40 is held back: the last real value
+  stays, or the reading stays `-`. It counts if it holds for 10 minutes, or at once when
+  the last reading was already -31 °F or colder, so a real -40 still shows.
 - **The right split-screen panel keeps the Mobis font with hooks on** (#174). HMG-API
   made its panel page's views as soon as the panel app started, even with no mod page;
   that loaded the process's fonts before the Mobis font's fallback was in place, so

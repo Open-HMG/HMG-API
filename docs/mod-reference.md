@@ -33,6 +33,7 @@ setting). It never edits your code.
 | a folder on a USB stick | `"usb": ["MyFolder"]`: your apps get `hmgapi.intent.action.USB_FOLDER`; services ask `hmgapid usb` |
 | to read the car | `"vehicle": {"read": ["battery12v.soc", "gear.park", "hv.soc"]}`, then `hmgapid vehicle <name>…` or `api.vehicle(…)`: no root, one read shared by every mod (see Vehicle readings) |
 | to send a car command | `"vehicle": {"commands": [...]}` and `hmgapid vehicle-do <command> <args>`: named, guarded, no root (see Vehicle commands) |
+| to tidy up when the car is parked, or before the head unit shuts down | `"car_events": {"parked": {"script": "bin/park.sh"}, "shutdown": {}}`: a script, your apps and your hooks hear it (see Car events) |
 | buttons | `"input": [{"key": "tune_enter", "press": "hold", "stock": "replace", "open": "<your app>/.Grid"}]`: one reader for every mod (see Buttons) |
 | a page in the right-hand split-screen panel | `"provides": {"panel": [{"title": "Battery", "widget": "<your app>/.MyWidget"}]}`: a standard Android app widget from your app (example: `mods/examples/side-panel`) |
 | Android Auto settings and events | `"projection"` (see Phone projection) |
@@ -151,6 +152,9 @@ Each entry is `"<id>"`, `"<id> <range>"` or `{"id": …, "version": <range>}`; r
 | `seat_state.<seat>` | raw | that step: 2 off, 3-5 ventilation, 6-8 heat |
 | `outside_temp`, `outside_temp_f` | °C, °F | climate control's outside temperature (pushed by the car; converted on a car that shows the other unit) |
 | `parking_brake` | 0/1 | the electronic parking brake engaged |
+| `power` | text | the power service's status: `on`, `logic_on` (the car is off, the head unit still up), `adm`, `system_ready`, `delay_mode`, `preparing_off`, `off` |
+| `doors.closed` | 0/1 | all four doors closed (body control, pushed; the trunk and hood don't count); `-` until the car has said |
+| `parked` | 0/1 | HMG-API's parked state, by the owner's rule (the `parked` / `unparked` car events) |
 
 Each value is read through the car's own interface, by method name from the car's
 hook map, and kept for a short time (100 ms for steering and pedals, up to 60 s
@@ -333,13 +337,70 @@ sysctl comes back).
   `.../net.sh down` takes everything out. The keeper's log:
   `/data/hmgapi/logs/hmgapi/net.log`.
 
+## Internet: home Wi-Fi, never the car's mobile data
+
+A mod never uses the car's cellular link (`rmnet`), DNS lookups included. Its apps (by
+uid) and its services (hmgapid runs them with HMG-API's group 2950 or 2951 as their
+effective group) are refused there by the network keeper, and their lookups can't reach
+the car's DNS servers: an app's go through `wlan0` in netd (no servers there unless home Wi-Fi is up), a service's run in its own
+process (`ANDROID_DNS_MODE=local`). The owner can let one mod use mobile data anyway, at
+their own risk: `"overrides": {"allow_cellular": ["<mod>"]}` in `hmgapi.json` (the plan
+warns).
+
+For internet, a mod asks for **home Wi-Fi**:
+
+```json
+"wifi": {"home": true}
+```
+
+With the owner's switch on (HMG-API app, Settings > Home Wi-Fi; it turns the car's own Wi-Fi
+client feature on: one file, a restart), the head unit joins the owner's home network **while
+the car is off**: switched off for 30 s (its screen goes dark with it, and the stock apps end
+projection then), or `parked` (car events), whichever comes first. Then the hotspot wireless
+CarPlay and Android Auto use goes off and the car's own Wi-Fi client joins; the moment the car
+is switched on again, the client goes off and the hotspot comes back as it was. (A client
+next to the hotspot, on a second interface, didn't hold up on these units' Wi-Fi driver.)
+While joined, the traffic of the mods that ask (their apps, and their services) goes through
+home Wi-Fi; the car's own stays on mobile data. A mod that asks while the switch is off has no
+internet (the plan says so). IPv4 only for now. This is also how HMG-API itself is meant to
+check for updates.
+
+- Check before a download: `HmgApi.homeWifiUp()`, or `HmgApi.homeWifi()`
+  (`{"state": "up", "rssi": -61, "freq": 2437}`; `state` up, waiting (the car is on),
+  searching, nonetworks, stock (the car's own Wi-Fi settings have the Wi-Fi), off). It never
+  gives the network's name. Car events' `parked` is a good moment to start one; switching the
+  car on ends it (the client goes off).
+- On request: the HMG-API app's "Connect now" (`hmgapid wifi now [minutes]`, `wifi back`)
+  switches the same way with the car on, in P only (wireless CarPlay and Android Auto are off
+  meanwhile); it ends on "back", out of P, or after the minutes (30 by default, at most 240).
+  It's how HMG-API's updater is meant to get online later.
+- The networks: in Android's own Wi-Fi config, added and forgotten in the HMG-API app (typing
+  a key needs P; the page lists what home Wi-Fi saw while parked). Keys are never in a log or
+  Car Report.
+- The keeper: `hmgapi wifi` (`/data/hmgapi/state/wifi.sh`), its log
+  `/data/hmgapi/logs/hmgapi/wifi.log`; routing table 95, rule priority 900, mark 0x2951.
+
 ## Files and settings that several mods share
 
 - **Feature flags:** `"feature_flags": ["com.hkmc.software.connectivity.carplay_wireless"]`.
   HMG-API writes the same permissions file for every mod that asks and comments out
   its `featurexml.cfg` line; it stays while any mod wants it.
 - **Wi-Fi client:** `"wifi": {"client": true}` (the `android.hardware.wifi` feature
-  and `persist.wifi.state=3`, as Tilepad's toggle does); any number of mods can ask.
+  and `persist.wifi.state=3`, as Tilepad's toggle does); any number of mods can ask. The
+  stock client and the hotspot don't run together (the stock Wi-Fi stack ignores the
+  client switch while the hotspot is up); for internet, ask for home Wi-Fi instead (above),
+  which switches between them while parked.
+- **Wi-Fi hotspot:** `"wifi": {"hotspot": true}`: the stock hotspot feature
+  (`com.hkmc.software.wifihotspot`), without which the unit never powers its Wi-Fi chip.
+  Korean units and some US trims ship without it, or delete it at boot from
+  `featurexml.cfg`. Where the stock file is there, HMG-API only comments out its
+  `featurexml.cfg` line; where it isn't, HMG-API's own file goes in. Shared by every mod
+  that asks, and back to stock when none does. Both asks can go together.
+  A mod that asks for the hotspot and lists `"features": ["hmgapi.wifi"]` in `"system"`
+  also runs on a unit where the chip hasn't been seen yet but its driver, firmware and
+  `com.hkmc.software.wifi.module` feature are there (`hmgapi.wifi.unpowered`): the mod
+  turns it on. Once the chip has shown on SDIO, it's `hmgapi.wifi` for every mod. The
+  Car Report's `unit.wifi` says which: `seen`, `stock hotspot`, `unpowered` or `none`.
 - **`media_codecs.xml` by codec name** (patches.json):
   `{"type": "codecs", "path": "/system/etc/media_codecs.xml", "stock": "any",
   "remove": ["OMX.google.h264.decoder"], "add": [{"name": "OMX.google.vp9.decoder",
@@ -367,6 +428,51 @@ charge_door open` or `api.command("seat_heat", "driver", "low")`, without root. 
 review gave it (park only, one holder of the ambient light, conditioning stopped
 when its mod is turned off ...): the list, arguments and guards are in
 `vehicle-commands.md`.
+
+## Car events
+
+A mod that keeps something running (a phone session, a recording, a connection) can put
+it away when the driver parks and leaves, and before the head unit shuts down, instead of
+being cut off mid-way:
+
+```json
+"car_events": {
+  "parked":   {"script": "bin/park.sh"},
+  "unparked": {},
+  "shutdown": {"script": "bin/off.sh", "user": "system"},
+  "wake":     {}
+}
+```
+
+| Event | When |
+|---|---|
+| `parked` | the car is off, in P, and by the owner's rule: a door opened and then all four closed (the default: the driver got out), all four are closed, or they've been closed for a minute or five (Settings > Vehicle > "When the car is parked"; `hmgapid park-rule door\|closed\|<10-1800 s>`). Once per stop. No door status from the car: no `parked` |
+| `unparked` | the car is switched on again after `parked`, before the head unit shut down: bring back what you put away |
+| `shutdown` | the head unit is about to shut down (the car's own system off). Scripts get 6 s; the car goes on after 10 s whatever happens |
+| `wake` | the head unit came back from a QuickBoot suspend: apps and services kept running through the off, so bring back what `parked` or `shutdown` put away |
+
+Each event reaches the mod three ways, all at once:
+
+- **its script**, with the event as `$1`: a service of the mod's named `on-<event>` (start
+  `manual`, no restart), so it runs as its `"user"` (root by default; `system`, `app`),
+  with the services' environment, and its output is in `hmgapid service-log on-<event>`.
+  It gets 60 s (6 s for `shutdown`), then it's stopped. The mod can't have a service of
+  its own by that name.
+- **its apps**: an ordered broadcast `hmgapi.intent.action.CAR_EVENT`, extra `event`
+  (`HmgApi.ACTION_CAR_EVENT`, `EXTRA_EVENT`, `EVENT_*` in the client). Declare the receiver
+  with `android:permission="android.permission.DEVICE_POWER"` so only HMG-API can send it,
+  and use `goAsync()` for anything longer than a moment.
+- **its hooks**, in each app process they run in: `mod.onCarEvent(app, listener)` in
+  `appLoaded`. The listener runs off the app's main thread (post to the app's own thread
+  for its objects), only for the events the mod asked for and only while it's on; HMG-API
+  waits up to 5 s per process.
+
+HMG-API waits for all three to finish (or their time to run out) before it sends the
+next event (`shutdown` doesn't wait for a `parked` still running), and at `shutdown`
+before it tells the car it's done. It only holds a shutdown up while an
+enabled mod asks for `shutdown`. The vehicle service runs while any enabled mod asks for
+an event. `hmgapid service-log hmgapi vehicle` says what it saw (power, doors) and what
+each event did.
 
 ## Packaging
 

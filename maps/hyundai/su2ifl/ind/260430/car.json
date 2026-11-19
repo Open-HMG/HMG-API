@@ -1,0 +1,199 @@
+{
+  "make": "hyundai",
+  "model": "su2ifl",
+  "name": "Creta",
+  "region": "ind",
+  "firmware": "260430",
+  "products": [
+    "SU2IFL.IND."
+  ],
+  "status": "probed",
+  "verified": null,
+  "files": {
+    "/system/app/ButtonSettings.odex": "691f0deafb81ee31086b49da8abe12a1",
+    "/system/app/HKMC_BtSettings.odex": "1cba77f67a5827a75fcd3ce633311748",
+    "/system/app/HKMC_DiPO.odex": "1e035512e2898702f1d00c8fccac6b2f",
+    "/system/app/HKMC_GPM.odex": "97252c2c839bcd2088eaf6120565c231",
+    "/system/app/HKMC_HomeSetting_WP.odex": "a3bbacb8510dd885c467d0830e10d22e",
+    "/system/app/Iap2ServerApp.odex": "2a6e98df322951aa194041a56e3e5356",
+    "/system/app/Launcher_WP3.odex": "d23e799f8b657eddca5345ba1301fa9d",
+    "/system/app/RightScreenHome.odex": "fd8b01dda305a1943c653e49adf80697",
+    "/system/app/Settings_W.odex": "6d92cb709c7f16690919003d341b179a",
+    "/system/app/ThemeSettings.odex": "5ccdd053e956aa75d03f7aff7b65ae22",
+    "/system/framework/automotive-service.odex": "e8fdf415a255bf1f47ace8b269a5fa0d",
+    "/system/framework/automotive.odex": "1eda44002b70be8bd693cbe9cb2d6742",
+    "/system/framework/com.broadcom.bt.jar": "dbf374aa8bde80fad95746a67719ce51",
+    "/system/framework/com.hkmc.ext.hcan.odex": "761dbe6387e035c41018bc85059c63e2",
+    "/system/framework/com.tcc.iap2.odex": "0d89f8a54dae365317ae4c749263ff6f",
+    "/system/framework/core.odex": "320993719ef525d0c34b1c4073cbcd4b",
+    "/system/framework/framework.odex": "7a768570d936eda87eee7e6aeafa6628",
+    "/system/framework/framework2.odex": "98203dd15f44fa0a290b0065d7f8fcd1"
+  },
+  "apps": [
+    "btsettings",
+    "buttonsettings",
+    "dipo",
+    "framework",
+    "gpm",
+    "homesetting",
+    "iap2",
+    "launcher",
+    "panel",
+    "settings",
+    "themesettings"
+  ],
+  "app_files": {
+    "btsettings": {
+      "package": "com.android.btsettings",
+      "files": [
+        "/system/app/HKMC_BtSettings.odex"
+      ]
+    },
+    "buttonsettings": {
+      "package": "com.android.buttonsettings",
+      "files": [
+        "/system/app/ButtonSettings.odex"
+      ]
+    },
+    "dipo": {
+      "package": "com.daudio.app.dipo",
+      "files": [
+        "/system/app/HKMC_DiPO.odex",
+        "/system/framework/com.tcc.iap2.odex",
+        "/system/framework/com.broadcom.bt.jar"
+      ]
+    },
+    "framework": {
+      "package": null,
+      "files": [
+        "/system/framework/framework.odex",
+        "/system/framework/core.odex",
+        "/system/framework/framework2.odex",
+        "/system/framework/automotive.odex",
+        "/system/framework/com.hkmc.ext.hcan.odex",
+        "/system/framework/automotive-service.odex"
+      ]
+    },
+    "gpm": {
+      "package": "com.google.android.projection.sink",
+      "files": [
+        "/system/app/HKMC_GPM.odex"
+      ]
+    },
+    "homesetting": {
+      "package": "com.hkmc.system.app.homesetting",
+      "files": [
+        "/system/app/HKMC_HomeSetting_WP.odex"
+      ]
+    },
+    "iap2": {
+      "package": "com.tcc.iap2server",
+      "files": [
+        "/system/app/Iap2ServerApp.odex"
+      ]
+    },
+    "launcher": {
+      "package": "com.android.launcher3",
+      "files": [
+        "/system/app/Launcher_WP3.odex"
+      ]
+    },
+    "panel": {
+      "package": "com.mobis.splitscreen.right",
+      "files": [
+        "/system/app/RightScreenHome.odex"
+      ]
+    },
+    "settings": {
+      "package": "com.android.settings",
+      "files": [
+        "/system/app/Settings_W.odex"
+      ]
+    },
+    "themesettings": {
+      "package": "com.android.themesettings",
+      "files": [
+        "/system/app/ThemeSettings.odex"
+      ]
+    }
+  },
+  "missing": {
+    "btsettings.projection_helper": "not kept from the Car Report: its by-reference class com.android.settings2.bluetooth.iP has none of its 4 members here, so it is likely a different class with the same name (stock files or a newer Car Report map it)",
+    "btsettings.projection_helper.device_connections_available": "not kept from the Car Report: its by-reference class com.android.settings2.bluetooth.iP has none of its 4 members here, so it is likely a different class with the same name (stock files or a newer Car Report map it)",
+    "btsettings.projection_helper.open_device_connections": "not kept from the Car Report: its by-reference class com.android.settings2.bluetooth.iP has none of its 4 members here, so it is likely a different class with the same name (stock files or a newer Car Report map it)",
+    "btsettings.projection_helper.open_other_page": "not kept from the Car Report: its by-reference class com.android.settings2.bluetooth.iP has none of its 4 members here, so it is likely a different class with the same name (stock files or a newer Car Report map it)",
+    "btsettings.projection_helper.open_wireless_page": "not kept from the Car Report: its by-reference class com.android.settings2.bluetooth.iP has none of its 4 members here, so it is likely a different class with the same name (stock files or a newer Car Report map it)",
+    "dipo.carplay.decode_failure": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "dipo.carplay.disable_bluetooth": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "dipo.carplay.disconnect": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "dipo.carplay.force_key_frame": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "dipo.carplay.restart_bonjour": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "dipo.carplay.screen_timeout": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.bcm_listener_stub.doors": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.car_services.power": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.hscan_service.battery_12v_saver": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.hscan_service.battery_12v_sensor_error": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.hscan_service.battery_12v_sensor_invalid": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.hscan_service.battery_12v_sensor_state": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.network_management_service": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.network_management_service.start_access_point": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.power_listener": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.power_listener_stub": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.power_listener_stub.as_interface": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.power_listener_stub.power_status_changed": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.power_listener_stub.system_off": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.power_service": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.power_service.confirm_system_off": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.power_service.power_status": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.power_service.register_system_off_responder": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.power_service.unregister_system_off_responder": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.power_service_stub": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.power_service_stub.as_interface": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.pp_service": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.pp_service.aa_connected_address": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.pp_service.cancel_connection_pp": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.pp_service.connect_pp": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.pp_service.cp_connected_address": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.pp_service.disconnect_pp": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.pp_service.on_wireless_connected": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.pp_service.on_wireless_disconnected": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.pp_service.send_connect_pp_from_bt": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.wifi_configuration": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.wifi_configuration.ap_mode": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.wifi_configuration.connectivity_psk": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.wifi_configuration.connectivity_ssid": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.wifi_configuration.is_24ghz_band": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "gpm.connection_manager": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "gpm.connection_manager.send_byebye": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "gpm.receiver_service.connect_wireless_session": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "gpm.receiver_service.connection_manager": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "gpm.receiver_service.on_create": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "gpm.receiver_service.wireless_explorer": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "gpm.wireless_explorer": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "gpm.wireless_explorer.connected_device": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)"
+  },
+  "by_reference": [
+    "dipo.iap2.bt_address",
+    "dipo.iap2.set_notify_on",
+    "panel.home.build_views",
+    "panel.home.test_page",
+    "panel.test_gate",
+    "panel.test_gate.on",
+    "panel.test_page",
+    "themesettings.split_item.type"
+  ],
+  "names": {
+    "homesetting.edit_list.items": {
+      "field": "cu",
+      "type": "java.util.List",
+      "static": true
+    }
+  },
+  "unconfirmed": [
+    "dipo.iap2.bt_address",
+    "dipo.iap2.set_notify_on",
+    "panel.home.build_views",
+    "panel.test_gate.on",
+    "themesettings.split_item.type"
+  ]
+}

@@ -24,8 +24,9 @@ import hmgapi.hook.Points;
  * fields); every other callback is acknowledged and ignored.
  */
 final class CarCallbacks {
-    /** outside temperature in tenths (Fahrenheit, and Celsius when the car's is valid); MIN_VALUE until climate control has said */
-    volatile int outsideF10 = Integer.MIN_VALUE, outsideC10 = Integer.MIN_VALUE;
+    /** the outside temperature (climate control's status), with its -40 "no value yet": see Ambient */
+    final Ambient outside = new Ambient();
+    volatile boolean saidNoAmbient;
     /** body control's heating status: steering wheel heat, rear defogger (raw); MIN_VALUE: not heard yet */
     volatile int wheelHeat = Integer.MIN_VALUE, defogger = Integer.MIN_VALUE;
 
@@ -39,6 +40,16 @@ final class CarCallbacks {
     private Listener system, bcm, cluster;
     private String lastFailure, lastBcmFailure, lastClusterFailure;   // logged once, not every tick
     private boolean lightAsked;
+
+    /**
+     * After QuickBoot STR suspend, body control's cached push values may be from an earlier
+     * drive until CAN wakes up; clear them so stale readings aren't served.
+     */
+    synchronized void onWake() {
+        wheelHeat = Integer.MIN_VALUE;
+        defogger = Integer.MIN_VALUE;
+        lightAsked = false;
+    }
 
     /** a binder answering some transactions of one interface */
     abstract static class Listener extends Binder {
@@ -102,10 +113,19 @@ final class CarCallbacks {
             try {
                 Object svc = Hub.bcm();
                 if (svc != null) {
-                    int code = (Integer) Points.get(null, "framework.bcm_listener_stub.heating", null);
-                    Listener l = new Listener(Points.cls(null, "framework.bcm_listener").getName(), code) {
+                    final int code = (Integer) Points.get(null, "framework.bcm_listener_stub.heating", null);
+                    // the door status: on a map that has it (registration sends the current one)
+                    final int doorCode = Points.has("framework.bcm_listener_stub.doors") ? (Integer) Points.get(null, "framework.bcm_listener_stub.doors", null) : Integer.MIN_VALUE;
+                    int[] codes = doorCode == Integer.MIN_VALUE ? new int[] { code } : new int[] { code, doorCode };
+                    Listener l = new Listener(Points.cls(null, "framework.bcm_listener").getName(), codes) {
                         @Override
                         void got(int c, Parcel d) {
+                            if (c == doorCode) {
+                                int[] v = new int[10];
+                                for (int i = 0; i < v.length; i++) v[i] = d.readInt();
+                                Hub.doors(v[4], v[5], v[6], v[7]);   // after the four unlock states: driver, passenger, rear left, rear right open
+                                return;
+                            }
                             int w = d.readInt(), f = d.readInt();
                             if (wheelHeat == Integer.MIN_VALUE) System.out.println("vehicle: heating status, first values: wheel " + w + ", defogger " + f);
                             wheelHeat = w;
@@ -116,7 +136,7 @@ final class CarCallbacks {
                     Points.call(svc.getClass().getClassLoader(), "framework.bcm_service.register_listener", svc, proxy, l);
                     bcm = l;
                     lastBcmFailure = null;
-                    System.out.println("vehicle: listening to the body control service (wheel heat, defogger)");
+                    System.out.println("vehicle: listening to the body control service (wheel heat, defogger" + (doorCode == Integer.MIN_VALUE ? "; no door status in this car's map" : ", doors") + ")");
                 }
             } catch (Throwable t) {
                 String why = String.valueOf(t.getCause() != null ? t.getCause() : t);
@@ -174,10 +194,12 @@ final class CarCallbacks {
                             float f = (Float) Points.call(null, "framework.datc_status.ambient_f", st);
                             float cc = (Float) Points.call(null, "framework.datc_status.ambient_c", st);
                             int stateC = (Integer) Points.call(null, "framework.datc_status.ambient_state_c", st);
-                            boolean first = outsideF10 == Integer.MIN_VALUE;
-                            outsideF10 = Math.round(f * 10);
-                            outsideC10 = stateC == 255 ? Integer.MIN_VALUE : Math.round(cc * 10);   // 255: Celsius not valid (a US car)
-                            if (first) System.out.println("vehicle: climate status, first outside temperature: " + f + " F, " + cc + " C (state " + stateC + ")");
+                            String said = outside.status(f, cc, stateC, android.os.SystemClock.elapsedRealtime());
+                            if ("ignored".equals(said) && !saidNoAmbient) {
+                                System.out.println("vehicle: climate status: outside temperature " + f + " F, likely no value yet (held back; counts if it stays " + Ambient.HOLD_MS / 60000 + " min)");
+                                saidNoAmbient = true;
+                            }
+                            if ("first".equals(said)) System.out.println("vehicle: climate status, first outside temperature: " + f + " F, " + cc + " C (state " + stateC + ")");
                         }
                     };
                     Object proxy = Points.call(null, "framework.datc_listener_stub.as_interface", null, l);
@@ -193,6 +215,86 @@ final class CarCallbacks {
                 Hub.services.remove("framework.car_services.datc");
             }
         }
+    }
+
+    /** the power listener, and its proxy (what the power service knows it by); null while not registered */
+    private Listener power;
+    private Object powerProxy;
+    private boolean powerResponder;
+    private String lastPowerFailure;
+    static final String RESPONDER = "hmgapi";
+
+    /**
+     * A system-off responder on the power service while a mod asked for "shutdown" (want), so
+     * the head unit waits for HMG-API's confirmSystemOff (10 s at most) before it shuts down;
+     * none otherwise, so HMG-API never holds a shutdown up for nothing. The power status is
+     * read every tick either way; the listener also gets its changes pushed.
+     */
+    synchronized void ensurePower(boolean want) {
+        if (power != null && (!alive("framework.car_services.power") || powerResponder != want)) dropPower();
+        if (power != null || !want) return;
+        if (!Points.has("framework.power_service.register_system_off_responder") || !Points.has("framework.power_listener_stub.system_off")) {
+            if (lastPowerFailure == null) System.out.println("vehicle: this car's map has no system-off responder points: no shutdown event");
+            lastPowerFailure = "no points";
+            return;
+        }
+        try {
+            Object svc = Hub.power();
+            if (svc == null) return;
+            final int changed = (Integer) Points.get(null, "framework.power_listener_stub.power_status_changed", null);
+            final int off = (Integer) Points.get(null, "framework.power_listener_stub.system_off", null);
+            Listener l = new Listener(Points.cls(null, "framework.power_listener").getName(), changed, off) {
+                @Override
+                void got(int c, Parcel d) {
+                    if (c == changed) Hub.power(d.readInt());
+                    else if (c == off) Hub.systemOff();
+                }
+            };
+            Object proxy = Points.call(null, "framework.power_listener_stub.as_interface", null, l);
+            Points.call(svc.getClass().getClassLoader(), "framework.power_service.register_system_off_responder", svc, proxy, RESPONDER);
+            power = l;
+            powerProxy = proxy;
+            powerResponder = true;
+            lastPowerFailure = null;
+            System.out.println("vehicle: a system-off responder on the power service (the shutdown event)");
+        } catch (Throwable t) {
+            String why = String.valueOf(t.getCause() != null ? t.getCause() : t);
+            if (!why.equals(lastPowerFailure)) System.out.println("vehicle: power listener: " + why + " (trying again every few seconds)");
+            lastPowerFailure = why;
+            Hub.services.remove("framework.car_services.power");
+        }
+    }
+
+    private void dropPower() {
+        try {
+            Object svc = Hub.services.get("framework.car_services.power");
+            if (svc != null && powerProxy != null) {
+                Points.call(svc.getClass().getClassLoader(), "framework.power_service.unregister_system_off_responder", svc, powerProxy, RESPONDER);
+            }
+        } catch (Throwable t) {
+            // the service went away: so did the registration
+        }
+        power = null;
+        powerProxy = null;
+        powerResponder = false;
+    }
+
+    /** the responder is done: the power service may go on with the shutdown */
+    synchronized boolean confirmSystemOff() {
+        try {
+            Object svc = Hub.services.get("framework.car_services.power");
+            if (svc == null || powerProxy == null) return false;
+            Points.call(svc.getClass().getClassLoader(), "framework.power_service.confirm_system_off", svc, powerProxy, RESPONDER);
+            return true;
+        } catch (Throwable t) {
+            System.out.println("vehicle: confirmSystemOff: " + t);
+            return false;
+        }
+    }
+
+    /** after a suspend the power service may still count HMG-API as confirmed: register again */
+    synchronized void powerAfterWake() {
+        if (power != null) dropPower();
     }
 
     /**

@@ -78,6 +78,11 @@ final class HmgApi {
         } catch (Throwable t) {
             e("input", t);
         }
+        try {
+            ProjectionAp.zygote();   // the wireless projection AP's name and key, in system_server
+        } catch (Throwable t) {
+            e("projection AP", t);
+        }
         Points.hook(null, "framework.activity_thread.handle_bind_application",
                 new MethodHook() {
                     @Override

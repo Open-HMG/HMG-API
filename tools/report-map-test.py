@@ -12,6 +12,7 @@ class ReportMapTest(unittest.TestCase):
         self.root = pathlib.Path(self.temp.name)
         self.report = {
             'report': 'hmgapi car report 1',
+            'hmgapi': {'version': '1.1.0-rc.3'},
             'unit': {'make': 'hyundai', 'name': 'Ioniq 6', 'model': 'CEEV',
                      'region': 'CAN', 'firmware': '260206'},
             'map_car': {
@@ -90,6 +91,22 @@ class ReportMapTest(unittest.TestCase):
         self.assert_missing(self.car()['missing'], expected)
         self.assertEqual(json.loads((self.root / 'maps/hyundai/ceev/can/260206/iap2.json').read_text()), {})
 
+    def test_points_not_in_the_catalogue_are_left_out(self):
+        # a fork's report: its own points, found, missing and by reference
+        mc = self.report['map_car']
+        mc['points']['btsettings.fork_only'] = {'class': 'example.Fork'}
+        mc['points']['btsettings.fork_only.go'] = {'method': 'go', 'params': [], 'ret': 'void'}
+        mc['not_found']['btsettings.fork_missing'] = '0 methods match'
+        mc['by_reference'].append('btsettings.fork_only')
+        result = self.run_import()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('not in the catalogue, left out: 3 point(s)', result.stdout)
+        car = self.car()
+        text = json.dumps(car)
+        for pid in ('btsettings.fork_only', 'btsettings.fork_only.go', 'btsettings.fork_missing'):
+            self.assertNotIn('"%s"' % pid, text)
+        self.assertEqual(car['by_reference'], ['btsettings.projection_helper'])
+
     def test_catalogue_points_newer_than_the_report_are_listed(self):
         result = self.run_import()
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -118,6 +135,46 @@ class ReportMapTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.car()['files'], self.report['map_car']['files'])
         self.assertIn('outvoted: report-2.json', result.stdout)
+
+    # by-reference classes the import doesn't keep (#47: a borrowed name, a different class)
+    MEMBERS = ['btsettings.projection_helper.device_connections_available',
+               'btsettings.projection_helper.open_device_connections',
+               'btsettings.projection_helper.open_other_page',
+               'btsettings.projection_helper.open_wireless_page']
+
+    def test_by_reference_class_from_an_old_mapper_is_left_to_the_unit(self):
+        self.report['hmgapi'] = {'version': '1.1.0-rc.1'}
+        self.report['map_car']['points']['btsettings.projection_helper.open_other_page'] = {
+            'method': 'aj', 'params': ['android.content.Context'], 'ret': 'void', 'static': True}
+        self.report['map_car']['not_found'] = {}
+        result = self.run_import()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('distrusted: btsettings.projection_helper', result.stdout)
+        car = self.car()
+        for pid in ['btsettings.projection_helper'] + self.MEMBERS:
+            self.assertTrue(car['missing'][pid].startswith('not kept from the Car Report: its by-reference class came from'), pid)
+            self.assertIn('1.1.0-rc.1', car['missing'][pid])
+        self.assertNotIn('btsettings.projection_helper', car.get('by_reference', []))
+        self.assertFalse((self.root / 'maps/hyundai/ceev/can/260206/btsettings.json').exists()
+                         and 'btsettings.projection_helper' in (self.root / 'maps/hyundai/ceev/can/260206/btsettings.json').read_text())
+
+    def test_by_reference_class_with_no_members_is_left_to_the_unit(self):
+        self.report['map_car']['not_found'] = {pid: '0 methods match in example.Helper' for pid in self.MEMBERS}
+        result = self.run_import()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        car = self.car()
+        for pid in ['btsettings.projection_helper'] + self.MEMBERS:
+            self.assertIn('has none of its 4 members here', car['missing'][pid], pid)
+
+    def test_by_reference_class_with_members_from_a_current_mapper_is_kept(self):
+        self.report['map_car']['points']['btsettings.projection_helper.open_other_page'] = {
+            'method': 'aj', 'params': ['android.content.Context'], 'ret': 'void', 'static': True}
+        result = self.run_import()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn('distrusted', result.stdout)
+        car = self.car()
+        self.assertNotIn('btsettings.projection_helper', car['missing'])
+        self.assertIn('btsettings.projection_helper', car['by_reference'])
 
 
 if __name__ == '__main__':

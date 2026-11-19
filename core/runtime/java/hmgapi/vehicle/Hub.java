@@ -42,6 +42,271 @@ public final class Hub {
     static final Map<String, Object> services = new HashMap<String, Object>();
     static final Map<String, String> values = new HashMap<String, String>();
     static final Map<String, Long> readAt = new HashMap<String, Long>();
+    static long lastSleepGap = Long.MIN_VALUE;
+    static int lastReady = -1;
+
+    /**
+     * Detects QuickBoot STR resume (elapsedRealtime advances while uptimeMillis freezes)
+     * so per-start command guards and cached readings never carry stale state across drives.
+     */
+    static synchronized boolean checkSession() {
+        long sleepGap = android.os.SystemClock.elapsedRealtime() - android.os.SystemClock.uptimeMillis();
+        if (lastSleepGap == Long.MIN_VALUE) {
+            lastSleepGap = sleepGap;
+            return false;
+        }
+        boolean woke = sleepGap - lastSleepGap >= 3000;
+        lastSleepGap = sleepGap;
+        if (woke) {
+            System.out.println("vehicle: system resumed from suspend; refreshing session state");
+            values.clear();
+            readAt.clear();
+            callbacks.onWake();
+            callbacks.powerAfterWake();
+            if (commands != null) commands.onNewSession();
+            lastReady = -1;
+            parking.reset();
+            shutdownSent = false;
+            confirmedOff = false;
+            fire("wake");
+        }
+        return woke;
+    }
+
+    // ---- car events (EventRun, Parking): state/events.txt, the owner's rule in settings/park_rule
+
+    static final String STATE = "/data/hmgapi/state/";
+    static final String PARK_RULE = "/data/hmgapi/settings/park_rule";
+    static final String ACTION = "hmgapi.intent.action.CAR_EVENT";
+    static final Parking parking = new Parking();
+    static volatile java.util.List<EventRun.Decl> eventDecls = new java.util.ArrayList<EventRun.Decl>();
+    /**
+     * shutdownSent: "shutdown" ran for this off. confirmedOff: HMG-API confirmed it. The power
+     * service never clears a responder's confirmation, so a later off wouldn't wait for HMG-API;
+     * but a new registration during a shutdown that goes on would hold it up (unconfirmed) for
+     * the car's 10 s. So the responder is registered again only once the car is on again (an off
+     * that didn't end in a shutdown) or after a wake.
+     */
+    static boolean shutdownSent, confirmedOff;
+    static final java.util.concurrent.ExecutorService eventQueue = java.util.concurrent.Executors.newSingleThreadExecutor();
+
+    static java.util.List<EventRun.Decl> readEvents() {
+        try {
+            return EventRun.parse(hmgapi.engine.Engine.read(new java.io.File(STATE + "events.txt")));
+        } catch (Exception e) {
+            return new java.util.ArrayList<EventRun.Decl>();
+        }
+    }
+
+    static String parkRule() {
+        try {
+            String r = Parking.rule(hmgapi.engine.Engine.read(new java.io.File(PARK_RULE)));
+            return r == null ? Parking.DOOR : r;
+        } catch (Exception e) {
+            return Parking.DOOR;   // the owner hasn't chosen
+        }
+    }
+
+    /** body control's door status (pushed): driver, passenger, rear left, rear right open */
+    static void doors(int drv, int pas, int rl, int rr) {
+        synchronized (Hub.class) {
+            int[] was = parking.doors.clone();
+            parking.doors[0] = drv;
+            parking.doors[1] = pas;
+            parking.doors[2] = rl;
+            parking.doors[3] = rr;
+            if (!java.util.Arrays.equals(was, parking.doors)) System.out.println("vehicle: doors open " + drv + " " + pas + " " + rl + " " + rr);
+            step();
+        }
+    }
+
+    /** the power status, from the power service (read each tick, or pushed to the responder) */
+    static void power(int status) {
+        synchronized (Hub.class) {
+            if (status != parking.power) System.out.println("vehicle: power " + Parking.powerName(status) + " (" + status + ")");
+            parking.power = status;
+            step();
+        }
+    }
+
+    /** Parking's verdict on the newest values (Hub.class held) */
+    static void step() {
+        StringBuilder log = new StringBuilder();
+        String e = parking.update(android.os.SystemClock.elapsedRealtime(), log);
+        if (log.length() > 0) System.out.println("vehicle: " + log);
+        if (e != null) fire(e);
+    }
+
+    /** the car's off: run "shutdown" (at most Vehicle.SHUTDOWN_SECONDS + 1 s), then tell the power service HMG-API is done */
+    static void systemOff() {
+        synchronized (Hub.class) {
+            if (shutdownSent) return;
+            shutdownSent = true;
+        }
+        System.out.println("vehicle: the head unit is shutting down (system off)");
+        Thread t = new Thread("vehicle-shutdown") {
+            @Override
+            public void run() {
+                try {
+                    runEvent("shutdown", (hmgapi.engine.Vehicle.SHUTDOWN_SECONDS + 1) * 1000L);
+                } catch (Throwable x) {
+                    System.out.println("vehicle: shutdown event: " + x);
+                } finally {
+                    System.out.println(callbacks.confirmSystemOff() ? "vehicle: confirmed the system off" : "vehicle: couldn't confirm the system off (the car goes on after its 10 s)");
+                    synchronized (Hub.class) {
+                        confirmedOff = true;
+                    }
+                }
+            }
+        };
+        t.setDaemon(true);
+        t.start();
+    }
+
+    /** parked, unparked, wake: one after another, off the tick */
+    static void fire(final String event) {
+        if (!EventRun.asked(eventDecls, event)) {
+            System.out.println("vehicle: " + event + " (no mod asked for it)");
+            return;
+        }
+        System.out.println("vehicle: " + event);
+        eventQueue.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    runEvent(event, hmgapi.engine.Vehicle.EVENT_SECONDS * 1000L);
+                } catch (Throwable x) {
+                    System.out.println("vehicle: " + event + " event: " + x);
+                }
+            }
+        });
+    }
+
+    static void runEvent(String event, long limitMs) {
+        new EventRun(new Unit()).run(event, eventDecls, limitMs);
+    }
+
+    /** the tick's part: what the mods asked for, the power status and gear, the responder */
+    static void eventsTick() {
+        java.util.List<EventRun.Decl> d = readEvents();
+        eventDecls = d;
+        boolean again = false;
+        synchronized (Hub.class) {
+            if (shutdownSent && parking.power == Parking.ACC_ON) {   // the off didn't end in a shutdown: ready for the next one
+                again = confirmedOff;
+                shutdownSent = confirmedOff = false;
+            }
+        }
+        if (again) callbacks.powerAfterWake();
+        boolean shuttingDown;
+        synchronized (Hub.class) {
+            shuttingDown = shutdownSent;
+        }
+        if (!shuttingDown) callbacks.ensurePower(EventRun.asked(d, "shutdown"));   // during a shutdown: no new registration
+        // the parked state is followed whether or not a mod asked for the events: the "parked" reading
+        // is it (home Wi-Fi reads it), and without the power and gear here it never saw the car go off
+        if (!Points.ready()) return;
+        int p = -1, g = -1;
+        try {
+            if (Points.has("framework.power_service.power_status")) p = num(call(power(), "framework.power_service.power_status"));
+        } catch (Throwable t) {
+            services.remove("framework.car_services.power");
+        }
+        try {
+            g = num(call(system(), "framework.system_service.gear_p_status")) == 1 ? 1 : 0;
+        } catch (Throwable t) {
+            g = -1;
+        }
+        synchronized (Hub.class) {
+            parking.rule = parkRule();
+            parking.park = g;
+            if (p >= 0) parking.power = p;
+            step();
+        }
+    }
+
+    /** the unit's side of an event: hmgapid's service control, services.status, am broadcast */
+    static final class Unit implements EventRun.Unit {
+        static int seq;
+
+        public String state(String mod, String service) {
+            try {
+                for (String l : hmgapi.engine.Engine.read(new java.io.File(STATE + "services.status")).split("\n")) {
+                    String[] w = l.trim().split(" ");
+                    if (w.length >= 3 && w[0].equals(mod) && w[1].equals(service)) return w[2];
+                }
+            } catch (Exception e) {
+                // no status yet
+            }
+            return null;
+        }
+
+        public void ctl(String verb, String mod, String service) {
+            java.io.File dir = new java.io.File(STATE + "ctl");
+            dir.mkdirs();
+            String name;
+            synchronized (Unit.class) {
+                name = "vehicle-" + android.os.Process.myPid() + "-" + (++seq);
+            }
+            java.io.File tmp = new java.io.File(dir, name + ".tmp"), f = new java.io.File(dir, name);
+            try {
+                java.io.FileOutputStream o = new java.io.FileOutputStream(tmp);
+                try {
+                    o.write((verb + " " + mod + " " + service).getBytes("UTF-8"));
+                } finally {
+                    o.close();
+                }
+                if (!tmp.renameTo(f)) System.out.println("vehicle: can't ask hmgapid to " + verb + " " + mod + "/" + service);
+            } catch (Exception e) {
+                System.out.println("vehicle: can't ask hmgapid to " + verb + " " + mod + "/" + service + ": " + e);
+            }
+        }
+
+        public EventRun.Waiter broadcast(String event) {
+            try {
+                // ordered (am waits for every receiver), foreground (receivers get it at once, 10 s at most each)
+                final Process p = new ProcessBuilder("/system/bin/am", "broadcast", "-a", ACTION, "--es", "event", event,
+                        "-f", String.valueOf(0x10000000)).redirectErrorStream(true).start();
+                final java.io.InputStream in = p.getInputStream();
+                return new EventRun.Waiter() {
+                    boolean exited;
+
+                    public boolean done() {
+                        if (exited) return true;
+                        try {
+                            while (in.available() > 0) in.read();   // am's output, so it never blocks on a full pipe
+                            p.exitValue();
+                            exited = true;
+                        } catch (IllegalThreadStateException e) {
+                            // still running
+                        } catch (java.io.IOException e) {
+                            exited = true;
+                        }
+                        return exited;
+                    }
+
+                    public void cancel() {
+                        p.destroy();
+                    }
+                };
+            } catch (Exception e) {
+                System.out.println("vehicle: can't send the event to apps: " + e);
+                return null;
+            }
+        }
+
+        public long now() { return android.os.SystemClock.elapsedRealtime(); }
+
+        public void pause(long ms) {
+            try {
+                Thread.sleep(ms);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        public void log(String line) { System.out.println("vehicle: " + line); }
+    }
 
     public static void main(String[] args) throws Exception {
         facts = new SystemCheck.Facts("", null);
@@ -56,16 +321,35 @@ public final class Hub {
         }
         commands = new Commands(new CarServices());
         final MicomWatch watch = new MicomWatch();
+        checkSession();
         callbacks.ensure();
+        eventDecls = readEvents();
+        new EventRun(new Unit()).settle(eventDecls);   // event scripts a run before this one left "exited"
+        try {
+            eventsTick();
+        } catch (Throwable t) {
+            System.out.println("vehicle: car events: " + t);
+        }
         Thread tick = new Thread("vehicle-tick") {
             @Override
             public void run() {
                 while (true) {
                     try {
                         Thread.sleep(2000);
+                        checkSession();
+                        int rdy = -1;
+                        try { if (Points.ready()) rdy = hev("framework.hev_flag.ev_ready"); } catch (Throwable ignored) {}
+                        synchronized (Hub.class) {
+                            if (lastReady == 1 && rdy == 0 && commands != null) {
+                                System.out.println("vehicle: EV_RDY off; resetting per-drive command guards");
+                                commands.onNewSession();
+                            }
+                            if (rdy == 0 || rdy == 1) lastReady = rdy;
+                        }
                         commands.tick(declared());
                         watch.sync();
                         callbacks.ensure();
+                        eventsTick();
                     } catch (Throwable e) {
                         System.out.println("vehicle: tick: " + e);
                     }
@@ -77,11 +361,13 @@ public final class Hub {
         LocalServerSocket server = new LocalServerSocket(SOCKET);
         System.out.println("vehicle: listening on @" + SOCKET);
         while (true) {
-            LocalSocket s = server.accept();
+            LocalSocket s = null;
             try {
+                s = server.accept();
                 serve(s);
             } catch (Throwable t) {
                 System.out.println("vehicle: " + t);
+                if (s == null) try { Thread.sleep(100); } catch (InterruptedException ignored) {}
             } finally {
                 close(s);
             }
@@ -95,7 +381,11 @@ public final class Hub {
      * and each connection leaked an fd.
      */
     static void close(LocalSocket s) {
-        java.io.FileDescriptor fd = s.getFileDescriptor();
+        if (s == null) return;
+        java.io.FileDescriptor fd = null;
+        try { fd = s.getFileDescriptor(); } catch (Throwable ignored) {}
+        try { s.shutdownOutput(); } catch (Throwable ignored) {}
+        try { s.shutdownInput(); } catch (Throwable ignored) {}
         try {
             if (fd != null && fd.valid()) libcore.io.Libcore.os.close(fd);
         } catch (Throwable t) {
@@ -111,6 +401,7 @@ public final class Hub {
     static void serve(LocalSocket s) throws Exception {
         int uid = s.getPeerCredentials().getUid();
         if (uid != 0 && uid != 1000) return;   // hmgapid (it checks what each mod declared); system_server only passes the light status
+        if (checkSession()) callbacks.ensure();
         s.setSoTimeout(2000);
         BufferedReader in = new BufferedReader(new InputStreamReader(s.getInputStream(), "UTF-8"), 1024);
         String line = in.readLine();
@@ -160,6 +451,22 @@ public final class Hub {
     static String read(String name) throws Exception {
         if (!Points.ready()) return null;
         if ("gear.park".equals(name)) return bool(num(call(system(), "framework.system_service.gear_p_status")) == 1);
+        if ("power".equals(name)) {
+            if (!Points.has("framework.power_service.power_status")) return null;
+            return Parking.powerName(num(call(power(), "framework.power_service.power_status")));
+        }
+        if ("doors.closed".equals(name)) {
+            int c;
+            synchronized (Hub.class) {
+                c = parking.doorsClosed();
+            }
+            return c < 0 ? null : String.valueOf(c);
+        }
+        if ("parked".equals(name)) {
+            synchronized (Hub.class) {
+                return bool(parking.parked);
+            }
+        }
         if ("parking_brake".equals(name)) {   // EPB status: 2 engaged, 1 released (EV6, 2026-10-31)
             int st = num(call(system(), "framework.system_service.parking_brake_status"));
             return st == 2 ? "1" : st == 1 ? "0" : null;
@@ -213,7 +520,8 @@ public final class Hub {
         if ("defogger".equals(name)) return callbacks.defogger == Integer.MIN_VALUE ? null : String.valueOf(callbacks.defogger);
         if ("outside_temp".equals(name) || "outside_temp_f".equals(name)) {
             // climate control's status (pushed): Fahrenheit always; Celsius when the car's is valid, else converted
-            int f10 = callbacks.outsideF10, c10 = callbacks.outsideC10;
+            long now = android.os.SystemClock.elapsedRealtime();
+            int f10 = callbacks.outside.f10(now), c10 = callbacks.outside.c10(now);
             if (f10 == Integer.MIN_VALUE) return null;
             if ("outside_temp_f".equals(name)) return dec(f10 / 10f);
             return dec(c10 != Integer.MIN_VALUE ? c10 / 10f : (f10 / 10f - 32f) * 5f / 9f);
@@ -247,6 +555,10 @@ public final class Hub {
 
     static String seatId(String seat) {
         return "driver".equals(seat) ? "drv" : "passenger".equals(seat) ? "ast" : "rear_left".equals(seat) ? "rl" : "rr";
+    }
+
+    static Object power() throws Exception {
+        return service("framework.car_services.power", "framework.power_service_stub.as_interface", null);
     }
 
     static Object usm() throws Exception {
@@ -423,7 +735,28 @@ public final class Hub {
 
         public void setGuideLines(int state) { run(get("pgs"), "framework.pgs_service.request_guide_lines", state); }
 
-        public void hideStartupNotice() { run(get("factory"), "framework.factory_service.hide_consent_screen"); }
+        private final java.util.concurrent.atomic.AtomicInteger noticeGen = new java.util.concurrent.atomic.AtomicInteger();
+
+        public void hideStartupNotice() {
+            final int gen = noticeGen.incrementAndGet();
+            run(get("factory"), "framework.factory_service.hide_consent_screen");
+            Thread t = new Thread("startup-notice-confirm") {
+                @Override
+                public void run() {
+                    long[] gaps = { 150, 250, 400, 700, 1100 };
+                    for (long g : gaps) {
+                        pause(g);
+                        if (noticeGen.get() != gen) return;
+                        try {
+                            if (!park()) return;
+                            CarServices.run(get("factory"), "framework.factory_service.hide_consent_screen");
+                        } catch (Throwable ignored) {}
+                    }
+                }
+            };
+            t.setDaemon(true);
+            t.start();
+        }
 
         public boolean noticeAllowed() { return new java.io.File("/data/hmgapi/settings/allow/startup_notice").isFile(); }   // hmgapid allow
 

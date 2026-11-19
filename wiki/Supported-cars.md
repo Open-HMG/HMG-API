@@ -8,16 +8,42 @@ the parts that change the car's own apps stay off, and the app says which.
 | Car | Region | Head unit software | Hook map |
 |---|---|---|---|
 | Kia EV6 | USA | 260507 | ✅ checked on a car (325 of 325 hook points) |
+| Kia EV6 | India | 260430 | 351 of 351 points mapped from stock files and two reports from one car; original 283 checked on-car; expanded map check pending |
 | Kia EV6 | Canada | 260206 | 325 of 325 hook points found in stock files; waiting for a check on a car |
 | Hyundai Ioniq 5 | Canada | 260206 | 325 of 325 hook points found in stock files; waiting for a check on a car |
 | Hyundai Ioniq 5 (all trims, incl. SE) | USA | 260507 | 325 of 325 hook points found in stock files, same files as 3 Car Reports; waiting for a check on a car |
-| Hyundai Ioniq 5 (2022 and 2023 on) | USA | 260903 | made on owners' cars by HMG-API's own mapper (351 of 351 hook points; the 2022's files are the same, #192); waiting for a check on a car |
-| Kia Sportage | USA | 260507 | made on an owner's car by HMG-API's own mapper (351 of 351 hook points); waiting for a check on a car |
+| Hyundai Ioniq 5 (2022 and 2023 on) | USA and Canada | 260903 | made on owners' cars by HMG-API's own mapper (351 of 351 hook points; the 2022's files are the same, #192, and so are the Canadian car's, #274); waiting for a check on a car |
+| Kia Sportage (and Hybrid, Plug-in Hybrid), Forte, Carnival 2022, Niro Hybrid and Plug-in Hybrid, Soul, Seltos 2024 | USA | 260507 | made on an owner's Sportage by HMG-API's own mapper (351 of 351 hook points); the others run the same software; waiting for a check on a car |
 | Kia Telluride | USA | 260507 | made on an owner's car by HMG-API's own mapper (351 of 351 hook points); waiting for a check on a car |
 | Kia Niro EV | USA | 260507 | made on 3 owners' cars by HMG-API's own mapper (343 of 351 hook points: the 8 newest need a Car Report from 1.1.0 or newer); waiting for a check on a car |
 | Kia Carnival | USA | 260507 | made on an owner's car by HMG-API's own mapper (343 of 351 hook points: the 8 newest need a Car Report from 1.1.0 or newer); waiting for a check on a car |
 | Hyundai Palisade | USA | 260903 | made on an owner's car by HMG-API's own mapper (343 of 351 hook points: the 8 newest need a Car Report from 1.1.0 or newer); waiting for a check on a car |
-| Hyundai Ioniq 6 | Canada | 260206 | ✅ checked on a car (351 of 351 hook points), from a Car Report and stock Bluetooth settings files |
+| Hyundai Ioniq 6 | Canada and USA | 260206 | ✅ checked on a Canadian car (351 of 351 hook points), from a Car Report and stock Bluetooth settings files; a US car on 260206 has the same 18 stock files (#319) |
+| Hyundai Ioniq 6 | USA | 260507 | all 351 hook points, from stock files and an rc.3 Car Report (#253); waiting for a check on a car |
+| Hyundai Elantra (and Hybrid), Sonata (and Hybrid), Santa Fe (and Hybrid, Plug-in Hybrid), Kona, Kona Electric, Ioniq (Electric, Hybrid, Plug-in Hybrid), Venue, Veloster N, Palisade 2020-22 | USA | 260507 | 351 of 351 hook points found in stock files; waiting for a check on a car |
+| Kia K5, Sorento (and Hybrid, Plug-in Hybrid), Stinger, Soul, Seltos 2021, Niro 2020-22 (EV, Hybrid, Plug-in Hybrid), Cadenza, Telluride 2020-21 | USA | 260507 | 351 of 351 hook points found in stock files; waiting for a check on a car |
+| Hyundai Elantra (and Hybrid), Sonata (and Hybrid), Santa Fe (and Hybrid, Plug-in Hybrid), Kona, Kona Electric, Ioniq (Electric, Hybrid, Plug-in Hybrid), Venue, Veloster N, Palisade 2020-22 | Canada | 260206 | 351 of 351 hook points found in stock files; waiting for a check on a car |
+| Hyundai Elantra (and Hybrid), Sonata (and Hybrid), Santa Fe (and Hybrid, Plug-in Hybrid), Kona, Kona Electric 2020-21, Ioniq (Electric, Hybrid, Plug-in Hybrid), Venue 2020-22, Veloster N, Palisade 2020-22 | USA and Canada | 260903 | 391 of 391 hook points found in stock files; the US and Canadian cars run the same software (#320); waiting for a check on a car |
+| Kia K5, Sorento (and Hybrid, Plug-in Hybrid), Stinger, Soul (and EV), Seltos 2021, Niro 2020-21 (EV, Hybrid, Plug-in Hybrid), Telluride 2020-21 | Canada | 260206 | 351 of 351 hook points found in stock files; waiting for a check on a car |
+| Kia K5 (and Hybrid), Sorento, Stinger, Seltos, Soul, Niro, Mohave The Master, K7, Morning, Ray | Korea | 260902 | 351 of 351 hook points found in stock files (the K5 Hybrid's files from a Car Report are the same); waiting for a check on a car |
+| Hyundai Ioniq 5 | Korea | 260902 | 351 of 351 hook points found in stock files; waiting for a check on a car |
+| Hyundai Sonata (and Hybrid), Santa Fe, Palisade, Avante (`CN7`) | Korea | 260902 | made on owners' cars by HMG-API's own mapper (351 of 351 hook points: 5 reports from 3 models agree, and an rc.3 Car Report from a Santa Fe, #276, maps the newest; the Avante's 18 stock files are the same, #275); waiting for a check on a car |
+| Kia Niro (EV, Hybrid, Plug-in Hybrid), Sportage (and Hybrid, Plug-in Hybrid), Carnival, Telluride, Forte, Soul (and EV), Seltos 2024 | Canada | 260206 | made on an owner's Niro EV by HMG-API's own mapper (347 of 351 hook points); the others run the same software; waiting for a check on a car |
+| Genesis G70 | USA | 260507 | made on an owner's car by HMG-API's own mapper (325 of 351 hook points: the 26 newest need a Car Report from 1.1.0 or newer); waiting for a check on a car |
+| Genesis G70 | Korea | 260902 | made on an owner's car by HMG-API's own mapper (341 of 351 hook points: the 9 newest, and the panel's test switch, need a Car Report from a newer HMG-API); waiting for a check on a car |
+| Hyundai Ioniq 6 | USA and Canada | 260903 | ✅ checked on a US car (351 of 351 hook points), from stock files; the US and Canadian cars have the same 18 stock files, so one map covers both, with no mapping to the USA needed on a Canadian car: the Canadian car's own mapper agrees point for point |
+| Kia EV6 | Korea | 260902 | made on an owner's car by HMG-API's own mapper (319 of 351 hook points: the newer ones need a Car Report from a newer HMG-API); waiting for a check on a car |
+| Kia K3 | Korea | 260902 | made on an owner's car by HMG-API's own mapper (323 of 351 hook points: the newer ones need a Car Report from a newer HMG-API); waiting for a check on a car |
+| Genesis G70 | Canada | 260903 | made on an owner's car by HMG-API's own mapper (351 of 351 hook points, from an rc.3 Car Report, #231); waiting for a check on a car |
+| Hyundai Ioniq 6 | Singapore | 260907 | made on an owner's car by HMG-API's own mapper (312 of 351 hook points: this build's button settings and iAP2 server differ, #265); waiting for a check on a car |
+| Hyundai Creta | India | 260430 | made on an owner's car by HMG-API's own mapper (339 of 351 hook points); waiting for a check on a car |
+| Hyundai Elantra (`CN7PE`) | USA | 260507 | made on an owner's car by HMG-API's own mapper (351 of 351 hook points, #252); waiting for a check on a car |
+| Hyundai Elantra N 2024 (`CN7NPE`) | USA | 260903 | made on an owner's car by HMG-API's own mapper (351 of 351 hook points, #254); waiting for a check on a car |
+| Hyundai Kona (`OSPE`) | USA | 260903 | made on an owner's car by HMG-API's own mapper (351 of 351 hook points, #257); waiting for a check on a car |
+| Hyundai Avante facelift (`CN7PE`) | Korea | 260902 | made on an owner's car by HMG-API's own mapper (351 of 351 hook points, #297); waiting for a check on a car |
+| Hyundai Ioniq 6 | Korea | 260902 | made on an owner's car by HMG-API 1.0.2's mapper (333 of 351 hook points; 3 of them wait for a newer Car Report to confirm them, #310); waiting for a check on a car |
+| Hyundai Creta Electric (`SU2IEV`) | India | 260430 | made on an owner's car by HMG-API's own mapper (351 of 351 hook points, #325); waiting for a check on a car |
+| Kia Niro EV (`SG225EV`) | Canada | 260206 | made on an owner's car by HMG-API's own mapper (351 of 351 hook points, #261); waiting for a check on a car |
 
 **Your car isn't listed, or says "waiting"?** Install HMG-API and make a
 [Car Report](Car-Report): HMG-API maps your car from its own software on the spot,
@@ -28,6 +54,9 @@ and the report is everything needed to add it. You can also try that map yoursel
 has an older version, update it first (the manufacturer's update site or the dealer).
 
 **Not supported:** head units without navigation ("Display Audio") are a different
-system. No Korean car is listed yet: their head units have the Wi-Fi chip, but it stays
-off on cars without the Wi-Fi hotspot feature. New regions are on hold for now (USA
-and Canada only); reports are still welcome.
+system.
+
+**Wi-Fi:** the older Hyundai and Kia software (the Elantra and K5 rows above) and the
+Korean software have no Wi-Fi hotspot feature, so mods that need the hotspot (wireless
+CarPlay and Android Auto) can't use it there yet. The hook map is still what the other
+mods need.

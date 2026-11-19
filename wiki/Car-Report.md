@@ -9,6 +9,21 @@ anything missing on your car gets fixed. It takes about a minute.
    in.
 3. Get the report file and attach it to the issue, then submit.
 
+## After you send it
+
+Each build (model, region and software version) has one open "Car tracker" issue, and
+new reports are sorted into it automatically:
+
+- **Your build has a tracker:** your report's summary goes there and your issue is
+  closed with a link to it. Follow up in the tracker. Closing it doesn't mean the
+  problem is fixed.
+- **No tracker yet:** your issue becomes the tracker for your build.
+- **Head unit software older than 2026** (a version below `260000`): HMG-API doesn't
+  support it, so the issue is closed with a request to update the head unit first.
+  Send a new report once it's updated.
+
+If it was sorted wrong, say so in the issue and a maintainer will reopen it.
+
 ## Getting the file
 
 **USB stick:** plug one in before making the report. The file is in the folder

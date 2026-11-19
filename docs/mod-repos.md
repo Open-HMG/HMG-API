@@ -184,7 +184,11 @@ field is in use.
 On a mod release (decision C), the mod's release run prints the
 `tools/catalog.py add <zip> --download <url> --repo <url>` command; a maintainer opens the
 HMG-API PR; `catalog.yml` downloads and checks it. The wiki's Community mods page updates
-on merge.
+on merge. A PR that is only a version bump of an existing entry (`tools/catalog.py bump`:
+same author key, newer final version, a signed release of the entry's repo; only
+`version`, `download`, `sha256` and the package's own `description` change) merges itself
+once that check passes (`catalog-automerge.yml`); new mods, key changes and anything else
+wait for a maintainer.
 
 ## 8. Core tests that use the moving mods
 

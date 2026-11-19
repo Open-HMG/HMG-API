@@ -16,6 +16,13 @@ Started HMG-API (and HMG Leafia Plus before it), and maintains the core and its 
 [![Sponsor VysseCodes on GitHub](https://img.shields.io/badge/Sponsor_on_GitHub-%E2%9D%A4-bf3989?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/VysseCodes)
 [![Buy VysseCodes a coffee on Ko-fi](https://img.shields.io/badge/Buy_me_a_coffee-Ko--fi-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white)](https://ko-fi.com/vyssecodes)
 
+### zpoon, maintainer
+
+Reviews pull requests and car maps, and helps keep the official mods working.
+
+[![Sponsor zpoon on GitHub](https://img.shields.io/badge/Sponsor_on_GitHub-%E2%9D%A4-bf3989?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/zpoon)
+[![Buy zpoon a coffee on Ko-fi](https://img.shields.io/badge/Buy_me_a_coffee-Ko--fi-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white)](https://ko-fi.com/zpoon)
+
 <!-- Maintainers: add yourself below in the same format (name and role, one line on what
 you work on, your links), by PR. See https://github.com/Open-HMG/HMG-API/issues/136.
 Badges: copy the two above and change the name and the link (sponsors/<you>,

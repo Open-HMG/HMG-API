@@ -157,6 +157,75 @@
       }
     },
     {
+      "id": "framework.network_management_service",
+      "kind": "class",
+      "find": {
+        "name": "com.android.server.NetworkManagementService"
+      },
+      "about": "Android's network management service (services.jar, in system_server): it tells netd how to run the hotspot"
+    },
+    {
+      "id": "framework.network_management_service.start_access_point",
+      "kind": "method",
+      "of": "framework.network_management_service",
+      "find": {
+        "name": "startAccessPoint",
+        "params": [
+          "android.net.wifi.WifiConfiguration",
+          "java.lang.String"
+        ],
+        "ret": "void"
+      },
+      "about": "the head unit's access point starts (config, interface). Some builds start the projection AP (apMode 2) with the hotspot's name and key instead of the connectivity ones the phone is given; HMG-API puts those in"
+    },
+    {
+      "id": "framework.wifi_configuration",
+      "kind": "class",
+      "find": {
+        "name": "android.net.wifi.WifiConfiguration"
+      }
+    },
+    {
+      "id": "framework.wifi_configuration.ap_mode",
+      "kind": "field",
+      "of": "framework.wifi_configuration",
+      "find": {
+        "name": "apMode",
+        "type": "int"
+      },
+      "about": "HKMC's access point mode: 2 is the AP for wireless CarPlay and Android Auto (setWifiApEnabledForConnectivity)"
+    },
+    {
+      "id": "framework.wifi_configuration.connectivity_ssid",
+      "kind": "field",
+      "of": "framework.wifi_configuration",
+      "find": {
+        "name": "ConnectivitySSID",
+        "type": "java.lang.String"
+      },
+      "about": "the projection AP's network name, the one the phone is given"
+    },
+    {
+      "id": "framework.wifi_configuration.connectivity_psk",
+      "kind": "field",
+      "of": "framework.wifi_configuration",
+      "find": {
+        "name": "ConnectivityPSK",
+        "type": "java.lang.String"
+      },
+      "about": "the projection AP's key, the one the phone is given"
+    },
+    {
+      "id": "framework.wifi_configuration.is_24ghz_band",
+      "kind": "field",
+      "of": "framework.wifi_configuration",
+      "find": {
+        "name": "is24GHzBand",
+        "type": "boolean"
+      },
+      "about": "the hotspot runs on 2.4 GHz (channel24GHzBand) instead of channel; newer builds ignore it for the projection AP"
+    },
+    {
       "id": "framework.navigation_cluster",
       "kind": "class",
       "find": {
@@ -2250,6 +2319,273 @@
         "ret": "void"
       },
       "about": "asks the cluster for the battery info; answered through onHandleBatteryInfoResp"
+    },
+    {
+      "id": "framework.car_services.power",
+      "kind": "field",
+      "of": "framework.car_services",
+      "find": {
+        "name": "POWER_SERVICE",
+        "type": "java.lang.String",
+        "static": true
+      }
+    },
+    {
+      "id": "framework.power_service",
+      "kind": "class",
+      "find": {
+        "name": "com.hkmc.power.IMicomPowerService"
+      },
+      "about": "the head unit's power service (com.hkmc.micom.power): power status, and the system-off responders it waits for before it shuts down"
+    },
+    {
+      "id": "framework.power_service_stub",
+      "kind": "class",
+      "find": {
+        "name": "com.hkmc.power.IMicomPowerService$Stub"
+      }
+    },
+    {
+      "id": "framework.power_service_stub.as_interface",
+      "kind": "method",
+      "of": "framework.power_service_stub",
+      "find": {
+        "name": "asInterface",
+        "params": [
+          "android.os.IBinder"
+        ],
+        "ret": "@framework.power_service",
+        "static": true
+      }
+    },
+    {
+      "id": "framework.power_service.power_status",
+      "kind": "method",
+      "of": "framework.power_service",
+      "find": {
+        "name": "getPowerStatus",
+        "params": [],
+        "ret": "int"
+      },
+      "about": "0 ACC on (the car is on), 1 logic on (off, the head unit still up), 2 ADM, 5 system ready, 6 delay mode, 7 preparing system off, 255 off (MicomPowerConstants.AccStatus)"
+    },
+    {
+      "id": "framework.power_service.register_system_off_responder",
+      "kind": "method",
+      "of": "framework.power_service",
+      "find": {
+        "name": "registerSystemOffResponder",
+        "params": [
+          "@framework.power_listener",
+          "java.lang.String"
+        ],
+        "ret": "void"
+      },
+      "about": "the service then tells the listener onSystemOff and waits for its confirmSystemOff (10 s at most) before it shuts the system down; dropped when the listener's process dies"
+    },
+    {
+      "id": "framework.power_service.unregister_system_off_responder",
+      "kind": "method",
+      "of": "framework.power_service",
+      "find": {
+        "name": "unregisterSystemOffResponder",
+        "params": [
+          "@framework.power_listener",
+          "java.lang.String"
+        ],
+        "ret": "void"
+      }
+    },
+    {
+      "id": "framework.power_service.confirm_system_off",
+      "kind": "method",
+      "of": "framework.power_service",
+      "find": {
+        "name": "confirmSystemOff",
+        "params": [
+          "@framework.power_listener",
+          "java.lang.String"
+        ],
+        "ret": "void"
+      },
+      "about": "a responder is done: once every responder has confirmed, the shutdown starts"
+    },
+    {
+      "id": "framework.power_listener",
+      "kind": "class",
+      "find": {
+        "name": "com.hkmc.power.IMicomPowerStatusListener"
+      }
+    },
+    {
+      "id": "framework.power_listener_stub",
+      "kind": "class",
+      "find": {
+        "name": "com.hkmc.power.IMicomPowerStatusListener$Stub"
+      },
+      "about": "HMG-API answers its callbacks with a plain binder (only the ones it reads); every callback is one-way"
+    },
+    {
+      "id": "framework.power_listener_stub.as_interface",
+      "kind": "method",
+      "of": "framework.power_listener_stub",
+      "find": {
+        "name": "asInterface",
+        "params": [
+          "android.os.IBinder"
+        ],
+        "ret": "@framework.power_listener",
+        "static": true
+      }
+    },
+    {
+      "id": "framework.power_listener_stub.power_status_changed",
+      "kind": "field",
+      "of": "framework.power_listener_stub",
+      "find": {
+        "name": "TRANSACTION_onPowerStatusChanged",
+        "type": "int",
+        "static": true
+      },
+      "about": "onPowerStatusChanged(status): sent on registration and on every change"
+    },
+    {
+      "id": "framework.power_listener_stub.system_off",
+      "kind": "field",
+      "of": "framework.power_listener_stub",
+      "find": {
+        "name": "TRANSACTION_onSystemOff",
+        "type": "int",
+        "static": true
+      },
+      "about": "onSystemOff(): the head unit is about to shut down; responders confirm with confirmSystemOff"
+    },
+    {
+      "id": "framework.bcm_listener_stub.doors",
+      "kind": "field",
+      "of": "framework.bcm_listener_stub",
+      "find": {
+        "name": "TRANSACTION_onDoorAllStateChanged",
+        "type": "int",
+        "static": true
+      },
+      "about": "onDoorAllStateChanged(unlock: driver, passenger, rear left, rear right; open: driver, passenger, rear left, rear right, trunk; hood): open 1, closed 0, -1 unknown; sent on registration and on change"
+    },
+    {
+      "id": "framework.pp_service",
+      "kind": "class",
+      "find": {
+        "name": "com.android.server.phoneprojection.PPService"
+      },
+      "about": "Phone Projection's service (services.jar, in system_server, binder \"phoneprojection\"): every CarPlay / Android Auto connect, disconnect and session report goes through it"
+    },
+    {
+      "id": "framework.pp_service.connect_pp",
+      "kind": "method",
+      "of": "framework.pp_service",
+      "find": {
+        "name": "connectPP",
+        "params": [
+          "int",
+          "java.lang.String",
+          "java.lang.String",
+          "int"
+        ],
+        "ret": "void"
+      },
+      "about": "a projection connect: (type 1 CarPlay / 2 Android Auto, Bluetooth address, name, connection 0 USB / 1 wireless), from any app (Device Connections, Phone Projection, auto connection)"
+    },
+    {
+      "id": "framework.pp_service.disconnect_pp",
+      "kind": "method",
+      "of": "framework.pp_service",
+      "find": {
+        "name": "disconnectPP",
+        "params": [
+          "int",
+          "java.lang.String",
+          "java.lang.String",
+          "int"
+        ],
+        "ret": "void"
+      }
+    },
+    {
+      "id": "framework.pp_service.cancel_connection_pp",
+      "kind": "method",
+      "of": "framework.pp_service",
+      "find": {
+        "name": "cancelConnectionPP",
+        "params": [
+          "int",
+          "java.lang.String",
+          "java.lang.String",
+          "int"
+        ],
+        "ret": "void"
+      }
+    },
+    {
+      "id": "framework.pp_service.send_connect_pp_from_bt",
+      "kind": "method",
+      "of": "framework.pp_service",
+      "find": {
+        "name": "sendConnectPPFromBT",
+        "params": [
+          "java.lang.String",
+          "java.lang.String"
+        ],
+        "ret": "void"
+      },
+      "about": "Bluetooth settings' Device Connections connects a phone for projection (address, type)"
+    },
+    {
+      "id": "framework.pp_service.on_wireless_connected",
+      "kind": "method",
+      "of": "framework.pp_service",
+      "find": {
+        "name": "onWirelessConnected",
+        "params": [
+          "int",
+          "java.lang.String"
+        ],
+        "ret": "void"
+      },
+      "about": "a wireless session is up (type, Bluetooth address)"
+    },
+    {
+      "id": "framework.pp_service.on_wireless_disconnected",
+      "kind": "method",
+      "of": "framework.pp_service",
+      "find": {
+        "name": "onWirelessDisconnected",
+        "params": [
+          "int",
+          "java.lang.String"
+        ],
+        "ret": "void"
+      },
+      "about": "a wireless session ended (type, Bluetooth address)"
+    },
+    {
+      "id": "framework.pp_service.aa_connected_address",
+      "kind": "method",
+      "of": "framework.pp_service",
+      "find": {
+        "name": "getAAConnectedBTAddress",
+        "params": [],
+        "ret": "java.lang.String"
+      }
+    },
+    {
+      "id": "framework.pp_service.cp_connected_address",
+      "kind": "method",
+      "of": "framework.pp_service",
+      "find": {
+        "name": "getCPConnectedBTAddress",
+        "params": [],
+        "ret": "java.lang.String"
+      }
     }
   ]
 }

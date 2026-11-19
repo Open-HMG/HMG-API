@@ -59,7 +59,7 @@ import java.util.TreeMap;
  * names the lpatch binary.
  */
 public final class Engine {
-    public static final String HMGAPI_VERSION = "1.1.0-rc.2";
+    public static final String HMGAPI_VERSION = "1.1.0-rc.5";
     /**
      * The release a pre-release leads to (1.1.0 for 1.1.0-rc.1): what a mod's "hmgapi"
      * range of final versions is checked against (Version.meetsHmgapi). Updates compare
@@ -134,12 +134,14 @@ public final class Engine {
     }
 
     public static void main(String[] args) {
+        roomToWork();
         Engine e = new Engine();
         int rc;
         try {
             rc = e.run(args);
         } catch (Throwable t) {
             e.out.add("engine error: " + t);
+            e.failedAt(t, args);
             rc = 1;
         }
         if (!e.mirrors.isEmpty() || !e.restarts.isEmpty()) e.out.add("then    " + e.describeAfter());
@@ -153,6 +155,54 @@ public final class Engine {
         }
         System.exit(rc);
     }
+
+    /**
+     * The whole heap Dalvik allows (dalvik.vm.heapsize), not its growth limit: the engine is
+     * a command-line app_process, which gets the growth limit apps do (128 MB of 256 on the
+     * TCC897x builds: the K5's Car Report ran out of memory there). Off the unit there's no
+     * VMRuntime: nothing to do.
+     */
+    static void roomToWork() {
+        try {
+            Class<?> c = Class.forName("dalvik.system.VMRuntime");
+            Object rt = c.getMethod("getRuntime").invoke(null);
+            c.getMethod("clearGrowthLimit").invoke(rt);
+        } catch (Throwable ignored) {
+            // not Dalvik, or no such method: the growth limit stays
+        }
+    }
+
+    static final int ERROR_FRAMES = 8;
+
+    /**
+     * Where an engine error happened: its first frames in the output (the app shows it, so a
+     * photo of the screen says where), and the whole trace in state/engine-error.txt (the
+     * next Car Report's errors). Best effort: after an OutOfMemoryError this may fail too.
+     */
+    void failedAt(Throwable t, String[] args) {
+        try {
+            StackTraceElement[] st = t.getStackTrace();
+            for (int i = 0; i < st.length && i < ERROR_FRAMES; i++) out.add("  at " + st[i]);
+            if (st.length > ERROR_FRAMES) out.add("  ... " + (st.length - ERROR_FRAMES) + " more");
+            for (Throwable c = t.getCause(); c != null && c != c.getCause(); c = c.getCause()) {
+                out.add("  caused by " + c);
+                if (c.getStackTrace().length > 0) out.add("    at " + c.getStackTrace()[0]);
+            }
+        } catch (Throwable ignored) {
+            // no room even for that: the first line is out already
+        }
+        try {
+            if (!data.isDirectory()) return;
+            java.io.StringWriter w = new java.io.StringWriter();
+            w.write("engine " + (args.length > 0 ? args[0] : "") + " at " + new java.util.Date() + "\n");
+            t.printStackTrace(new java.io.PrintWriter(w, true));
+            write(errorFile, w.toString());
+        } catch (Throwable ignored) {
+            // the output has the frames
+        }
+    }
+
+    final File errorFile = new File(stateDir, "engine-error.txt");
 
     /** Live properties and service restarts, run after the result is printed. */
     final Map<String, String> mirrors = new LinkedHashMap<String, String>();
@@ -332,6 +382,7 @@ public final class Engine {
             Set<String> on = new LinkedHashSet<String>();
             Map<String, Map<String, Object>> all = LiveState.mods(this, on);
             out.addAll(ModRuntime.describe(this, all, on));
+            out.addAll(HomeWifi.describe(this, all, on));
             adbTcpWarning(all, on);
         }
         if (!problems.isEmpty()) {
@@ -403,7 +454,7 @@ public final class Engine {
                 problems.add(m.id + ": " + e.getMessage());
                 continue;
             }
-            String sys = SystemCheck.check(m.json.get("system"), facts);
+            String sys = SystemCheck.check(m.json.get("system"), facts, SystemCheck.asksHotspot(m.json));
             if (sys != null) {
                 if (!SystemCheck.ignored(hmgapi, m.id)) {
                     problems.add(m.id + ": " + sys);
@@ -417,7 +468,7 @@ public final class Engine {
                 for (Object o : (List<Object>) parts) {
                     Map<String, Object> part = (Map<String, Object>) o;
                     if (when((String) part.get("when"), m.settings)) {
-                        String ps = SystemCheck.check(part.get("system"), facts);
+                        String ps = SystemCheck.check(part.get("system"), facts, SystemCheck.asksHotspot(m.json));
                         if (ps != null && !SystemCheck.ignored(hmgapi, m.id)) {
                             out.add(m.id + ": part " + part.get("id") + " left out: " + ps);
                             continue;
@@ -440,6 +491,15 @@ public final class Engine {
             m.set = best == null ? "" : String.valueOf(cars.get(best));
             all.add(m);
         }
+        Mod core = HomeWifi.coreMod(this);   // the owner's home Wi-Fi: the stock client feature, HMG-API's own
+        if (core != null) {
+            try {
+                features(core);
+                all.add(core);
+            } catch (IllegalArgumentException e) {
+                problems.add("hmgapi: " + e.getMessage());
+            }
+        }
         return order(all);
     }
 
@@ -454,11 +514,53 @@ public final class Engine {
      * shares it; it stays while any mod wants it) and its featurexml.cfg line
      * commented out (the car deletes the file at boot while the line is live).
      */
+    /** the permissions file HMG-API writes for a feature: the same bytes for every mod (SystemCheck knows it by them) */
+    static String featureXml(String name) {
+        return "<permissions>\n    <feature name=\"" + name + "\" />\n</permissions>\n";
+    }
+
+    /** the stock hotspot feature: without it the unit never powers its Wi-Fi chip */
+    static final String HOTSPOT = "com.hkmc.software.wifihotspot";
+
+    /** mod.json "wifi": {"client": true} and/or {"hotspot": true} */
+    @SuppressWarnings("unchecked")
+    static boolean wifiAsk(Object wifi, String what) {
+        if (wifi == null) return false;
+        String usage = "\"wifi\": {\"client\": true}, {\"hotspot\": true} and/or {\"home\": true}";
+        if (!(wifi instanceof Map)) throw new IllegalArgumentException(usage);
+        for (Map.Entry<String, Object> e : ((Map<String, Object>) wifi).entrySet()) {
+            if (!("client".equals(e.getKey()) || "hotspot".equals(e.getKey()) || "home".equals(e.getKey())) || !(e.getValue() instanceof Boolean)) throw new IllegalArgumentException(usage);
+        }
+        return Boolean.TRUE.equals(((Map<String, Object>) wifi).get(what));
+    }
+
     @SuppressWarnings("unchecked")
     void features(Mod m) throws IOException {
         Object f = m.json.get("feature_flags");
         Object wifi = m.json.get("wifi");
-        if (wifi instanceof Map && Boolean.TRUE.equals(((Map<String, Object>) wifi).get("client"))) {
+        boolean client = wifiAsk(wifi, "client"), hotspot = wifiAsk(wifi, "hotspot");
+        if (hotspot) {
+            // "wifi": {"hotspot": true}: the stock hotspot feature, which is what makes the unit power
+            // its Wi-Fi chip (Korean units and some US trims ship without it, or delete it at boot from
+            // featurexml.cfg). A stock file that's there stays: only its featurexml line is commented
+            // out. Otherwise HMG-API's own file goes in, as for "feature_flags", shared by every mod.
+            File stock = new File(root + "/system/etc/permissions/" + HOTSPOT + ".xml");
+            if (stock.isFile() && !read(stock).equals(featureXml(HOTSPOT))) {
+                List<Object> changes = (List<Object>) m.patches.get("changes");
+                if (changes == null) m.patches.put("changes", changes = new ArrayList<Object>());
+                Map<String, Object> cfg = new LinkedHashMap<String, Object>();
+                cfg.put("type", "lines");
+                cfg.put("path", "/system/onebin/{onebin}/featurexml.cfg");
+                cfg.put("stock", "any");
+                cfg.put("comment", new ArrayList<Object>(java.util.Arrays.asList("-/system/etc/permissions/" + HOTSPOT + ".xml")));
+                changes.add(cfg);
+            } else {
+                List<Object> l = f instanceof List ? new ArrayList<Object>((List<Object>) f) : new ArrayList<Object>();
+                if (!l.contains(HOTSPOT)) l.add(HOTSPOT);
+                m.json.put("feature_flags", f = l);
+            }
+        }
+        if (client) {
             // "wifi": {"client": true}: Hyundai's Wi-Fi client (Tilepad's toggle, the Wireless mod's
             // opt-in): the android.hardware.wifi feature and persist.wifi.state=3 (client + wireless;
             // client and hotspot share one channel on these units). The same for every mod: merged.
@@ -472,8 +574,6 @@ public final class Engine {
             prop.put("key", "persist.wifi.state");
             prop.put("value", "3");
             changes.add(prop);
-        } else if (wifi != null) {
-            throw new IllegalArgumentException("\"wifi\": {\"client\": true}");
         }
         if (f == null) return;
         if (!(f instanceof List)) throw new IllegalArgumentException("\"feature_flags\" is a list of feature names");
@@ -486,7 +586,7 @@ public final class Engine {
             if (!name.matches(FEATURE)) throw new IllegalArgumentException("feature \"" + name + "\": a com.hkmc.*, android.hardware.* or android.software.* name");
             dir.mkdirs();
             File x = new File(dir, name + ".xml");
-            String text = "<permissions>\n    <feature name=\"" + name + "\" />\n</permissions>\n";
+            String text = featureXml(name);
             if (!(x.isFile() && read(x).equals(text))) write(x, text);
             Map<String, Object> add = new LinkedHashMap<String, Object>();
             add.put("type", "add");
@@ -752,10 +852,12 @@ public final class Engine {
         Set<String> settingsRestore = new LinkedHashSet<String>();
         Map<String, String> rebased = new TreeMap<String, String>();   // path -> live md5: changed outside HMG-API, built on again
         Map<String, String> rebasedFrom = new TreeMap<String, String>();   // path -> what HMG-API had written (merges: checked after build)
+        boolean force;           // --force: owned files that aren't what HMG-API wrote are written again
 
-        boolean isEmpty() {
+        boolean isEmpty() throws IOException {
             if (!rebased.isEmpty()) return false;
             for (Target t : targets.values()) if (t.restore || t.result == null || !t.result.equals(owned(t.path))) return false;
+            if (force) for (Target t : targets.values()) if (!t.result.equals(md5(sys(t.path)))) return false;
             for (String k : settings.keySet()) if (!String.valueOf(settings.get(k)[0]).equals(ownedSetting(k))) return false;
             return settingsRestore.isEmpty() && bindsText(binds).equals(currentBinds());
         }
@@ -808,6 +910,7 @@ public final class Engine {
     @SuppressWarnings("unchecked")
     Plan plan(boolean restoreAll, boolean force) throws Exception {
         Plan p = new Plan();
+        p.force = force;
         p.state = loadState();
         Map<String, Object> files = (Map<String, Object>) p.state.get("files");
         Map<String, Object> st = (Map<String, Object>) p.state.get("settings");
@@ -995,7 +1098,8 @@ public final class Engine {
      */
     @SuppressWarnings("unchecked")
     String rebaseWhy(String path, String live, Map<String, Object> owned, Target t) throws IOException {
-        if ("absent".equals(live)) return null;
+        // gone, as before HMG-API added it (another package's uninstall deleted it): stock again, safe to build on
+        if ("absent".equals(live)) return "absent".equals(owned.get("stock")) ? "not there, as before HMG-API added it" : null;
         if (t != null && !t.changes.isEmpty()) {
             boolean merge = true;
             for (Ch ch : t.changes) merge &= MERGES.contains(ch.type) && "any".equals(ch.c.get("stock"));
@@ -1639,7 +1743,10 @@ public final class Engine {
         Map<String, Object> files = (Map<String, Object>) p.state.get("files");
         Map<String, Object> st = (Map<String, Object>) p.state.get("settings");
         List<Target> changed = new ArrayList<Target>();
-        for (Target t : p.targets.values()) if (t.restore || !t.result.equals(p.owned(t.path))) changed.add(t);
+        for (Target t : p.targets.values()) {
+            // --force: also a file whose result is unchanged but which was deleted or changed outside HMG-API (#103)
+            if (t.restore || !t.result.equals(p.owned(t.path)) || (p.force && !t.result.equals(md5(sys(t.path))))) changed.add(t);
+        }
 
         // journal: what each file was before, so a lost apply or a trial can be rolled back
         rm(prevDir);

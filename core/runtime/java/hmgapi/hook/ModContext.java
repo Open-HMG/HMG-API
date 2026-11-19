@@ -139,6 +139,17 @@ public final class ModContext {
         }
     }
 
+    /**
+     * Car events in this app's process: parked, unparked, shutdown, wake (CarEvents). The mod
+     * asks for the ones it wants in mod.json ("car_events": {"parked": {}, "shutdown": {}});
+     * the listener hears only those, and only while the mod is on. It runs off the app's main
+     * thread; post to the app's own thread for anything that must run there. A shutdown
+     * leaves a few seconds: keep it short. Call it in appLoaded.
+     */
+    public void onCarEvent(LoadedApp app, CarEvents.Listener listener) {
+        CarEvents.add(this, app, listener);
+    }
+
     /** Is the mod on right now? (Its hooks don't run while it's off.) */
     public boolean enabled() {
         return enabled;

@@ -46,6 +46,15 @@ public final class HmgApi {
     public static final String ACTION_STATE_CHANGED = "hmgapi.intent.action.STATE_CHANGED";
     /** phone projection events (mod.json "projection": {"events": true}): extras "event", "value" or "type" + "data" */
     public static final String ACTION_PROJECTION = "hmgapi.intent.action.PROJECTION";
+    /**
+     * car events (mod.json "car_events"): extra EXTRA_EVENT, one of EVENT_*. An ordered broadcast:
+     * HMG-API waits for the receiver (goAsync() and finish() for longer work; a shutdown leaves a
+     * few seconds). Declare the receiver with android:permission="android.permission.DEVICE_POWER"
+     * so only HMG-API (or the system) can send it.
+     */
+    public static final String ACTION_CAR_EVENT = "hmgapi.intent.action.CAR_EVENT";
+    public static final String EXTRA_EVENT = "event";
+    public static final String EVENT_PARKED = "parked", EVENT_UNPARKED = "unparked", EVENT_SHUTDOWN = "shutdown", EVENT_WAKE = "wake";
     public static final String EXTRA_FOLDER = "folder", EXTRA_PATH = "path", EXTRA_MOUNTED = "mounted";
 
     /** hmgapid's answer that isn't a success */
@@ -172,6 +181,40 @@ public final class HmgApi {
     }
 
     /** the car's own on-screen notice (shown over any app, CarPlay and Android Auto too) */
+    /**
+     * Home Wi-Fi as this mod sees it (mod.json "wifi": {"home": true}): {"state": "up", "rssi": -61,
+     * "freq": 2437}. state: up, waiting (the car isn't parked: home Wi-Fi is only on while it is),
+     * searching, nonetworks, stock (the car's own Wi-Fi settings have the Wi-Fi), or off. Mods never use
+     * the car's mobile data, so without home Wi-Fi up a mod has no internet; check this before a
+     * download (the car events' "parked" is the moment). No network name: that's the owner's.
+     */
+    public static JSONObject homeWifi() {
+        try {
+            java.io.FileInputStream in = new java.io.FileInputStream("/data/hmgapi/public/wifi.json");
+            try {
+                ByteArrayOutputStream b = new ByteArrayOutputStream();
+                byte[] buf = new byte[512];
+                for (int n; (n = in.read(buf)) > 0; ) b.write(buf, 0, n);
+                return new JSONObject(b.toString("UTF-8"));
+            } finally {
+                in.close();
+            }
+        } catch (Exception e) {
+            JSONObject off = new JSONObject();
+            try {
+                off.put("state", "off");
+            } catch (JSONException x) {
+                // can't happen
+            }
+            return off;
+        }
+    }
+
+    /** true when home Wi-Fi is up: this mod's traffic (if it asked for it) has somewhere to go */
+    public static boolean homeWifiUp() {
+        return "up".equals(homeWifi().optString("state"));
+    }
+
     public static void toast(Context ctx, String text) {
         ctx.sendBroadcast(new Intent("com.hkmc.intent.action.TOAST")
                 .putExtra("com.hkmc.intent.extra.TOAST_MESSAGE", text)

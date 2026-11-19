@@ -252,6 +252,30 @@ won't reopen until the car stops. Only test this with someone else driving.
    ```
 4. At home: `tools/micom-decode.py micom-session.log ~/hmg-private/wiki/private/micom/ev6-usa-260507.json --changes`.
 
+## 9b. Car events (Car Check shows a notice for each)
+
+Watch the vehicle service while you do this (USB adb stays up while the car is off and
+the head unit is on):
+
+```
+adb shell "while true; do hmgapid service-log hmgapi vehicle; sleep 5; done" | grep -E 'power|doors|parked|unparked|shutdown|wake|system off'
+```
+
+1. In P, switch the car off. **Expect:** `power logic_on` (or another off status), `car
+   off`. No "Car event" notice yet (the default rule waits for you to get out).
+2. Open the driver's door, get out, close it. **Expect:** `doors open 1 0 0 0`, then all
+   closed, `parked`, the notice "Car event: parked", and in `adb shell hmgapid
+   service-log car-check on-parked` one line with the power and doors. With Wireless
+   CarPlay + Android Auto on: the phone's session ends.
+3. Get back in and switch the car on. **Expect:** `car on`, `unparked`, its notice;
+   wireless CarPlay/Android Auto comes back.
+4. Settings > Vehicle > "When the car is parked" > "All doors closed". Switch off in P:
+   **Expect:** `parked` at once, without a door. Put the rule back to the first choice.
+5. Switch off and leave the car until the head unit goes dark. Next time: **Expect:**
+   in the vehicle log before the gap, `the head unit is shutting down (system off)`,
+   `shutdown: ... (N ms)` with N under 7000, `confirmed the system off`; after a QuickBoot
+   resume, `wake`. Note how long the head unit stayed on after the door closed.
+
 ## 10. Restart and removal
 
 1. `adb shell hmgapid reboot`: everything above still works (bindings, panel page,

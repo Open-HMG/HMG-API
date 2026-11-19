@@ -218,9 +218,15 @@ keeper once >/dev/null
 check "nothing wanted: HMG-API's chain gone" "-A INPUT -j WLIST_IN" "$(first -S INPUT)"
 check "... and nothing applied" no "$([ -f "$D/state/net.applied" ] && echo yes || echo no)"
 eng publish-state
+has "mods still on: the keeper stays, for their cellular block" "hmgapi net " "$(cat "$D/state/services.txt")"
+: > "$D/mods/other/.disabled"; : > "$D/mods/bad/.disabled"
+eng publish-state
+keeper once >/dev/null
+check "no mods: their cellular block out" no "$([ -f "$D/state/mods-net.applied" ] && echo yes || echo no)"
+eng publish-state
 check "no keeper once nothing is in" "" "$(grep '^hmgapi net ' "$D/state/services.txt")"
 
-rm "$D/mods/cp/.disabled" "$D/mods/vpn/.disabled"
+rm "$D/mods/cp/.disabled" "$D/mods/vpn/.disabled" "$D/mods/other/.disabled" "$D/mods/bad/.disabled"
 eng publish-state
 keeper once >/dev/null
 keeper down >/dev/null
