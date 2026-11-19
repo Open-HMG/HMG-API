@@ -1,0 +1,53 @@
+# Sorts a new Car Report (tools/car-triage.py): firmware older than 2026 gets the
+# "update first" answer and is closed; a build that has an open tracker is folded into
+# it (the tracker gets the report's facts, the report is closed as a duplicate); a new
+# build's report becomes its tracker. Anything it can't read is left for a maintainer.
+# Each comment says it was sorted automatically and how to get it reopened.
+#
+# The issue's text is only read by the script (never put into a shell command), and the
+# job runs main's code with the repo token, limited to issues.
+name: Car Report triage
+
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: "Issue number to sort again"
+        required: true
+      dry_run:
+        description: "Only print what it would do"
+        type: boolean
+        default: true
+
+permissions: {}
+
+concurrency:
+  group: car-triage
+  cancel-in-progress: false
+
+jobs:
+  triage:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.issue.title, 'Car Report:')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+          sparse-checkout: tools/car-triage.py
+          sparse-checkout-cone-mode: false
+
+      - name: Sort the report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number || inputs.issue }}
+          DRY: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '--dry-run' || '' }}
+        run: |
+          case "$ISSUE" in ''|*[!0-9]*) echo "odd issue number"; exit 1 ;; esac
+          python3 tools/car-triage.py "$ISSUE" $DRY

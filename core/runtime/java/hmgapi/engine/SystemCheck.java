@@ -81,6 +81,7 @@ public final class SystemCheck {
         {"SP2PE", "kia", "Seltos"},
         {"IKFL", "genesis", "G70"},
         {"SU2IFL", "hyundai", "Creta"},
+        {"SU2IEV", "hyundai", "Creta Electric"},
         {"DL3", "kia", "K5"},
         {"DL3HEV", "kia", "K5 Hybrid"},
         // the older Hyundai and Kia builds (US 260507, Korea 260902): one map per build, many models

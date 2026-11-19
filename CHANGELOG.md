@@ -1,7 +1,59 @@
 # Changelog
 
-## Unreleased
+## 1.1.0-rc.5 (2026-11-19)
 
+- **The older Hyundai models on 260903, US and Canada: a hook map from stock files**
+  (`maps/hyundai/hmc/usa/260903`, all 391 points with code signatures). One system image
+  serves 25 models in both countries: Elantra (and Hybrid), Sonata (and Hybrid), Santa Fe
+  (and Hybrid, Plug-in Hybrid), Kona, Kona Electric 2020-21, Ioniq (Electric, Hybrid,
+  Plug-in Hybrid), Venue 2020-22, Veloster N and Palisade 2020-22 (#320). Their maps for
+  260507 (US) and 260206 (Canada) stay for cars not yet updated. Waiting for a check on a car.
+- **Maps for five more cars, from Car Reports.**
+  - The Korean Avante (`CN7`, #275) has the same 18 stock files as the Korean Hyundai
+    260902 map, and a US Ioniq 6 on 260206 (#319) has the same files as the Canadian
+    Ioniq 6 260206 map: `CN7.KOR.` and `CEEV.USA.` join those maps' products. #319's
+    report also confirms the Canadian map's 9 points that were mapped before code
+    signatures, so none are unconfirmed now.
+  - New maps: the facelifted Avante in Korea (`CN7PE.KOR` 260902, all 351 rc.4
+    points, #297), the Creta Electric in India (`SU2IEV.IND` 260430, all 351, #325)
+    and the Ioniq 6 in Korea (`CEEV.KOR` 260902, 333 of 351 from a 1.0.2 report, #310).
+    Each one is waiting for a check on a car.
+  - `tools/report-map.py` leaves out points that aren't in the catalogue, from a fork
+    or a local build (#325's report carried 127 of them), and says how many.
+  - The EV6 India map (#295) lists the 9 Phone Projection service points (#331) as
+    missing, like the other maps made from Car Reports; it claimed all 391 before.
+- **Kia EV6, India 260430 (`CVEV.IND`): a hook map** (`maps/kia/ev6/ind/260430`): 283
+  points from stock files plus 68 from two agreeing Car Reports from one car, all 351
+  of rc.4's points. The 283 pass the check on that car; the full map waits for one.
+  The 31 points newer than the reports are listed as missing (#295).
+- **Hook points for Phone Projection's service** (`framework.pp_service.*`: `PPService` in
+  system_server, binder `phoneprojection`): `connect_pp`, `disconnect_pp`,
+  `cancel_connection_pp`, `send_connect_pp_from_bt` (Device Connections), `on_wireless_connected`,
+  `on_wireless_disconnected`, `aa_connected_address`, `cp_connected_address`. Every CarPlay and
+  Android Auto connect, from any screen, and every wireless session report goes through it;
+  the Wireless mod's projection manager (which phone projects) uses them. Mapped on the 17
+  builds with stock files, missing on the Car Report maps until a newer report maps them.
+  Off-car only.
+
+- **The `parked` reading works without a mod asking for car events.** The vehicle service
+  only followed the power and gear for the parking rule when a mod declared
+  `"car_events"`, so on a car where none did, `parked` stayed 0 (a US EV6: switched off,
+  door closed, no "car off" in the vehicle log). It now follows them whenever the map is
+  ready; an event no mod asked for is still only logged. A door already open when the car
+  goes off counts as "opened" (a test for that order).
+
+- **A swapped voice button no longer leaves the car's voice assistant to start by
+  itself.** A binding's `send` injected the key with scan code 0. For a sent hold of
+  the voice button, the car makes the long press itself
+  (`ModeKeyDispatcher.generateLongKeyEventForPtt`: device 5, the real button's scan
+  code), and Android pairs a key's up with its down by device, source, key code and
+  scan code, so HMG-API's up never ended that down: the button stayed down in the
+  window on screen (Android Auto). The next key the car or HMG-API consumed, or the
+  reversing camera taking the screen, made Android cancel it there, and GPM took the
+  cancelled up for a release and started the car's own assistant, minutes later and
+  with no press. A sent key now carries the press's scan code when it is the same
+  button; for another button, a car repeat with a different scan code is logged, and
+  the input log line says the scan code sent (#301).
 - **Car events: mods can tidy up when you park and before the head unit shuts down.**
   A mod asks for them in mod.json (`"car_events": {"parked": {"script": "bin/x.sh"},
   "shutdown": {}}`): its script runs (as the user it gives, with its own log), its apps
@@ -28,6 +80,29 @@
   `.connect_wireless_session`, `gpm.wireless_explorer.*`) and DiPO's
   `dipo.carplay.disconnect` and `.restart_bonjour`: mapped on the 17 builds with stock
   files, missing on the Car Report maps until a newer report maps them. Off-car only.
+- **Home Wi-Fi while the car is off.** A new owner switch (HMG-API app, Settings > Home Wi-Fi,
+  off by default; it turns the car's own Wi-Fi client feature on, one file and a restart): when
+  the car has been off for 30 s (its screen goes dark with it, and the stock apps end projection
+  then) or is parked (car events), the projection hotspot goes off and the car's own Wi-Fi
+  client joins your home network; the moment you switch on, it's the other way round, the
+  hotspot as it was. "Connect now" on the page (`hmgapid wifi now [minutes]`, `back`) does the
+  same with the car on, in P only, until back, out of P or the time is up (30 minutes by
+  default). While joined, the car's own traffic stays on mobile data
+  (HKMC's `mobile_hipri` keeps its services there; HMG-API puts the default route and DNS
+  back); only HMG-API and mods that ask (`"wifi": {"home": true}`) use home Wi-Fi. The page
+  adds and forgets networks (in Android's own Wi-Fi config; a key needs P) and lists what home
+  Wi-Fi saw. The client library has `homeWifi()` / `homeWifiUp()`. Tried on a US EV6. (A
+  client next to the hotspot, on a second interface, was tried first and dropped: on these
+  units' driver the hotspot's channel moved whenever it scanned, and any hotspot restart left
+  it unusable until a restart.)
+- **Mods never use the car's mobile data**, DNS included: every enabled mod's apps (by
+  uid) and services (now run with HMG-API's group 2950/2951) are refused on `rmnet`, and
+  their lookups can't reach the car's DNS servers. Internet for mods is home Wi-Fi only;
+  `overrides.allow_cellular` lets the owner allow one mod, with a warning in the plan.
+  This changes mods that used mobile data until now.
+- `hmgapid wpa` (the keeper's helper: a `wpa_supplicant` control command), and `hmgapid wifi
+  saved|seen|join|forget|now|back` for HMG-API's app (a key only ever in the keeper's
+  environment).
 
 - **Wireless CarPlay and Android Auto on the older Hyundai and Kia builds: the
   projection AP gets the name and key the phone is given.** On the US 260507, Canada

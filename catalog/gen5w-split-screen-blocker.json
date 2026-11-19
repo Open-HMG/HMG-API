@@ -1,0 +1,15 @@
+{
+  "id": "gen5w-split-screen-blocker",
+  "name": "Gen5W Split Screen Blocker",
+  "description": "Removes the right-hand split screen and its slide-out tab from every screen. To turn it off: in HMG-API, open Mods, pick Gen5W Split Screen Blocker, switch it off and tap Apply changes. The split screen comes back at the next screen change, even if HMG-API shows Restart needed. To turn it back on: switch it on, tap Apply changes, then tap Restart unit. Works only on Ioniq 6 USA 260507 software; on any other software it changes nothing.",
+  "authors": [
+    "DeFlight, LLC"
+  ],
+  "license": "MIT",
+  "uuid": "f1154a64-b4d2-81b9-b45c-e791b3200a46",
+  "version": "1.0.0",
+  "repo": "https://github.com/DeFlight/hmgapi-gen5w-split-screen-blocker",
+  "download": "https://github.com/DeFlight/hmgapi-gen5w-split-screen-blocker/releases/download/V1.0.0/gen5w-split-screen-blocker-v1.0.0.zip",
+  "sha256": "7b320396ab6d6bea2caa4b0769b67c3096c3a10efb221f3810584348aa0fefc3",
+  "hmgapi": ">=1.0.0"
+}
