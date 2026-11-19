@@ -257,6 +257,71 @@ All three turn off the same feature in some form. They differ in what's allowed 
 docked-path test (Q9), which needs a `/system` change done with the backup rules. If
 docked mode works, build Option 1. Option 2 only for the screens that turn out fine.
 
+## 5. Update (2026-11-19): a choice for the panel itself, and where it fits
+
+Two features, often mixed up. Option 0-2 above are about **docked mode** (apps get
+narrower beside the panel). The owners' request is simpler: **choose whether the panel
+shows at all, everywhere or per app**. The community mod *Gen5W Split Screen Blocker*
+(DeFlight, catalogue #316) does the "never" part on one build only.
+
+### What the blocker does
+
+- Hooks only, no `/system` write. It runs only when `/system/app/RightScreenHome.odex`
+  has its md5 `cc1bd5131bee221ea3b5ed24a1c1d31a` (US Ioniq 6 260507); on any other
+  build it changes nothing. No `"system"` list in its `mod.json`.
+- By name, not through hook points: class `com.mobis.splitscreen.right.k.r` (the
+  panel's base service, `SplitScreenBase` in section 1), method `bh(boolean)` (the
+  show/hide method, log `setSplitSeenShow`), and a `FrameLayout` field for the
+  slide-out tab, set to `GONE`.
+
+### Points a panel on/off (and per-app) choice needs
+
+| Point (proposed) | What | Found by |
+|---|---|---|
+| `panel.base` | the panel's base `Service` subclass (`k/r` on the US EV6 and Ioniq 6) | `public setFreezeSS(boolean, String)`; the strings below |
+| `panel.base.set_shown` | `bh(boolean)`: shows or hides the panel | string `setSplitSeenShow` |
+| `panel.base.tab` | the slide-out tab's view (field, `FrameLayout`) | type, in `panel.base` |
+| `panel.base.check_freeze` | `D(String)`: runs on every activity switch with the resumed class name, so a per-app rule can hide the panel (and the tab) there | string `checkFreezeSS but resumed class is not registered` |
+| `panel.base.btn_off` (optional) | the panel's own "button off" list (`addBtnOffScreen`), which already hides it for DiPO, GPM, navigation and others | `BtnOffScreen` strings |
+
+**Can they be mapped?** Yes, from stock files: every stock tree we have holds those
+anchor strings in `RightScreenHome.odex` (checked 2026-11-19):
+
+| Build | `RightScreenHome.odex` md5 |
+|---|---|
+| `kia/ev6/usa/260507` | `8c06f565…` |
+| `kia/ev6/can/260206` | `8c06f565…` |
+| `kia/kmc/usa/260507` | `bd97b438…` |
+| `kia/kmc/can/260206` | `df6e0bec…` |
+| `kia/kmc/kor/260902` | `ab86e6a3…` |
+| `kia/nq5`, `kia/onpe`, `kia/ka423`, `kia/sg2ev` USA 260507 | `7b84ed63…` |
+| `kia/sg2ev/can/260206` | `1b4724ae…` |
+| `hyundai/hmc/usa/260507` | `4b299b74…` |
+| `hyundai/hmc/can/260206` | `8fca00b8…` |
+| `hyundai/neev/usa/260507` | `a4671749…` |
+| `hyundai/neev/can/260206` | `413a1578…` |
+| `hyundai/neev23/usa/260903` | `47899328…` |
+| `hyundai/ceev/usa/260903` | `e326ce15…` |
+| `hyundai/neev/kor/260902` | `4e6bcde4…` |
+
+17 trees, 13 panel builds, each with `setSplitSeenShow` (10 hits), `checkFreezeSS` (2) and
+the button-off strings (22). The maps made on cars (no stock tree) get the points from
+a Car Report made with an HMG-API that has them.
+
+### Where it goes
+
+- **Core:** the hook points only, mapped on every car in `maps/`, with tests
+  (`core/hookpoints/test.sh`, `tools/test-hooks.py`). No panel feature in core.
+- **A mod:** the owner's choice (panel on or off; or a list of apps where it's hidden),
+  through the points. The blocker can move to them, or Open-HMG ships one.
+- **Effort and risk:** about 1-2 days with tests. Low risk: hooks only, nothing on
+  `/system`; off means the stock panel.
+- **Docked mode** (Option 1/2) stays a separate, later step: it needs the
+  `Feature.hasFeature` hook in every process and system_server, the on-car Q9 test, and
+  projection can't resize during a session.
+
+**Status:** planned after 1.1.0 (`release/1.2`); not started.
+
 ## Questions for the car
 
 Run as the shell user unless noted. The main log buffer only holds ~10 s, so for logs,
