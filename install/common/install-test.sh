@@ -24,7 +24,19 @@ printf '#!/bin/sh\necho "setprop $*" >> "%s/calls.log"\n' "$T" > $T/bin/setprop
 # INSTALL_FAILED_INVALID_URI, as on the car (#187)
 printf '#!/bin/sh\necho "pm $*" >> "%s/calls.log"\ncase "$1" in path) [ -n "$FAKE_HAVE_APP" ] && echo package:/data/app/hmgapi.app-1.apk ;; install) case "$(ls -l "$3" | cut -c8)" in r) echo "${FAKE_PM:-Success}" ;; *) echo "Failure [INSTALL_FAILED_INVALID_URI]" ;; esac ;; esac\nexit 0\n' "$T" > $T/bin/pm
 printf '#!/bin/sh\necho "am $*" >> "%s/calls.log"\n' "$T" > $T/bin/am
+# SELinux file labels (only used once $R/sys/fs/selinux exists): kept beside the tree in $T/labels
+mkdir -p $T/labels
+cat > $T/bin/ls <<LS
+#!/bin/sh
+[ "\$1" = -Z ] || exec /bin/ls "\$@"
+[ -e "\$2" ] || exit 1
+echo "-rwxr-xr-x root shell \$(cat $T/labels/\$(echo "\$2" | tr / _) 2>/dev/null || echo u:object_r:system_file:s0) \${2##*/}"
+LS
+printf '#!/bin/sh\necho "chcon $*" >> %s/calls.log\necho "$1" > %s/labels/$(echo "$2" | tr / _)\n' "$T" "$T" > $T/bin/chcon
+# restorecon: what file_contexts gives app_process
+printf '#!/bin/sh\necho "restorecon $*" >> %s/calls.log\ncase "$1" in */app_process) echo u:object_r:zygote_exec:s0 > %s/labels/$(echo "$1" | tr / _) ;; esac\n' "$T" "$T" > $T/bin/restorecon
 chmod +x $T/bin/*
+lbl() { cat $T/labels/$(echo "$1" | tr / _) 2>/dev/null || echo u:object_r:system_file:s0; }
 calls() { cat $T/calls.log 2>/dev/null || true; : > $T/calls.log; }
 run() { set +e; out=$(cd $T && env PATH="$T/bin:$PATH" ROOT=$R CAPCHECK=0 $SH "$@" 2>&1); rc=$?; set -e; }
 tree() { (cd $R/system && find . -type f | sort | while read f; do echo "$(md5sum < "$f" | cut -c1-32) $f"; done) }
@@ -57,12 +69,12 @@ chmod 755 $R/system/xbin/nemesis
 BEFORE=$(tree)
 # the payload's binaries, with this tree's scripts (so a script edit needs no rebuild)
 P=$T/payload; cp -r $PL $P
-cp install/common/install.sh install/common/uninstall.sh install/common/lib.sh install/common/stock.txt install/common/app-pending.sh install/common/app-open.sh install/common/hook-check.sh install/common/boot.sh $P/
+cp install/common/install.sh install/common/uninstall.sh install/common/lib.sh install/common/stock.txt install/common/app-pending.sh install/common/app-open.sh install/common/hook-check.sh install/common/boot.sh install/common/rescue.sh $P/
 rm -rf $P/nemesis; mkdir -p $P/nemesis/mod $P/nemesis/bin
 cp -r install/nemesis/scripts $P/nemesis/scripts; cp -r install/nemesis/mod/scripts $P/nemesis/mod/scripts
 cp install/nemesis/bin/open.sh install/nemesis/bin/start.sh $P/nemesis/bin/; cp install/nemesis/conflicts.txt $P/nemesis/
 [ -f "$STOCK" ] || echo "$(md5sum < $R/system/bin/app_process | cut -c1-32) test stock" > $P/stock.txt
-(cd $P && md5sum hmgapid lpatch app_process libhmgapi_hook.so hmgapi-hook.jar HmgApi.apk install.sh uninstall.sh lib.sh stock.txt app-pending.sh app-open.sh hook-check.sh boot.sh MAPS.md5 > MANIFEST)
+(cd $P && md5sum hmgapid lpatch app_process libhmgapi_hook.so hmgapi-hook.jar HmgApi.apk install.sh uninstall.sh lib.sh stock.txt app-pending.sh app-open.sh hook-check.sh boot.sh rescue.sh MAPS.md5 > MANIFEST)
 
 # refusals first: nothing may change
 cp $R/system/bin/app_process $T/real; echo x >> $R/system/bin/app_process
@@ -207,7 +219,7 @@ firmware_update() {
 }
 head -c 9000 /dev/urandom > $T/newfw; chmod 755 $T/newfw
 echo "$(md5sum < $T/newfw | cut -c1-32) test new firmware" >> $P/stock.txt
-(cd $P && md5sum hmgapid lpatch app_process libhmgapi_hook.so hmgapi-hook.jar HmgApi.apk install.sh uninstall.sh lib.sh stock.txt app-pending.sh app-open.sh hook-check.sh boot.sh MAPS.md5 > MANIFEST)
+(cd $P && md5sum hmgapid lpatch app_process libhmgapi_hook.so hmgapi-hook.jar HmgApi.apk install.sh uninstall.sh lib.sh stock.txt app-pending.sh app-open.sh hook-check.sh boot.sh rescue.sh MAPS.md5 > MANIFEST)
 export HMGAPI_TEST_ENGINE=$T/bin/engine
 run $P/install.sh $P
 mkdir -p $R/data/hmgapi/state; echo '{"files": {}, "settings": {}}' > $R/data/hmgapi/state/files.json
@@ -263,4 +275,42 @@ run $P/install.sh $P
 check "uninstalled, then a firmware update: the stale backup found, reset" "engine firmware-reset" "$(calls | grep '^engine firmware' || true)"
 check "... new backup" "$(md5sum < $T/newfw)" "$(md5sum < $R/data/hmgapi/stock/system/bin/app_process)"
 unset HMGAPI_TEST_ENGINE
+
+# SELinux on (a car that boots Enforcing): app_process and the stock copy keep the stock label
+check "no selinuxfs: no labels touched" "" "$(calls | grep -e chcon -e restorecon || true)"
+mkdir -p $R/sys/fs/selinux; echo 1 > $R/sys/fs/selinux/enforce
+ZE=u:object_r:zygote_exec:s0; A=$R/system/bin/app_process
+echo $ZE > $T/labels/$(echo $A | tr / _)
+run $P/install.sh $P
+has "selinux: install finishes" "installed. Restart the head unit" "$out"
+has "... says the label" "app_process SELinux label: $ZE (enforcing)" "$out"
+c=$(calls)
+has "... the stock copy labelled before it's renamed into place" "chcon $ZE $A.hmgapi-stock.hmgapi-new" "$c"
+has "... the wrapper too" "chcon $ZE $A.hmgapi-new" "$c"
+check "... both have it in place" "$ZE $ZE" "$(lbl $A) $(lbl $A.hmgapi-stock)"
+check "... saved for the uninstall" "$ZE" "$(cat $R/data/hmgapi/stock/app_process.label)"
+# an update over a build that didn't keep labels: the wrapper and copy lost theirs
+rm $R/data/hmgapi/stock/app_process.label; rm $T/labels/*
+run $P/install.sh $P
+has "selinux: update over a build without labels: file_contexts' label" "restorecon $A" "$(calls)"
+check "... both relabelled" "$ZE $ZE" "$(lbl $A) $(lbl $A.hmgapi-stock)"
+check "... and saved" "$ZE" "$(cat $R/data/hmgapi/stock/app_process.label)"
+# rescue.sh: Android doesn't start: only the stock app_process back, with its label, hooks off
+check "selinux: rescue.sh kept on the unit" yes "$([ -f $R/data/hmgapi/rescue.sh ] && echo yes)"
+run $R/data/hmgapi/rescue.sh
+has "rescue: said" "rescue: app_process is stock" "$out"
+check "rescue: stock app_process bytes" "$(md5sum < $T/real)" "$(md5sum < $A)"
+check "... its stock label" "$ZE" "$(lbl $A)"
+check "... hooks off" yes "$([ -f $R/data/hmgapi/hook/disable ] && echo yes)"
+check "... the rest of HMG-API still there (uninstall later)" yes "$([ -f $R/system/bin/hmgapid ] && echo yes)"
+run $P/install.sh $P
+has "rescue: install again works" "HMG-API's wrapper is in place" "$out"
+check "... the wrapper back" "$(md5sum < $P/app_process)" "$(md5sum < $A)"
+run $R/data/hmgapi/rescue.sh
+echo u:object_r:system_file:s0 > $T/labels/$(echo $A | tr / _)
+run $R/data/hmgapi/uninstall.sh --purge
+has "selinux: uninstall finishes" "HMG-API uninstalled" "$out"
+check "... stock app_process has the stock label" "$ZE" "$(lbl $A)"
+check "... /system stock" "$BEFORE" "$(tree)"
+rm -rf $R/sys
 exit $fail

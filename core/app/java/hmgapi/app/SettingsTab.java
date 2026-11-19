@@ -17,11 +17,11 @@ import java.io.FileInputStream;
 /**
  * HMG-API's own settings, by category: Vehicle (the owner's switches for mods'
  * commands), Updates, Phone projection (what mods set), Hook map (this car's map,
- * checks, mapping it from its own files), About. The switches are kept by hmgapid
- * (allow <name>).
+ * checks, mapping it from its own files), System (SELinux), About. The switches are
+ * kept by hmgapid (allow <name>).
  */
 final class SettingsTab {
-    static final String[] CATS = { "Vehicle", "Updates", "Phone projection", "Hook map", "About" };
+    static final String[] CATS = { "Vehicle", "Updates", "Phone projection", "Hook map", "System", "About" };
     final MainActivity a;
     LinearLayout cats, page;
     static int current;   // the category shown last, kept while the app runs
@@ -66,6 +66,7 @@ final class SettingsTab {
         else if (n == 1) updates();
         else if (n == 2) projection();
         else if (n == 3) hookMap();
+        else if (n == 4) system();
         else about();
     }
 
@@ -332,6 +333,44 @@ final class SettingsTab {
                 show(current);
             }
         }.start(a);
+    }
+
+    /** SELinux: off on most of these units; some newer cars boot Enforcing. boot.sh writes public/selinux.txt. */
+    void system() {
+        String mode = "disabled", boot = "";
+        try {
+            for (String l : read(new File("/data/hmgapi/public/selinux.txt")).split("\n")) {
+                if (l.startsWith("mode ")) mode = l.substring(5).trim();
+                if (l.startsWith("boot ")) boot = l.substring(5).trim();
+            }
+        } catch (Exception e) {
+            // not written yet (before the first start with this build)
+        }
+        try {
+            String live = read(new File("/sys/fs/selinux/enforce")).trim();
+            mode = live.equals("1") ? "enforcing" : live.equals("0") ? "permissive" : mode;
+        } catch (Exception e) {
+            // no selinuxfs (disabled), or not readable here: the boot steps' word
+        }
+        if (mode.equals("disabled") && boot.isEmpty()) {
+            Ui.text(page, "SELinux", 21, true, Ui.TEXT);
+            Ui.text(page, "SELinux is off on this head unit (stock), so there's nothing to change here.", 16, false, Ui.GREY);
+            return;
+        }
+        fact("SELinux now", mode.equals("enforcing") ? "Enforcing" : mode.equals("permissive") ? "Permissive" : "Off");
+        fact("At start", boot.startsWith("enforcing permissive") ? "Enforcing (stock), set to Permissive by HMG-API"
+                : boot.startsWith("enforcing failed") ? "Enforcing (stock); HMG-API couldn't set Permissive (please send a Car Report)"
+                : boot.startsWith("enforcing") ? "Enforcing (stock)" : "?");
+        owner("SELinux", "This head unit starts with SELinux Enforcing, which can stop HMG-API's hooks and mods from working. "
+                + "On: HMG-API sets it to Permissive early in each start. That turns off a layer of Android's protection for "
+                + "every app on the head unit, not only HMG-API's. Off (the default): the next start is stock again. "
+                + "NEMESIS Manager's SELinux switch changes it until the next restart. Takes effect at the next restart.",
+                "Set SELinux to Permissive at start", "selinux_permissive", false, new Runnable() {
+                    @Override
+                    public void run() {
+                        a.needRestart();
+                    }
+                });
     }
 
     void about() {

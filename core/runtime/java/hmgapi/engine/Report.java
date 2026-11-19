@@ -18,7 +18,8 @@ import java.util.regex.Pattern;
  * points it lacks, this car mapped from its own files (MapProbe: names only, ready to
  * become its map), the last on-car map check, the unit's features, each installed
  * mod and whether it loads here, HMG-API's recent errors, and the unit's network
- * (NetReport: the stock firewall and its rules, routes, logged drops).
+ * (NetReport: the stock firewall and its rules, routes, logged drops), and SELinux (selinux:
+ * the mode, what HMG-API did at start, app_process's labels, the kernel's denials).
  *
  * Model-level facts only. Never: anything from /data but HMG-API's own state, VIN,
  * serials, phone numbers, IMEI, account details, addresses. Log lines are scrubbed
@@ -51,6 +52,13 @@ final class Report {
         unit.put("wifi", e.facts.wifi());   // seen, stock hotspot, unpowered (the hotspot feature off) or none
         unit.put("features", new ArrayList<Object>(e.facts.features()));
         r.put("unit", unit);
+        try {
+            r.put("selinux", selinux(e));
+        } catch (Throwable t) {
+            Map<String, Object> se = new LinkedHashMap<String, Object>();
+            se.put("error", scrub(String.valueOf(t)));
+            r.put("selinux", se);
+        }
 
         CarMap map = CarMap.load(e.root, e.facts, e.hmgapi);
         Map<String, Object> mj = new LinkedHashMap<String, Object>();
@@ -182,6 +190,66 @@ final class Report {
         return 0;
     }
 
+    /** SELinux: off (no selinuxfs) on most of these units; what a car that boots Enforcing needs to be looked at. */
+    static Map<String, Object> selinux(Engine e) {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        String mode = "disabled";
+        try {
+            String v = Engine.read(new File(e.root + "/sys/fs/selinux/enforce")).trim();
+            mode = v.equals("1") ? "enforcing" : v.equals("0") ? "permissive" : mode;
+        } catch (Exception ignored) {
+            // no selinuxfs: disabled
+        }
+        m.put("mode", mode);
+        try {
+            m.put("boot", Engine.read(new File(e.root + "/dev/.hmgapi-selinux")).trim());   // the zygote wrapper's or boot.sh's note
+        } catch (Exception ignored) {
+            // nothing noted: not Enforcing at start, or an older wrapper
+        }
+        m.put("option_on", new File(e.data, "settings/allow/selinux_permissive").isFile());
+        // the kernel's command line: only its SELinux word (the rest can hold a serial number)
+        try {
+            for (String w : Engine.read(new File(e.root + "/proc/cmdline")).trim().split("\\s+")) {
+                if (w.startsWith("androidboot.selinux=") || w.startsWith("selinux=") || w.startsWith("enforcing=")) m.put("cmdline_" + w.split("=")[0], w.split("=", 2)[1]);
+            }
+        } catch (Exception ignored) {
+            // not readable
+        }
+        if (!"disabled".equals(mode)) {
+            Map<String, Object> labels = new LinkedHashMap<String, Object>();
+            for (String f : new String[] {"/system/bin/app_process", "/system/bin/app_process.hmgapi-stock", "/system/bin/hmgapid",
+                    "/system/lib/libhmgapi_hook.so", "/system/framework/hmgapi-hook.jar", "/system/etc/install-recovery.sh"}) {
+                String l = NetReport.run("ls", "-Z", e.root + f).trim();
+                for (String w : l.split("\\s+")) if (w.contains(":object_r:")) labels.put(f, w);
+            }
+            m.put("labels", labels);
+            String saved = null;
+            try {
+                saved = Engine.read(new File(e.data, "stock/app_process.label")).trim();
+            } catch (Exception ignored) {
+                // not saved (SELinux was off at install)
+            }
+            m.put("app_process_stock_label", saved);
+            // the kernel's denials (the last 40): which part of HMG-API (or a mod) the policy stops
+            List<Object> avc = new ArrayList<Object>();
+            try {
+                for (String l : Engine.exec("dmesg").text.split("\n")) if (l.contains("avc:")) avc.add(scrub(l));
+            } catch (Exception x) {
+                avc.add("[dmesg: " + x.getMessage() + "]");
+            }
+            m.put("denials", avc.size() > 40 ? new ArrayList<Object>(avc.subList(avc.size() - 40, avc.size())) : avc);
+        }
+        return m;
+    }
+
+    static String selinuxLine(Map<String, Object> se) {
+        if (se == null || se.get("mode") == null) return null;
+        String s = String.valueOf(se.get("mode"));
+        if (se.get("boot") != null) s += " (at start: " + se.get("boot") + ")";
+        if (se.get("denials") instanceof List) s += ", " + ((List<?>) se.get("denials")).size() + " denial(s) logged";
+        return s;
+    }
+
     static Map<String, Object> notNoFiles(Map<String, String> missing) {
         Map<String, Object> m = new TreeMap<String, Object>();
         for (Map.Entry<String, String> x : missing.entrySet()) if (!x.getValue().startsWith("no stock ")) m.put(x.getKey(), x.getValue());
@@ -252,6 +320,8 @@ final class Report {
                 .append(unit.get("platform")).append(", Android ").append(unit.get("android")).append(", Wi-Fi chip: ")
                 .append(Boolean.TRUE.equals(unit.get("wifi_chip")) ? "yes" : "no").append("\n");
         s.append("- ").append(map.get("summary")).append("\n");
+        String sel = selinuxLine((Map<String, Object>) r.get("selinux"));
+        if (sel != null) s.append("- SELinux: ").append(sel).append("\n");
         Map<String, Object> nf = (Map<String, Object>) pj.get("not_found");
         s.append("- Mapped from this car's files: ").append(pj.get("found")).append(" points found, ")
                 .append(nf == null ? 0 : nf.size()).append(" not found\n");
@@ -290,6 +360,13 @@ final class Report {
                 for (int i = Math.max(0, drops.size() - 15); i < drops.size(); i++) s.append(drops.get(i)).append("\n");
                 s.append("```\n");
             }
+        }
+        Map<String, Object> se = (Map<String, Object>) r.get("selinux");
+        List<Object> den = se == null ? null : (List<Object>) se.get("denials");
+        if (den != null && !den.isEmpty()) {
+            s.append("\n## SELinux denials\n\n```\n");
+            for (int i = Math.max(0, den.size() - 15); i < den.size(); i++) s.append(den.get(i)).append("\n");
+            s.append("```\n");
         }
         List<Object> errs = (List<Object>) r.get("errors");
         if (!errs.isEmpty()) {
@@ -336,6 +413,8 @@ final class Report {
         String body = "Product: " + unit.get("product") + "\nHMG-API: " + r.get("hmgapi") + "\nMap: " + map.get("status")
                 + (Boolean.TRUE.equals(map.get("hooks_on")) ? " (hooks on)" : " (hooks off)")
                 + "\nFound on this car: " + pj.get("found") + " points, " + (nf == null ? 0 : nf.size()) + " not found"
+                + (selinuxLine((Map<String, Object>) r.get("selinux")) != null && !"disabled".equals(((Map<String, Object>) r.get("selinux")).get("mode"))
+                        ? "\nSELinux: " + selinuxLine((Map<String, Object>) r.get("selinux")) : "")
                 + (r.get("network") instanceof Map && ((Map<String, Object>) r.get("network")).get("summary") != null
                         ? "\nNetwork: " + ((Map<String, Object>) r.get("network")).get("summary") : "")
                 + "\n\nPlease attach " + name + ".json (USB stick: HMG-API reports; adb: adb pull /data/hmgapi/public/reports/).";

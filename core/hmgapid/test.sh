@@ -271,6 +271,11 @@ check "allow: only known switches" 2 "$(code root allow everything on)"
 check "allow: block_ambient_light off by default" off "$(run root allow block_ambient_light)"
 check "allow: block_ambient_light on" on "$(run root allow block_ambient_light on)"
 run root allow block_ambient_light off >/dev/null
+check "allow: selinux_permissive off by default" off "$(run root allow selinux_permissive)"
+check "allow: the HMG-API app turns selinux_permissive on" on "$(run app allow selinux_permissive on)"
+check "... where the zygote wrapper reads it" yes "$([ -f "$T/app/root/settings/allow/selinux_permissive" ] && echo yes || echo no)"
+check "... a mod's app can't" 13 "$(code mod allow selinux_permissive off)"
+run app allow selinux_permissive off >/dev/null
 check "allow: off again" no "$(run root allow startup_notice off >/dev/null; [ -f "$T/root/root/settings/allow/startup_notice" ] && echo yes || echo no)"
 check "park-rule: door by default" door "$(run root park-rule)"
 check "park-rule: closed" closed "$(run root park-rule closed)"

@@ -39,13 +39,14 @@ remount() {
     mount -o remount,"$1" /system >/dev/null 2>&1
 }
 
-# put <payload file> <path> <mode> <group>: copy, md5 check, rename into place
+# put <payload file> <path> <mode> <group> [label]: copy, md5 check, label (SELinux), rename into place
 put() {
     local src=$P/$1 dst=$ROOT$2 want
     want=$(sum "$src")
     [ "$(sum "$dst")" = "$want" ] && return 0
     cp "$src" "$dst.hmgapi-new" || fail "copy $1"
     chmod "$3" "$dst.hmgapi-new"; chown root:"$4" "$dst.hmgapi-new" 2>/dev/null
+    label_set "$5" "$dst.hmgapi-new" || { rm -f "$dst.hmgapi-new"; fail "can't give $2 the stock SELinux label ($5)"; }
     [ "$(sum "$dst.hmgapi-new")" = "$want" ] || { rm -f "$dst.hmgapi-new"; fail "md5 mismatch after copying $1"; }
     mv "$dst.hmgapi-new" "$dst" || { rm -f "$dst.hmgapi-new"; fail "rename onto $2"; }
     log "installed $2"
@@ -139,10 +140,24 @@ for d in "" /stock /state /mods /settings /hook /inbox /dalvik-cache /public; do
 done
 # apps may traverse (not list) /data/hmgapi and mods, and read public/ (live state)
 chmod 711 "$D" "$D/mods"; chmod 755 "$D/public"
+sel_publish   # the app's System page before the first restart
 [ -f "$D/settings/hmgapi.json" ] || echo '{"updates": false}' > "$D/settings/hmgapi.json"
 chmod 600 "$D/settings/hmgapi.json"
 
 backup /system/bin/app_process
+# its SELinux label, from the stock file whenever it's there (an update finds the wrapper, so it
+# keeps the saved one; a first install, or one after a firmware update, takes it anew): with
+# SELinux on, init starts the zygote only from a file with that label (zygote_exec)
+LF=$D/stock/app_process.label
+[ -n "$UPDATE" ] || label_of "$B" > "$LF"
+LBL=$(cat "$LF" 2>/dev/null)
+# an update over a build that didn't save it: the label the unit's file_contexts gives app_process
+if [ -z "$LBL" ] && [ -n "$UPDATE" ] && [ -e "$ROOT$SEL" ]; then
+    restorecon "$B" 2>/dev/null
+    LBL=$(label_of "$B")
+    [ -n "$LBL" ] && echo "$LBL" > "$LF"
+fi
+[ -n "$LBL" ] && log "app_process SELinux label: $LBL ($(sel_mode))"
 backup /system/etc/install-recovery.sh
 backup /system/etc/qb_runtime.sh
 
@@ -156,10 +171,14 @@ rm -f "$ROOT/data/dalvik-cache/system@framework@hmgapi-hook.jar@classes.dex"
 if [ -z "$UPDATE" ]; then
     cp "$B" "$KEEP.hmgapi-new" || fail "copy app_process"
     chmod 755 "$KEEP.hmgapi-new"; chown root:shell "$KEEP.hmgapi-new" 2>/dev/null
+    label_set "$LBL" "$KEEP.hmgapi-new" || { rm -f "$KEEP.hmgapi-new"; fail "can't give the stock app_process copy its SELinux label ($LBL)"; }
     [ "$(sum "$KEEP.hmgapi-new")" = "$HAVE" ] || { rm -f "$KEEP.hmgapi-new"; fail "app_process copy md5 mismatch"; }
     mv "$KEEP.hmgapi-new" "$KEEP" || fail "keep stock app_process"
 fi
-put app_process /system/bin/app_process 755 shell
+put app_process /system/bin/app_process 755 shell "$LBL"
+# an update over a build that didn't keep the labels: both get the stock one now
+label_fix "$LBL" "$B" || fail "can't give app_process its stock SELinux label ($LBL)"
+label_fix "$LBL" "$KEEP" || fail "can't give app_process.hmgapi-stock its stock SELinux label ($LBL)"
 hook_add /system/etc/install-recovery.sh top || fail "boot hook in install-recovery.sh"
 hook_add /system/etc/qb_runtime.sh end || fail "boot hook in qb_runtime.sh"
 sync
@@ -180,7 +199,7 @@ rm -f "$D/hook/disable"
         echo "file $(sum "$ROOT$f") $f"
     done
 } > "$D/installed.txt"
-cp "$P/uninstall.sh" "$P/lib.sh" "$P/stock.txt" "$P/app-pending.sh" "$P/hook-check.sh" "$P/boot.sh" "$D/" && chmod 700 "$D/uninstall.sh" "$D/app-pending.sh" "$D/hook-check.sh" "$D/boot.sh"
+cp "$P/uninstall.sh" "$P/lib.sh" "$P/stock.txt" "$P/app-pending.sh" "$P/hook-check.sh" "$P/boot.sh" "$P/rescue.sh" "$D/" && chmod 700 "$D/uninstall.sh" "$D/app-pending.sh" "$D/hook-check.sh" "$D/boot.sh" "$D/rescue.sh"
 # open.sh (NEMESIS Manager's Launch, adb) installs the app from this copy if it's missing, then opens it
 cp "$P/app-open.sh" "$D/open.sh" && chmod 700 "$D/open.sh" || fail "keep open.sh"
 cp "$P/HmgApi.apk" "$D/HmgApi.apk" && chmod 644 "$D/HmgApi.apk" || fail "keep a copy of the app"

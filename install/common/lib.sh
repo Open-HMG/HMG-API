@@ -117,3 +117,60 @@ hook_remove() {
     [ -x "$_f" ] || chmod 644 "$_f.hmgapi-new"
     mv "$_f.hmgapi-new" "$_f"
 }
+
+# SELinux. Most of these units boot with it disabled (no selinuxfs); some newer cars may
+# boot Enforcing. sel_mode: enforcing, permissive or disabled, now.
+SEL=/sys/fs/selinux/enforce
+sel_mode() {
+    case "$(cat "$ROOT$SEL" 2>/dev/null)" in
+        1) echo enforcing ;;
+        0) echo permissive ;;
+        *) echo disabled ;;
+    esac
+}
+
+# The boot steps' part (boot.sh): the owner's Permissive option, if the zygote wrapper
+# couldn't set it (its note says what it found); then what this boot's mode is for the app
+# and the Car Report (public/selinux.txt). Nothing is saved or put back: a boot without the
+# option (or without HMG-API) is stock again.
+selinux_boot() {
+    _d=$ROOT/data/hmgapi _n=$ROOT/dev/.hmgapi-selinux
+    if [ "$(sel_mode)" = enforcing ] && [ -f "$_d/settings/allow/selinux_permissive" ]; then
+        case "$(cat "$_n" 2>/dev/null)" in
+            *permissive*) ;;   # set by the wrapper, and the owner made it Enforcing again since: leave it
+            *)
+                if echo 0 > "$ROOT$SEL" 2>/dev/null; then
+                    echo "enforcing permissive boot.sh" > "$_n"
+                    echo "SELinux: Permissive (set by boot.sh)"
+                else
+                    echo "enforcing failed boot.sh" > "$_n"
+                    echo "SELinux: Enforcing, can't set Permissive"
+                fi ;;
+        esac
+    fi
+    sel_publish
+}
+# public/selinux.txt: the mode now and the start's note, for the app's Settings → System
+sel_publish() {
+    { echo "mode $(sel_mode)"; echo "boot $(cat "$ROOT/dev/.hmgapi-selinux" 2>/dev/null)"; } > "$ROOT/data/hmgapi/public/selinux.txt" \
+        && chmod 644 "$ROOT/data/hmgapi/public/selinux.txt"
+}
+
+# File labels (SELinux contexts). With SELinux on, the zygote only starts from a file
+# labelled like the stock app_process (zygote_exec), and a copied file gets its folder's
+# label. label_of <file>: the label, or nothing (SELinux off, no label); label_set <label> <file>;
+# label_fix <label> <file>: label_set unless it's already that. Full paths (ROOT included).
+label_of() {
+    [ -e "$ROOT$SEL" ] || return 0
+    for _w in $(ls -Z "$1" 2>/dev/null); do
+        case "$_w" in *:object_r:*) echo "$_w"; return 0 ;; esac
+    done
+}
+label_set() {
+    [ -n "$1" ] && [ -e "$ROOT$SEL" ] || return 0
+    chcon "$1" "$2"
+}
+label_fix() {
+    [ -n "$1" ] && [ "$(label_of "$2")" != "$1" ] || return 0
+    label_set "$1" "$2"
+}

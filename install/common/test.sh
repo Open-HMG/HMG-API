@@ -135,4 +135,24 @@ check "... and boot.log says so" "1" "$(grep -c "recover didn't finish" "$T/boot
 rm -f "$D/state/journal.json"; rm -f "$T/hmgapid.calls"
 env ROOT="$T" $SH "$PWD/boot.sh" > /dev/null 2>&1; wait
 check "boot: no journal: recover isn't run" "" "$(calls)"
+# selinux_boot (boot.sh): the owner's Permissive option when the zygote wrapper couldn't; this boot's mode for the app
+mkdir -p "$D/public" "$D/settings/allow" "$T/dev"
+SB() { L selinux_boot; }
+check "selinux: disabled (no selinuxfs): said, nothing else" "mode disabled|boot " "$(SB >/dev/null; tr '\n' '|' < "$D/public/selinux.txt" | sed 's/|$//')"
+check "... readable by the app" "-rw-r--r--" "$(ls -l "$D/public/selinux.txt" | cut -c1-10)"
+mkdir -p "$T/sys/fs/selinux"; echo 1 > "$T/sys/fs/selinux/enforce"; echo "enforcing kept" > "$T/dev/.hmgapi-selinux"
+o=$(SB)
+check "selinux: enforcing, option off: left alone" "1|" "$(cat "$T/sys/fs/selinux/enforce")|$o"
+check "... said" "mode enforcing|boot enforcing kept" "$(tr '\n' '|' < "$D/public/selinux.txt" | sed 's/|$//')"
+: > "$D/settings/allow/selinux_permissive"; echo "enforcing failed wrapper" > "$T/dev/.hmgapi-selinux"
+o=$(SB)
+check "selinux: option on, the wrapper couldn't: boot.sh sets it" "0|SELinux: Permissive (set by boot.sh)" "$(cat "$T/sys/fs/selinux/enforce")|$o"
+check "... said" "mode permissive|boot enforcing permissive boot.sh" "$(tr '\n' '|' < "$D/public/selinux.txt" | sed 's/|$//')"
+echo 1 > "$T/sys/fs/selinux/enforce"; echo "enforcing permissive wrapper" > "$T/dev/.hmgapi-selinux"
+o=$(SB)
+check "selinux: set by the wrapper, Enforcing again since (the owner, NEMESIS Manager): left alone" "1|" "$(cat "$T/sys/fs/selinux/enforce")|$o"
+rm "$T/dev/.hmgapi-selinux"
+o=$(SB)
+check "selinux: option on, no wrapper note (an older wrapper): boot.sh sets it" "0" "$(cat "$T/sys/fs/selinux/enforce")"
+rm -rf "$T/sys" "$T/dev/.hmgapi-selinux" "$D/settings/allow/selinux_permissive"
 exit $fail
