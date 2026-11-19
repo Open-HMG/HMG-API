@@ -38,11 +38,82 @@ public final class Dex {
         File src;   // the file it was read from (sites() reads its code again)
         public final List<Member> fields = new ArrayList<Member>();
         public final List<Member> methods = new ArrayList<Member>();
-        public final Set<String> strings = new LinkedHashSet<String>();
+        /** const-strings in all its methods (a sorted array: contains() only) */
+        public Set<String> strings = Strings.NONE;
+        Set<String> stringsRead = new LinkedHashSet<String>();   // while reading
+    }
+
+    /**
+     * A sorted String[] as a read-only Set (contains by binary search): a class's or
+     * method's const-strings. A LinkedHashSet costs ~40 bytes an entry, and the framework's
+     * ~250k methods were most of a 128 MB unit's heap.
+     */
+    static final class Strings extends java.util.AbstractSet<String> {
+        static final Strings NONE = new Strings(new String[0]);
+        final String[] a;
+
+        Strings(String[] a) {
+            this.a = a;
+        }
+
+        static Set<String> of(Set<String> s) {
+            if (s == null || s.isEmpty()) return NONE;
+            String[] a = s.toArray(new String[s.size()]);
+            java.util.Arrays.sort(a);
+            return new Strings(a);
+        }
+
+        @Override
+        public boolean contains(Object o) {
+            return o instanceof String && java.util.Arrays.binarySearch(a, (String) o) >= 0;
+        }
+
+        @Override
+        public int size() {
+            return a.length;
+        }
+
+        @Override
+        public java.util.Iterator<String> iterator() {
+            return java.util.Arrays.asList(a).iterator();
+        }
+    }
+
+    /**
+     * One copy of each name, type and parameter list across all the files read (MapProbe
+     * keeps the whole framework: the same "java.lang.String" from every dex, ~300k strings).
+     * forget() drops the pools; what was read keeps its copies.
+     */
+    static Map<String, String> namePool = new java.util.HashMap<String, String>();
+    static Map<List<String>, List<String>> paramPool = new java.util.HashMap<List<String>, List<String>>();
+
+    static String shared(String s) {
+        String have = namePool.get(s);
+        if (have != null) return have;
+        namePool.put(s, s);
+        return s;
+    }
+
+    static List<String> shared(List<String> l) {
+        if (l.isEmpty()) return java.util.Collections.emptyList();
+        List<String> have = paramPool.get(l);
+        if (have != null) return have;
+        have = java.util.Collections.unmodifiableList(java.util.Arrays.asList(l.toArray(new String[l.size()])));
+        paramPool.put(have, have);
+        return have;
+    }
+
+    /** Drops the pools and the cached file sites() reads (a whole dex): MapProbe's run is done. */
+    public static void forget() {
+        namePool = new java.util.HashMap<String, String>();
+        paramPool = new java.util.HashMap<List<String>, List<String>>();
+        lastFile = null;
+        lastDex = null;
     }
 
     final byte[] b;
     final int base;
+    Set<String> keep;   // const-strings walk() keeps (null: all)
     String[] strings;
     String[] types;
 
@@ -55,6 +126,14 @@ public final class Dex {
 
     /** Every class in an .odex, .dex, or the classes.dex of a .jar/.apk: name -> class. */
     public static Map<String, Cls> read(File f) throws Exception {
+        return read(f, null);
+    }
+
+    /**
+     * keep: the const-strings to keep (the ones the hook point catalogue asks about), or null
+     * for all. A unit's framework and apps hold ~300k, nearly all log text no point asks for.
+     */
+    public static Map<String, Cls> read(File f, Set<String> keep) throws Exception {
         byte[] data;
         String n = f.getName();
         if (n.endsWith(".jar") || n.endsWith(".apk") || n.endsWith(".zip")) {
@@ -62,20 +141,48 @@ public final class Dex {
             try {
                 ZipEntry e = z.getEntry("classes.dex");
                 if (e == null) return new LinkedHashMap<String, Cls>();
-                data = readAll(z.getInputStream(e));
+                data = readAll(z.getInputStream(e), e.getSize());
             } finally {
                 z.close();
             }
         } else {
-            data = readAll(new FileInputStream(f));
+            data = readAll(new FileInputStream(f), f.length());
         }
-        Map<String, Cls> out = new Dex(data).classes();
+        Dex d = new Dex(data);
+        d.keep = keep;
+        Map<String, Cls> out = d.classes();
+        data = null;
         for (Cls c : out.values()) c.src = f;
         return out;
     }
 
     static byte[] readAll(InputStream in) throws Exception {
+        return readAll(in, -1);
+    }
+
+    /**
+     * size known (a file's length, a zip entry's size): one array of exactly that size. A
+     * growing buffer costs about three times the file at its peak (the buffer doubles, then
+     * is copied), and Dalvik needs each array in one piece: a 10 MB framework.odex then
+     * ran a 128 MB unit (the TCC897x builds) out of memory.
+     */
+    static byte[] readAll(InputStream in, long size) throws Exception {
         try {
+            if (size >= 0 && size < Integer.MAX_VALUE) {
+                byte[] out = new byte[(int) size];
+                int at = 0, k;
+                while (at < out.length && (k = in.read(out, at, out.length - at)) > 0) at += k;
+                int more = at == out.length ? in.read() : -1;
+                if (at == out.length && more < 0) return out;
+                // the size was wrong: what's read so far, then the rest
+                ByteArrayOutputStream o = new ByteArrayOutputStream(at + 65536);
+                o.write(out, 0, at);
+                if (more >= 0) o.write(more);
+                out = null;
+                byte[] buf = new byte[65536];
+                while ((k = in.read(buf)) > 0) o.write(buf, 0, k);
+                return o.toByteArray();
+            }
             ByteArrayOutputStream o = new ByteArrayOutputStream();
             byte[] buf = new byte[65536];
             int k;
@@ -124,12 +231,12 @@ public final class Dex {
             else if ((c & 0xe0) == 0xc0) s.append((char) ((c & 0x1f) << 6 | (b[pos++] & 0x3f)));
             else s.append((char) ((c & 0x0f) << 12 | (b[pos++] & 0x3f) << 6 | (b[pos++] & 0x3f)));
         }
-        return strings[idx] = s.toString();
+        return strings[idx] = s.toString();   // this file only; what's kept goes through shared()
     }
 
     String type(int idx) {
         if (types[idx] != null) return types[idx];
-        return types[idx] = javaType(string(u4(base + h(0x44) + idx * 4)));
+        return types[idx] = shared(javaType(string(u4(base + h(0x44) + idx * 4))));
     }
 
     /** a dex descriptor as map-car.py's jtype writes it: Lcom/x/Y; -> com.x.Y, [I -> int[] */
@@ -168,6 +275,8 @@ public final class Dex {
             c.sup = sup == -1 ? null : type(sup);
             int data = u4(d + 24);
             if (data != 0) classData(c, base + data);
+            c.strings = Strings.of(c.stringsRead);
+            c.stringsRead = null;
             out.put(c.name, c);
         }
         return out;
@@ -185,7 +294,7 @@ public final class Dex {
             int f = base + h(0x54) + idx * 8;
             Member m = new Member();
             m.type = type(u2(f + 2));
-            m.name = string(u4(f + 4));
+            m.name = shared(string(u4(f + 4)));
             m.isStatic = (acc & 0x8) != 0;
             c.fields.add(m);
             pos = save;
@@ -199,22 +308,23 @@ public final class Dex {
             int save = pos;
             int mo = base + h(0x5c) + idx * 8;
             Member m = new Member();
-            m.name = string(u4(mo + 4));
+            m.name = shared(string(u4(mo + 4)));
             int proto = base + h(0x4c) + u2(mo + 2) * 12;
             m.ret = type(u4(proto + 4));
-            m.params = new ArrayList<String>();
+            List<String> params = new ArrayList<String>();
             int pl = u4(proto + 8);
             if (pl != 0) {
                 int n = u4(base + pl);
-                for (int k = 0; k < n; k++) m.params.add(type(u2(base + pl + 4 + k * 2)));
+                for (int k = 0; k < n; k++) params.add(type(u2(base + pl + 4 + k * 2)));
             }
+            m.params = shared(params);
             m.isStatic = (acc & 0x8) != 0;
             m.isVirtual = i >= dm;
             m.code = code == 0 ? 0 : base + code;
-            m.strings = new LinkedHashSet<String>();
-            if (code != 0) m.sig = walk(base + code, m.strings);
-            c.strings.addAll(m.strings);
-            if (m.strings.isEmpty()) m.strings = java.util.Collections.emptySet();   // most methods: the framework has ~100k
+            Set<String> ms = new LinkedHashSet<String>();
+            if (code != 0) m.sig = walk(base + code, ms);
+            c.stringsRead.addAll(ms);
+            m.strings = Strings.of(ms);   // most methods have none: the shared empty one
             c.methods.add(m);
             pos = save;
         }
@@ -247,8 +357,10 @@ public final class Dex {
                 sig = (sig ^ (v & 0xff)) * 0x100000001b3L;
                 sig = (sig ^ (v >>> 8)) * 0x100000001b3L;
             }
-            if (op == 0x1a) out.add(string(u2(at + 2)));
-            else if (op == 0x1b) out.add(string(u4(at + 2)));
+            if (op == 0x1a || op == 0x1b) {
+                String k = string(op == 0x1a ? u2(at + 2) : u4(at + 2));
+                if (keep == null || keep.contains(k)) out.add(shared(k));
+            }
             i += SIZE[op];
         }
         return sig;
@@ -286,12 +398,13 @@ public final class Dex {
         if (n.endsWith(".jar") || n.endsWith(".apk") || n.endsWith(".zip")) {
             ZipFile z = new ZipFile(f);
             try {
-                return readAll(z.getInputStream(z.getEntry("classes.dex")));
+                ZipEntry e = z.getEntry("classes.dex");
+                return readAll(z.getInputStream(e), e.getSize());
             } finally {
                 z.close();
             }
         }
-        return readAll(new FileInputStream(f));
+        return readAll(new FileInputStream(f), f.length());
     }
 
     /** "com.x.Y.name(a,b)ret" for a method_ids entry */

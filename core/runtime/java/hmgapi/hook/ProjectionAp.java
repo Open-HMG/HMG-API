@@ -60,7 +60,7 @@ final class ProjectionAp {
                     p.args[0] = copy;
                     HmgApi.i("projection AP: started with its connectivity name" + (sameKey ? "" : " and key")
                             + (band24 ? " on its own channel, not the hotspot's 2.4 GHz one" : "")
-                            + " (this build would use the hotspot's)");
+                            + " (the older builds would use the hotspot's; the newer ones already do this)");
                 } catch (Throwable t) {
                     HmgApi.e("projection AP", t);
                 }

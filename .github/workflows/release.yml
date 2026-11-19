@@ -1,10 +1,12 @@
 # A HMG-API release from a version tag (v1.1.0; pre-releases v1.1.0-alpha.N, -beta.N,
-# -rc.N: docs/releasing.md): built and tested,
+# -rc.N: docs/releasing.md), or a test build from a test-<name> tag (tools/mktestbuild.sh:
+# the version it's built on, files named hmgapi-<version>-<name>-*, the tag's message as
+# its title and notes; docs/releasing.md "Test builds"): built and tested,
 # with the mod SDK (hmgapi-mod-sdk-<version>.zip, in SHA256SUMS: what mod repos pin),
 # signed with HMG-API's keys (repository secrets), then attached to a *draft* GitHub
 # release (a pre-release, never "Latest", when the tag has a "-"). Publishing it stays a person's call.
 #
-# Secrets (in the "release" environment, which only v* tags can use): HMGAPI_APP_P12 (base64) and HMGAPI_APP_PASS, the app's signing key;
+# Secrets (in the "release" environment, which only v* and test-* tags can use, each run approved by a maintainer): HMGAPI_APP_P12 (base64) and HMGAPI_APP_PASS, the app's signing key;
 # HMGAPI_RELEASE_KEY and HMGAPI_RELEASE_KEY_PUB (base64), the release key the app
 # checks updates against. The bundled mods come signed from their own repos' releases
 # (tools/release-mods.txt, pinned by their catalogue entries); core signs no mod.
@@ -12,7 +14,7 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    tags: ["v*", "test-*"]
 
 permissions:
   contents: write
@@ -44,7 +46,13 @@ jobs:
       - name: The tag is this version
         run: |
           v=$(sed -n 's/.*HMGAPI_VERSION = "\(.*\)";/\1/p' core/runtime/java/hmgapi/engine/Engine.java)
-          test "v$v" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME, but HMG-API's version is $v"; exit 1; }
+          case "$GITHUB_REF_NAME" in
+            test-*)   # a test build: any version, the name from the tag
+              n=${GITHUB_REF_NAME#test-}
+              echo "$n" | grep -qE '^[a-z0-9]+(-[a-z0-9]+)*-[0-9]+$' || { echo "$GITHUB_REF_NAME: test-<name>, <name> lowercase letters, digits and dashes ending in its number"; exit 1; }
+              echo "TESTNAME=$n" >> "$GITHUB_ENV" ;;
+            *) test "v$v" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME, but HMG-API's version is $v"; exit 1; } ;;
+          esac
           echo "$v" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.(0|[1-9][0-9]*))?$' || { echo "$v: x.y.z or x.y.z-alpha.N, -beta.N, -rc.N (docs/releasing.md)"; exit 1; }
           echo "VERSION=$v" >> "$GITHUB_ENV"
 
@@ -84,12 +92,28 @@ jobs:
           cp out/releases/hmgapi-"$VERSION".zip out/assets/hmgapi-"$VERSION"-update.zip
           cp out/packages/*.zip out/assets/
           cp out/dist/mods/*-nemesis*.zip out/assets/
+          if [ -n "$TESTNAME" ]; then   # a test build: its name in every file
+            rm -f out/assets/hmgapi-mod-sdk-*.zip   # mod repos pin a release's SDK, never a test build's
+            for f in out/assets/hmgapi-"$VERSION"-*.zip; do
+              mv "$f" "out/assets/hmgapi-$VERSION-$TESTNAME-${f#out/assets/hmgapi-$VERSION-}"
+            done
+            # the build stamp must name the tagged commit: no uncommitted changes
+            case "$(cat out/payload/BUILD)" in *+*) echo "the build says $(cat out/payload/BUILD)"; exit 1 ;; esac
+          fi
           (cd out/assets && sha256sum *.zip > SHA256SUMS)
 
       - name: Draft release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          if [ -n "$TESTNAME" ]; then   # a test build: the tag's message is its title and notes
+            git fetch -q --force --depth=1 "https://github.com/$GITHUB_REPOSITORY" "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+            title=$(git tag -l --format='%(contents:subject)' "$GITHUB_REF_NAME")
+            git tag -l --format='%(contents:body)' "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"
+            [ -n "$title" ] && [ -s "$RUNNER_TEMP/notes.md" ] || { echo "$GITHUB_REF_NAME: an annotated tag with a title and notes (tools/mktestbuild.sh)"; exit 1; }
+            gh release create "$GITHUB_REF_NAME" --draft --prerelease --latest=false --title "$title" --notes-file "$RUNNER_TEMP/notes.md" out/assets/*
+            exit 0
+          fi
           notes=".github/release-notes/$GITHUB_REF_NAME.md"
           [ -f "$notes" ] || notes=CHANGELOG.md
           pre=""; case "$GITHUB_REF_NAME" in *-*) pre="--prerelease --latest=false" ;; esac   # a pre-release is never "Latest"

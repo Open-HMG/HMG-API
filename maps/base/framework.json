@@ -1368,5 +1368,80 @@
     "field": "TRANSACTION_onDoorAllStateChanged",
     "type": "int",
     "static": true
+  },
+  "framework.pp_service": {
+    "class": "com.android.server.phoneprojection.PPService"
+  },
+  "framework.pp_service.connect_pp": {
+    "method": "connectPP",
+    "params": [
+      "int",
+      "java.lang.String",
+      "java.lang.String",
+      "int"
+    ],
+    "ret": "void",
+    "static": false
+  },
+  "framework.pp_service.disconnect_pp": {
+    "method": "disconnectPP",
+    "params": [
+      "int",
+      "java.lang.String",
+      "java.lang.String",
+      "int"
+    ],
+    "ret": "void",
+    "static": false
+  },
+  "framework.pp_service.cancel_connection_pp": {
+    "method": "cancelConnectionPP",
+    "params": [
+      "int",
+      "java.lang.String",
+      "java.lang.String",
+      "int"
+    ],
+    "ret": "void",
+    "static": false
+  },
+  "framework.pp_service.send_connect_pp_from_bt": {
+    "method": "sendConnectPPFromBT",
+    "params": [
+      "java.lang.String",
+      "java.lang.String"
+    ],
+    "ret": "void",
+    "static": false
+  },
+  "framework.pp_service.on_wireless_connected": {
+    "method": "onWirelessConnected",
+    "params": [
+      "int",
+      "java.lang.String"
+    ],
+    "ret": "void",
+    "static": false
+  },
+  "framework.pp_service.on_wireless_disconnected": {
+    "method": "onWirelessDisconnected",
+    "params": [
+      "int",
+      "java.lang.String"
+    ],
+    "ret": "void",
+    "static": false
+  },
+  "framework.pp_service.aa_connected_address": {
+    "method": "getAAConnectedBTAddress",
+    "params": [],
+    "ret": "java.lang.String",
+    "static": false
+  },
+  "framework.pp_service.cp_connected_address": {
+    "method": "getCPConnectedBTAddress",
+    "params": [],
+    "ret": "java.lang.String",
+    "static": false
   }
 }

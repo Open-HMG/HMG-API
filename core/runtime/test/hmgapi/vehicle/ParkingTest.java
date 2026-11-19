@@ -56,6 +56,17 @@ public final class ParkingTest {
         check("switched on again: unparked", "unparked", step(p, 8000));
         check("... once", null, step(p, 9000));
 
+        // the driver opens the door first, then switches off, gets out and closes it (a US EV6, 2026-11-18)
+        Parking first = new Parking();
+        first.power = Parking.ACC_ON;
+        first.park = 1;
+        doors(first, 1, 0, 0, 0);
+        check("door open while still on: nothing", null, step(first, 0));
+        first.power = Parking.DELAY_MODE;
+        check("switched off with the door open: not yet", null, step(first, 1000));
+        doors(first, 0, 0, 0, 0);
+        check("... and it closes: parked", "parked", step(first, 2000));
+
         p.power = Parking.OFF;
         check("off (255) counts as off", null, step(p, 10000));
         doors(p, 0, 1, 0, 0);

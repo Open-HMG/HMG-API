@@ -190,7 +190,6 @@ public final class Hub {
     static void eventsTick() {
         java.util.List<EventRun.Decl> d = readEvents();
         eventDecls = d;
-        boolean any = !d.isEmpty();
         boolean again = false;
         synchronized (Hub.class) {
             if (shutdownSent && parking.power == Parking.ACC_ON) {   // the off didn't end in a shutdown: ready for the next one
@@ -204,7 +203,9 @@ public final class Hub {
             shuttingDown = shutdownSent;
         }
         if (!shuttingDown) callbacks.ensurePower(EventRun.asked(d, "shutdown"));   // during a shutdown: no new registration
-        if (!any || !Points.ready()) return;
+        // the parked state is followed whether or not a mod asked for the events: the "parked" reading
+        // is it (home Wi-Fi reads it), and without the power and gear here it never saw the car go off
+        if (!Points.ready()) return;
         int p = -1, g = -1;
         try {
             if (Points.has("framework.power_service.power_status")) p = num(call(power(), "framework.power_service.power_status"));

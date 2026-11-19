@@ -61,14 +61,51 @@ public final class MapProbe {
 
     /** sys: a stock tree (app/, framework/) or a unit's /system; backups: <root>/data/hmgapi/stock or null; mapsDir: other cars' maps (names for smali-only points) */
     public MapProbe(String sys, String backups, File mapsDir) throws Exception {
+        this(sys, backups, mapsDir, null);
+    }
+
+    /**
+     * catalogueDir: the catalogue run() will map; given, only the const-strings its shapes
+     * name are kept from the dex files (Dex.read keep), the rest of the ~300k dropped as
+     * they're read. With all of them, the framework alone ran a 128 MB unit out of memory.
+     */
+    public MapProbe(String sys, String backups, File mapsDir, File catalogueDir) throws Exception {
         this.sys = sys;
         this.backups = backups;
         this.mapsDir = mapsDir;
+        this.keep = catalogueDir == null ? null : catalogueStrings(catalogueDir);
         for (String j : BCP) {
             File o = local("/system/framework/" + j + ".odex");
-            if (o.isFile()) framework.putAll(Dex.read(o));
+            if (o.isFile()) framework.putAll(Dex.read(o, keep));
         }
         loadReferences();
+    }
+
+    /** const-strings to keep (null: all) */
+    final Set<String> keep;
+
+    /** every string in a "strings" list anywhere in the catalogue's files */
+    static Set<String> catalogueStrings(File dir) throws Exception {
+        Set<String> out = new java.util.HashSet<String>();
+        File[] cats = dir.listFiles();
+        if (cats == null) return out;
+        for (File f : cats) if (f.getName().endsWith(".json")) collectStrings(Json.parse(Engine.read(f)), out);
+        return out;
+    }
+
+    @SuppressWarnings("unchecked")
+    static void collectStrings(Object o, Set<String> out) {
+        if (o instanceof Map) {
+            for (Map.Entry<String, Object> e : ((Map<String, Object>) o).entrySet()) {
+                if ("strings".equals(e.getKey()) && e.getValue() instanceof List) {
+                    for (Object s : (List<Object>) e.getValue()) out.add(String.valueOf(s));
+                } else {
+                    collectStrings(e.getValue(), out);
+                }
+            }
+        } else if (o instanceof List) {
+            for (Object x : (List<Object>) o) collectStrings(x, out);
+        }
     }
 
     /** a stock file: HMG-API's backup of it when it has one (a mod changed the file), else the file */
@@ -105,11 +142,15 @@ public final class MapProbe {
     public void run(File catalogueDir) throws Exception {
         File[] cats = catalogueDir.listFiles();
         java.util.Arrays.sort(cats);
-        for (File f : cats) {
-            if (!f.getName().endsWith(".json")) continue;
-            Map<String, Object> cat = Json.object(Engine.read(f));
-            if (!cat.containsKey("points")) continue;
-            mapCatalogue(cat);
+        try {
+            for (File f : cats) {
+                if (!f.getName().endsWith(".json")) continue;
+                Map<String, Object> cat = Json.object(Engine.read(f));
+                if (!cat.containsKey("points")) continue;
+                mapCatalogue(cat);
+            }
+        } finally {
+            Dex.forget();   // the name pools and the dex sites() kept: not needed after the run
         }
     }
 
@@ -134,7 +175,7 @@ public final class MapProbe {
             files.put(path, CarMap.md5(lf));
             String base = lf.getName().replaceAll("\\.odex$", "");
             if (cat.get("package") == null && java.util.Arrays.asList(BCP).contains(base)) continue;   // already in framework
-            classes.putAll(Dex.read(lf));
+            classes.putAll(Dex.read(lf, keep));
         }
         if (noFiles != null) {
             for (Map<String, Object> p : pts) missing.put(String.valueOf(p.get("id")), noFiles);
@@ -511,7 +552,7 @@ public final class MapProbe {
                 }
             }
         }
-        MapProbe p = new MapProbe(e.root + "/system", e.root + "/data/hmgapi/stock", maps);
+        MapProbe p = new MapProbe(e.root + "/system", e.root + "/data/hmgapi/stock", maps, new File(maps, "catalogue"));
         p.run(new File(maps, "catalogue"));
         Map<String, Object> r = p.result();
         r.put("product", e.facts.get("product"));
@@ -650,7 +691,7 @@ public final class MapProbe {
     }
 
     public static void main(String[] a) throws Exception {
-        MapProbe p = new MapProbe(new File(a[0]).getAbsolutePath(), null, a.length > 2 ? new File(a[2]) : null);
+        MapProbe p = new MapProbe(new File(a[0]).getAbsolutePath(), null, a.length > 2 ? new File(a[2]) : null, new File(a[1]));
         p.run(new File(a[1]));
         System.out.println(Json.write(p.result()));
     }

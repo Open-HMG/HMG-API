@@ -52,21 +52,56 @@ def one(v):
     return v
 sysv = m.get("system")
 sysv = [] if sysv in (None, "all", "*") else sysv if isinstance(sysv, list) else [sysv]
-osl = []
+ents = []   # (model, region, firmware), or a product prefix glob as a string
 for s in sysv:
     if not isinstance(s, dict):
-        osl = []
+        ents = []
         break
     prod = s.get("product")
     if prod is not None and "model" not in s:   # ro.build.product prefixes
         prod = [str(x) for x in (prod if isinstance(prod, list) else [prod])]
         globs = ["*.*.*.*"] if any(x.startswith("!") or x in ("all", "*") for x in prod) else [x + "*" for x in prod]
     else:
-        globs = ["%s.%s.*.%s" % (mo, r, f) for mo in one(s.get("model")) for r in one(s.get("region")) for f in one(s.get("firmware"))]
+        globs = [(mo, r, f) for mo in one(s.get("model")) for r in one(s.get("region")) for f in one(s.get("firmware"))]
     for g in globs:
-        if g not in osl:
-            osl.append(g)
-os_ = "any" if not osl or "*.*.*.*" in osl else ",".join(osl)
+        if g not in ents:
+            ents.append(g)
+# NEMESIS before 1.16.9 refuses an os= over 255 characters ("os is too long"; 1.16.9 takes 1024).
+# Over that, widen step by step until it fits: models sharing a prefix in one region and firmware
+# become prefix* (NEEV, NEEV23, NEEV23SE: NEEV*), then any model for that region and firmware, then
+# any car on that firmware, then any. The engine's own check of "system" still says which cars fit.
+OS_MAX = 255
+def osjoin(es):
+    out = []
+    for e in es:
+        g = e if isinstance(e, str) else "%s.%s.*.%s" % e
+        if g not in out:
+            out.append(g)
+    return "any" if not out or "*.*.*.*" in out else ",".join(out)
+def prefixed(es):
+    out = []
+    for e in es:
+        if not isinstance(e, str):
+            mo, r, f = e
+            base = min((x[0] for x in es if not isinstance(x, str) and x[1:] == (r, f) and mo.startswith(x[0])
+                        and x[0] != "*"), key=len, default=mo)
+            if base != mo or any(not isinstance(x, str) and x[1:] == (r, f) and x[0] != mo and x[0].startswith(mo)
+                                 for x in es):
+                e = (base.rstrip("*") + "*", r, f)
+        out.append(e)
+    return out
+steps = [lambda es: es, prefixed,
+         lambda es: [e if isinstance(e, str) else ("*",) + e[1:] for e in es],
+         lambda es: [e if isinstance(e, str) else ("*", "*", e[2]) for e in es]]
+os_ = "any"
+for i, st in enumerate(steps):
+    o = osjoin(st(ents))
+    if len(o) <= OS_MAX:
+        os_ = o
+        break
+if os_ != osjoin(ents):
+    sys.stderr.write("note: os= of %d characters is over the %d older NEMESIS takes; widened to %s "
+                     "(HMG-API's own check still limits the cars)\n" % (len(osjoin(ents)), OS_MAX, os_))
 for k, v in (("ID", mid), ("VERSION", ver), ("PACKAGE_ID", pkg), ("NAME", name), ("SHORT_DESC", short),
              ("DETAILED_DESC", detail), ("OS", os_)):
     print("%s=%s" % (k, v))
