@@ -1,0 +1,15 @@
+{
+  "id": "gen5w-button-mapper",
+  "name": "Gen5W Button Mapper",
+  "description": "Choose what each button's press and hold do: a CarPlay screen or media key, a car screen or any app on the car, the car's Home or Back, or Default (what the car does). MAP, NAV, MEDIA, RADIO, PHONE, SETUP, HOME, SEEK, TUNE, MODE, CALL, VOICE, MUTE, POI, CONNECT and the ☆ ★ buttons, whichever the car has. CarPlay choices work only while a phone is connected; otherwise the button does what the car does. Set it up from the Button Mapper tile in the app menu. Each of the car's profiles (Profile 1, Profile 2, Guest) has its own buttons and they switch with the car. Three presses of NAV within 1.5 s each still open NEMESIS Manager.",
+  "authors": [
+    "DeFlight, LLC"
+  ],
+  "license": "MIT",
+  "uuid": "f1154a64-b4d2-81b9-b45c-e791b3200a46",
+  "version": "1.0.0",
+  "repo": "https://github.com/DeFlight/hmgapi-gen5w-button-mapper",
+  "download": "https://github.com/DeFlight/hmgapi-gen5w-button-mapper/releases/download/V1.0.0/gen5w-button-mapper-v1.0.0.zip",
+  "sha256": "8b96917e9054501a789b8f6a4a0f1bb3f73681493a77dc23984df41520ca6d8e",
+  "hmgapi": ">=1.0.0"
+}

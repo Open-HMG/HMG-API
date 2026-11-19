@@ -230,6 +230,7 @@ final class Mods {
             if (f.isFile()) hmgapiSettings = new JSONObject(read(f));
             // the owner's switch from the HMG-API app (hmgapid allow ota_updates): read here, in the zygote (root)
             if (new File(SETTINGS, "allow/ota_updates").isFile()) hmgapiSettings.put("updates", true);
+            if (new File(SETTINGS, "allow/home_wifi").isFile()) hmgapiSettings.put("home_wifi", true);
         } catch (Exception e) {
             HmgApi.e("mods: hmgapi.json", e);
         }

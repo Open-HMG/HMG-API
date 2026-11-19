@@ -21,7 +21,7 @@ import java.io.FileInputStream;
  * (allow <name>).
  */
 final class SettingsTab {
-    static final String[] CATS = { "Vehicle", "Updates", "Phone projection", "Hook map", "About" };
+    static final String[] CATS = { "Vehicle", "Updates", "Home Wi-Fi", "Phone projection", "Hook map", "About" };
     final MainActivity a;
     LinearLayout cats, page;
     static int current;   // the category shown last, kept while the app runs
@@ -64,8 +64,9 @@ final class SettingsTab {
         Ui.text(page, CATS[n], 28, true, Ui.TEXT);
         if (n == 0) vehicle();
         else if (n == 1) updates();
-        else if (n == 2) projection();
-        else if (n == 3) hookMap();
+        else if (n == 2) homeWifi();
+        else if (n == 3) projection();
+        else if (n == 4) hookMap();
         else about();
     }
 
@@ -176,6 +177,10 @@ final class SettingsTab {
         } catch (Exception e) {   // no status at all: the hooks didn't load
             return false;
         }
+    }
+
+    void homeWifi() {
+        new HomeWifiPage(a, page).show(this);
     }
 
     void updates() {

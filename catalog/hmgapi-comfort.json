@@ -1,15 +1,15 @@
 {
   "id": "hmgapi-comfort",
   "name": "Comfort & Startup",
-  "description": "Automatic multi-tier cold-start seat & steering wheel warming, summer seat ventilation, passenger/rear seat policies, and instant startup notice dismissal across cold boots and QuickBoot wakes.",
+  "description": "Automatic multi-tier cold-start seat & steering wheel warming, summer seat ventilation, Metric (°C) & Imperial (°F) vehicle unit support, automatic front-passenger occupancy & late-boarding detection, trim-aware seat option detection, rear seat policies, and startup notice dismissal.",
   "authors": [
     "lemoyneiv"
   ],
   "license": "AGPL-3.0",
   "uuid": "28ad71e0-07c0-8e61-8bf3-380cc71f9280",
-  "version": "1.1.1",
+  "version": "1.1.8",
   "repo": "https://github.com/lemoyneiv/hmgapi-comfort",
-  "download": "https://github.com/lemoyneiv/hmgapi-comfort/releases/download/v1.1.1/hmgapi-comfort-v1.1.1.zip",
-  "sha256": "4127162bb713083a610ccd21fd89041d0b66e0f2aad8121b3dd482e1e6da5551",
+  "download": "https://github.com/lemoyneiv/hmgapi-comfort/releases/download/v1.1.8/hmgapi-comfort-v1.1.8.zip",
+  "sha256": "80496cd34e42f43577f07498442e7e287f85bd407cf5e5cf867d930a63fa2e05",
   "hmgapi": ">=1.0.0"
 }

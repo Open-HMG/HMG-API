@@ -1,0 +1,15 @@
+{
+  "id": "hmgapi-tile-manager",
+  "name": "Home Screen Tile Manager",
+  "description": "Show or hide stock system apps and mod packages on the Gen5W home screen and menu editor while leaving blank spaces intact, collapse empty spaces on demand, launch stock Edit Home Icons, and automatically back up and restore hidden tiles.",
+  "authors": [
+    "lemoyneiv"
+  ],
+  "license": "AGPL-3.0",
+  "uuid": "28ad71e0-07c0-8e61-8bf3-380cc71f9280",
+  "version": "1.0.7",
+  "repo": "https://github.com/lemoyneiv/hmgapi-tile-manager",
+  "download": "https://github.com/lemoyneiv/hmgapi-tile-manager/releases/download/v1.0.7/hmgapi-tile-manager-v1.0.7.zip",
+  "sha256": "2f5329152d874fedee9a9c537cc141e6f8f31a5653458fc01a684161f6ad4ea2",
+  "hmgapi": ">=1.0.0"
+}

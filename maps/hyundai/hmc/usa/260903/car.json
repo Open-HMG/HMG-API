@@ -1,0 +1,178 @@
+{
+  "make": "hyundai",
+  "model": "hmc",
+  "name": "Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N, Palisade 2020-22",
+  "region": "usa",
+  "firmware": "260903",
+  "products": [
+    "AEPEEV.CAN.",
+    "AEPEEV.USA.",
+    "AEPEHEV.CAN.",
+    "AEPEHEV.USA.",
+    "AEPEPHEV.CAN.",
+    "AEPEPHEV.USA.",
+    "CN7.CAN.",
+    "CN7.USA.",
+    "CN723.CAN.",
+    "CN723.USA.",
+    "CN7HEV.CAN.",
+    "CN7HEV.USA.",
+    "CN7HEV23.CAN.",
+    "CN7HEV23.USA.",
+    "DN8.CAN.",
+    "DN8.USA.",
+    "DN822.CAN.",
+    "DN822.USA.",
+    "DN822HEV.CAN.",
+    "DN822HEV.USA.",
+    "DN823.CAN.",
+    "DN823.USA.",
+    "DN823HEV.CAN.",
+    "DN823HEV.USA.",
+    "DN8HEV.CAN.",
+    "DN8HEV.USA.",
+    "JSN.CAN.",
+    "JSN.USA.",
+    "LX2.CAN.",
+    "LX2.USA.",
+    "OSEV.CAN.",
+    "OSEV.USA.",
+    "OSPE.CAN.",
+    "OSPE.USA.",
+    "OSPE23.CAN.",
+    "OSPE23.USA.",
+    "QX21.CAN.",
+    "QX21.USA.",
+    "TM23.CAN.",
+    "TM23.USA.",
+    "TMFL.CAN.",
+    "TMFL.USA.",
+    "TMHEV.CAN.",
+    "TMHEV.USA.",
+    "TMHEV23.CAN.",
+    "TMHEV23.USA.",
+    "TMPHEV.CAN.",
+    "TMPHEV.USA.",
+    "TMPHEV23.CAN.",
+    "TMPHEV23.USA."
+  ],
+  "status": "mapped",
+  "verified": null,
+  "files": {
+    "/system/app/HKMC_BtSettings.odex": "767b8f30a53656a3702988555ebde622",
+    "/system/app/ButtonSettings.odex": "e30a0d7d00aaa84f07e9a0dfff6f12be",
+    "/system/app/HKMC_DiPO.odex": "5567d79675608df812d8fda862705bb2",
+    "/system/framework/com.tcc.iap2.odex": "9de203a1ed99743d7c7698c6c4624b25",
+    "/system/framework/com.broadcom.bt.jar": "dbf374aa8bde80fad95746a67719ce51",
+    "/system/framework/framework.odex": "90ddd0a6e0487faf18eae3d749e3ecd4",
+    "/system/framework/core.odex": "8a3f8f07020cf3594b339969cad7f2fa",
+    "/system/framework/framework2.odex": "bf38830203f0beab661d655d4929f470",
+    "/system/framework/automotive.odex": "8be85094a396c2a62380e32974befd7f",
+    "/system/framework/com.hkmc.ext.hcan.odex": "f97e546569431ac1c0166e3c6e8abf38",
+    "/system/framework/automotive-service.odex": "2e97859fef6323f0c64ea12a34d8fe95",
+    "/system/app/HKMC_GPM.odex": "d40e4fa38a91b03c824c40169f0905da",
+    "/system/app/HKMC_HomeSetting_WP.odex": "4e9668a2693d90f75dcb4e8deb0ad41b",
+    "/system/app/Iap2ServerApp.odex": "49afa7e1da630a9b280d89526d963e63",
+    "/system/app/Launcher_WP3.odex": "6cd4aa9726afd9fdd20950be611e0827",
+    "/system/app/RightScreenHome.odex": "c879b20bdc0b9b012d7cfe2fc9d25675",
+    "/system/app/Settings_W.odex": "35c64fd2abd5b92068c60b851f918d91",
+    "/system/app/ThemeSettings.odex": "6a2985848e873269503d2e4a766ccf75"
+  },
+  "apps": [
+    "btsettings",
+    "buttonsettings",
+    "dipo",
+    "framework",
+    "gpm",
+    "homesetting",
+    "iap2",
+    "launcher",
+    "panel",
+    "settings",
+    "themesettings"
+  ],
+  "app_files": {
+    "btsettings": {
+      "package": "com.android.btsettings",
+      "files": [
+        "/system/app/HKMC_BtSettings.odex"
+      ]
+    },
+    "buttonsettings": {
+      "package": "com.android.buttonsettings",
+      "files": [
+        "/system/app/ButtonSettings.odex"
+      ]
+    },
+    "dipo": {
+      "package": "com.daudio.app.dipo",
+      "files": [
+        "/system/app/HKMC_DiPO.odex",
+        "/system/framework/com.tcc.iap2.odex",
+        "/system/framework/com.broadcom.bt.jar"
+      ]
+    },
+    "framework": {
+      "package": null,
+      "files": [
+        "/system/framework/framework.odex",
+        "/system/framework/core.odex",
+        "/system/framework/framework2.odex",
+        "/system/framework/automotive.odex",
+        "/system/framework/com.hkmc.ext.hcan.odex",
+        "/system/framework/automotive-service.odex"
+      ]
+    },
+    "gpm": {
+      "package": "com.google.android.projection.sink",
+      "files": [
+        "/system/app/HKMC_GPM.odex"
+      ]
+    },
+    "homesetting": {
+      "package": "com.hkmc.system.app.homesetting",
+      "files": [
+        "/system/app/HKMC_HomeSetting_WP.odex"
+      ]
+    },
+    "iap2": {
+      "package": "com.tcc.iap2server",
+      "files": [
+        "/system/app/Iap2ServerApp.odex"
+      ]
+    },
+    "launcher": {
+      "package": "com.android.launcher3",
+      "files": [
+        "/system/app/Launcher_WP3.odex"
+      ]
+    },
+    "panel": {
+      "package": "com.mobis.splitscreen.right",
+      "files": [
+        "/system/app/RightScreenHome.odex"
+      ]
+    },
+    "settings": {
+      "package": "com.android.settings",
+      "files": [
+        "/system/app/Settings_W.odex"
+      ]
+    },
+    "themesettings": {
+      "package": "com.android.themesettings",
+      "files": [
+        "/system/app/ThemeSettings.odex"
+      ]
+    }
+  },
+  "names": {
+    "panel.test_gate.on": {
+      "method": "pB",
+      "params": [],
+      "ret": "boolean",
+      "static": true,
+      "sig": "c65792efa099ac9e"
+    }
+  }
+}

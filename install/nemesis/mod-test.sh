@@ -149,6 +149,17 @@ check "the stick says how to uninstall" yes "$(unzip -p $T/dist/demo-1.0.0-nemes
 check "a mod with no system: os any" any "$(mk 1.0.0 on $T/author.key '[]'; val os)"
 check "system as one object, platform only: os any" any "$(mk 1.0.0 on $T/author.key '{"platform": ["tcc803x"]}'; val os)"
 check "product prefixes: os globs" "CVEV.USA.*,NEEV.CAN.*" "$(mk 1.0.0 on $T/author.key '{"product": ["CVEV.USA.", "NEEV.CAN."]}'; val os)"
+# NEMESIS before 1.16.9 refuses os= over 255 characters
+W='[{"model": ["CVEV", "NEEV", "NEEV23", "NEEV23SE", "CEEV", "NQ5HEV"], "region": "USA", "firmware": "260507"}, {"model": ["NEEV", "NEEV23", "NEEV23SE"], "region": "USA", "firmware": "260903"}, {"model": ["CVEV", "NEEV"], "region": "CAN", "firmware": "260206"}, {"model": "CEEV", "region": "CAN", "firmware": "260206"}, {"model": "CEEV", "region": "USA", "firmware": "260903"}, {"model": "CEEV", "region": "CAN", "firmware": "260903"}, {"model": "CN7NPE", "region": "USA", "firmware": "260903"}]'
+check "os over 255 characters: models sharing a prefix become prefix*" \
+    "CVEV.USA.*.260507,NEEV*.USA.*.260507,CEEV.USA.*.260507,NQ5HEV.USA.*.260507,NEEV*.USA.*.260903,CVEV.CAN.*.260206,NEEV.CAN.*.260206,CEEV.CAN.*.260206,CEEV.USA.*.260903,CEEV.CAN.*.260903,CN7NPE.USA.*.260903" \
+    "$(mk 1.0.0 on $T/author.key "$W" 2>/dev/null; val os)"
+W=$(i=0; printf '['; while [ $i -lt 30 ]; do printf '{"model": "CAR%02d", "region": "USA", "firmware": "260507"}, ' $i; i=$((i + 1)); done; printf '{"model": "X", "region": "CAN", "firmware": "260206"}]')
+check "... still too long: any model for that region and firmware" "*.USA.*.260507,*.CAN.*.260206" "$(mk 1.0.0 on $T/author.key "$W" 2>/dev/null; val os)"
+W=$(i=0; printf '['; while [ $i -lt 30 ]; do printf '{"model": "C", "region": "R%02d", "firmware": "260507"}, ' $i; i=$((i + 1)); done; printf '{"model": "C", "region": "R", "firmware": "260206"}]')
+check "... then any car on that firmware" "*.*.*.260507,*.*.*.260206" "$(mk 1.0.0 on $T/author.key "$W" 2>/dev/null; val os)"
+W=$(i=0; printf '['; while [ $i -lt 30 ]; do printf '{"model": "C", "region": "R", "firmware": "2605%02d"}, ' $i; i=$((i + 1)); done; printf '{"model": "C", "region": "R", "firmware": "260206"}]')
+check "... then any" any "$(mk 1.0.0 on $T/author.key "$W" 2>/dev/null; val os)"
 set +e; o=$(tools/mknemesismod.sh mods/examples/hello/mod.json $T/dist 2>&1); r=$?; set -e
 check "not a zip mod package: refused" 1 "$([ $r -ne 0 ] && echo 1)"
 rm -rf $T/u; mkdir $T/u; cp mods/examples/hello/mod.json $T/u/; (cd $T/u && zip -q $T/u.zip mod.json)

@@ -91,6 +91,22 @@ class ReportMapTest(unittest.TestCase):
         self.assert_missing(self.car()['missing'], expected)
         self.assertEqual(json.loads((self.root / 'maps/hyundai/ceev/can/260206/iap2.json').read_text()), {})
 
+    def test_points_not_in_the_catalogue_are_left_out(self):
+        # a fork's report: its own points, found, missing and by reference
+        mc = self.report['map_car']
+        mc['points']['btsettings.fork_only'] = {'class': 'example.Fork'}
+        mc['points']['btsettings.fork_only.go'] = {'method': 'go', 'params': [], 'ret': 'void'}
+        mc['not_found']['btsettings.fork_missing'] = '0 methods match'
+        mc['by_reference'].append('btsettings.fork_only')
+        result = self.run_import()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('not in the catalogue, left out: 3 point(s)', result.stdout)
+        car = self.car()
+        text = json.dumps(car)
+        for pid in ('btsettings.fork_only', 'btsettings.fork_only.go', 'btsettings.fork_missing'):
+            self.assertNotIn('"%s"' % pid, text)
+        self.assertEqual(car['by_reference'], ['btsettings.projection_helper'])
+
     def test_catalogue_points_newer_than_the_report_are_listed(self):
         result = self.run_import()
         self.assertEqual(result.returncode, 0, result.stderr)
