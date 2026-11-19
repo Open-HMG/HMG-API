@@ -278,6 +278,9 @@ unset HMGAPI_TEST_ENGINE
 
 # SELinux on (a car that boots Enforcing): app_process and the stock copy keep the stock label
 check "no selinuxfs: no labels touched" "" "$(calls | grep -e chcon -e restorecon || true)"
+# from a stock unit again (the firmware-update runs above leave HMG-API installed over a new firmware)
+run $R/data/hmgapi/uninstall.sh --purge
+cp $T/real $R/system/bin/app_process; BEFORE=$(tree); calls >/dev/null
 mkdir -p $R/sys/fs/selinux; echo 1 > $R/sys/fs/selinux/enforce
 ZE=u:object_r:zygote_exec:s0; A=$R/system/bin/app_process
 echo $ZE > $T/labels/$(echo $A | tr / _)
