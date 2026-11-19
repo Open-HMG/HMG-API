@@ -125,10 +125,41 @@ alongside core 1.1.0-rc.1).
 | core alpha, beta, rc | published as a **pre-release**, never Latest | — | — |
 | mod final | published in the mod's repo | **yes**: the catalogue PR (`tools/catalog.py add`, printed by the release run) | by the next core release, through its catalogue entry |
 | mod alpha, beta, rc | published as a pre-release in the mod's repo | **no**: `catalog.py` refuses pre-releases | only by a core pre-release, pinned in `tools/release-mods.txt` |
+| core test build | published as a **pre-release** `test-<name>`, never Latest (below) | — | — |
 
 The HMG-API app offers what's on the USB stick (the downloads from a release); owners
 choose a pre-release by downloading it. Pre-releases' notes say how to go back to the
 last final.
+
+## Test builds
+
+A test build is one branch's change for a tester's car, before it's merged: an Enforcing
+SELinux car, a car with less memory. It's its own kind beside releases and pre-releases:
+tag `test-<name>`, built, tested and signed by the release workflow like a release, and
+published as a GitHub pre-release titled "Test build" (GitHub has no third kind), never
+Latest. It keeps the version it's built on (1.1.0-rc.5), so the app offers it as
+**Reinstall HMG-API** and the next release updates over it. Its files carry the name
+(`hmgapi-1.1.0-rc.5-report-oom-1-usb.zip`), and a Car Report from it says which build
+it is (`HMG-API 1.1.0-rc.5 (build b7fcb86 …)`).
+
+```
+tools/mktestbuild.sh report-oom-1 --pr 347 --issue <N> --note "What to try, on which cars."
+```
+
+That writes the notes (install, how to check it's this build, going back) into an
+annotated tag on HEAD (committed and pushed) and pushes it. The release workflow waits
+for a maintainer's approval, as for a release, then builds and drafts the pre-release
+with the tag's message as its title and notes. Check the draft, then:
+
+```
+tools/mktestbuild.sh report-oom-1 --publish
+```
+
+A new build of the same change takes the next number (`report-oom-2`). Once a real
+release carries the change, delete the test build: `tools/mktestbuild.sh report-oom-1 --delete`.
+
+Who can do what: only admins can create `test-*` tags (the "Protect release tags"
+ruleset), and only `v*` and `test-*` tags can use the `release` environment's keys.
 
 ## Units on 1.0.2
 

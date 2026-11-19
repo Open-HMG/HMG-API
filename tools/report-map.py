@@ -178,6 +178,17 @@ def main():
             by_ref.discard(pid)
             missing[pid] = why
         print('distrusted: %s (%s), and its %d members' % (cid, mc['points'][cid].get('class'), len(members.get(cid, []))))
+    # points that aren't in the catalogue (a fork's or a local build's own): not kept
+    known = {p['id'] for p in catalogue}
+    unknown = sorted({pid for entries in by_app.values() for pid in entries if pid not in known}
+                     | {pid for pid in list(missing) + list(by_ref) if pid not in known})
+    for pid in unknown:
+        by_app.get(pid.split('.')[0], {}).pop(pid, None)
+        by_ref.discard(pid)
+        missing.pop(pid, None)
+    if unknown:
+        print('not in the catalogue, left out: %d point(s) (%s%s)'
+              % (len(unknown), ', '.join(unknown[:5]), ', ...' if len(unknown) > 5 else ''))
     found = {pid for entries in by_app.values() for pid in entries}
     # catalogue points newer than the HMG-API that made the reports: listed, not guessed
     for p in catalogue:

@@ -44,7 +44,8 @@ check "publish runs" 0 $rc
 check "apps.txt: enabled mods' apps" "dev.example.cam cam
 dev.example.game game" "$(cat $D/state/apps.txt)"
 check "services.txt: hmgapid's lines" "cam recorder system boot yes jar svc/cam.jar dev.example.cam.Main --quiet dir=/storage
-cam watch app:dev.example.cam android no script svc/watch.sh -" "$(grep -v '^hmgapi log ' $D/state/services.txt)"
+cam watch app:dev.example.cam android no script svc/watch.sh -" "$(grep -v -e '^hmgapi log ' -e '^hmgapi net ' $D/state/services.txt)"
+has "the network keeper runs while mods are on (it keeps them off cellular)" "hmgapi net root boot yes script" "$(cat $D/state/services.txt)"
 check "usb.txt" "cam Dashcam" "$(cat $D/state/usb.txt)"
 has "missing apk reported" "game: app dev.example.gone: no app/Gone.apk in the mod" "$out"
 has "bad service name reported" "game: service: \"name\" must be" "$out"

@@ -44,7 +44,7 @@ typedef unsigned int u32;
 typedef unsigned char u8;
 typedef long sl;
 
-#define VERSION "1.1.0-rc.4"
+#define VERSION "1.1.0-rc.5"
 
 #ifndef ROOTDIR
 #define ROOTDIR "/data/hmgapi"
@@ -79,6 +79,10 @@ typedef long sl;
 #ifndef SHELL_UID
 #define SHELL_UID 2000
 #endif
+/* mods' services run with this effective group (no Android AID uses it): the firewall keeps
+ * mods off the car's cellular link by it (state/net.rules, hmgapi.engine.HomeWifi) */
+#define MOD_GID 2950
+#define HOME_GID 2951   /* the same, and home Wi-Fi */
 #ifndef APP_PROCESS
 #define APP_PROCESS "/system/bin/app_process"
 #endif
@@ -1084,13 +1088,41 @@ static int svc_user(const char *user, u32 *gids, int *ng)
     return -1;
 }
 
+/* a mod's services' effective group (the engine's state/service-gids.txt, "<mod> <gid>"): MOD_GID (no
+ * cellular), HOME_GID (no cellular, home Wi-Fi) or 0 (the owner allowed cellular: its own). Not
+ * listed: MOD_GID. HMG-API's own services keep their own. */
+static int svc_gid(const char *mod, int uid)
+{
+    static char b[4096];
+    sl n;
+    int fd, g;
+    char *p;
+    ul k = slen(mod);
+    if (seq(mod, "hmgapi")) return uid;
+    fd = (int)x_open(ROOTDIR "/state/service-gids.txt", O_RDONLY, 0);
+    if (fd < 0) return MOD_GID;
+    n = x_read(fd, b, sizeof b - 1);
+    x_close(fd);
+    if (n <= 0) return MOD_GID;
+    b[n] = 0;
+    for (p = b; *p; ) {
+        if (spre(p, mod) && p[k] == ' ') {
+            for (g = 0, p += k + 1; *p >= '0' && *p <= '9'; p++) g = g * 10 + (*p - '0');
+            return g == MOD_GID || g == HOME_GID ? g : uid;
+        }
+        while (*p && *p != '\n') p++;
+        if (*p) p++;
+    }
+    return MOD_GID;
+}
+
 static void svc_start(struct svc *v, long now)
 {
     char path[256], dir[256], data[256], cache[256], logp[256], old[260], envb[6][300];
     static char *envp[110];
     char *argv[SVC_FIELDS + 6];
     u32 gids[20];
-    int ng, uid, ne = 0, na = 0, i, go[2];
+    int ng, uid, egid, ne = 0, na = 0, i, go[2];
     unsigned long long st[16];
     sl pid, lf;
     const char *mod = v->f[0], *name = v->f[1], *kind = v->f[5], *rel = v->f[6], *cls = v->f[7];
@@ -1133,9 +1165,13 @@ static void svc_start(struct svc *v, long now)
     path3(envb[4], sizeof envb[4], "HMGAPI_SERVICE=", name, "");
     path3(envb[5], sizeof envb[5], "CLASSPATH=", path, "");
     for (i = 0; i < 6; i++) if (i < 5 || seq(kind, "jar")) envp[ne++] = envb[i];
+    egid = svc_gid(mod, uid);
+    /* a mod's lookups in its own process (bionic, not netd): the firewall sees them by its group, so they
+     * go through home Wi-Fi or nowhere, never the car's cellular DNS */
+    if (egid == MOD_GID || egid == HOME_GID) envp[ne++] = "ANDROID_DNS_MODE=local";
     for (i = 0; g_env && g_env[i] && ne < 108; i++) {
         if (spre(g_env[i], "PATH=") || spre(g_env[i], "LD_LIBRARY_PATH=") || spre(g_env[i], "LD_PRELOAD=")
-            || spre(g_env[i], "ANDROID_DATA=") || spre(g_env[i], "CLASSPATH=")) continue;
+            || spre(g_env[i], "ANDROID_DATA=") || spre(g_env[i], "CLASSPATH=") || spre(g_env[i], "ANDROID_DNS_MODE=")) continue;
         envp[ne++] = g_env[i];
     }
     envp[ne] = 0;
@@ -1165,8 +1201,14 @@ static void svc_start(struct svc *v, long now)
         if (nul >= 0) x_dup2(nul, 0);
         if (lf >= 0) { x_dup2(lf, 1); x_dup2(lf, 2); }
         x_chdir(data);
-        if (uid != 0 && x_geteuid() == 0) {   /* off-car tests run unprivileged: no switch */
-            if (x_setgroups(ng, gids) < 0 || x_setresgid(uid, uid, uid) < 0 || x_setresuid(uid, uid, uid) < 0) x_exit(126);
+        if (x_geteuid() == 0) {   /* off-car tests run unprivileged: no switch */
+            /* A mod's service runs with MOD_GID or HOME_GID as its effective group (svc_gid): the
+             * firewall (net.sh) tells mods' traffic from the car's own by it, as root and system are
+             * shared. Its own group stays a supplementary one. */
+            if (uid != 0 && ng < 19) gids[ng++] = (u32)uid;
+            if (uid != 0 || egid != uid) {
+                if (x_setgroups(ng, gids) < 0 || x_setresgid(uid, egid, uid) < 0 || x_setresuid(uid, uid, uid) < 0) x_exit(126);
+            }
         }
         x_execve(argv[0], argv, envp);
         x_exit(127);
@@ -1233,8 +1275,10 @@ static int svc_valid(struct svc *v)
     if (!(seq(v->f[3], "boot") || seq(v->f[3], "android") || seq(v->f[3], "manual")) || !(seq(v->f[4], "yes") || seq(v->f[4], "no"))) return 0;
     if (!(seq(v->f[5], "jar") || seq(v->f[5], "script"))) return 0;
     k = v->f[6];
-    /* HMG-API's own services: only its jar, and the network keeper the engine writes (Network.java) */
-    if (seq(v->f[0], "hmgapi")) return seq(v->f[5], "jar") ? seq(k, ENGINE_JAR) : seq(k, ROOTDIR "/state/net.sh");
+    /* HMG-API's own services: only its jar, and the keepers the engine writes: the network keeper
+     * (Network.java) and the home Wi-Fi keeper (HomeWifi.java), each under its own name */
+    if (seq(v->f[0], "hmgapi")) return seq(v->f[5], "jar") ? seq(k, ENGINE_JAR)
+        : (seq(v->f[1], "net") && seq(k, ROOTDIR "/state/net.sh")) || (seq(v->f[1], "wifi") && seq(k, ROOTDIR "/state/wifi.sh"));
     if (k[0] == '/' || sstr(k, "..")) return 0;
     return 1;
 }
@@ -1636,14 +1680,42 @@ static int forget_answers(int fd)
     return 0;
 }
 
+/* home Wi-Fi for HMG-API's app: wifi saved | seen | join <ssid> [key] | forget <ssid> | now [minutes] | back
+ * (on request, in P: the updater's way in later). The keeper's
+ * script does it (state/wifi.sh); the key goes in its environment (HMGAPI_WIFI_PSK), never on a command
+ * line, which any process on the unit can read. */
+static int op_wifi(int fd, int argc, char **argv)
+{
+    static char psk[200];
+    char *a[6], *extra[2];
+    unsigned long long st[16];
+    int n = 0;
+    const char *v = argv[1];
+    if (!((seq(v, "saved") && argc == 2) || (seq(v, "seen") && argc == 2) || (seq(v, "join") && (argc == 3 || argc == 4))
+          || (seq(v, "forget") && argc == 3) || (seq(v, "now") && argc <= 3) || (seq(v, "back") && argc == 2))) {
+        say(fd, "usage: wifi saved | seen | join <network> [key] | forget <network> | now [minutes] | back\n");
+        return 2;
+    }
+    if (x_stat64(ROOTDIR "/state/wifi.sh", st) != 0) { say(fd, "home Wi-Fi is off (HMG-API settings)\n"); return 1; }
+    if (argc == 4 && slen(argv[3]) > 100) { say(fd, "that key is too long\n"); return 2; }
+    a[n++] = SH; a[n++] = ROOTDIR "/state/wifi.sh"; a[n++] = argv[1];
+    if (argc >= 3) a[n++] = argv[2];
+    a[n] = 0;
+    path3(psk, sizeof psk, "HMGAPI_WIFI_PSK=", argc == 4 ? argv[3] : "", "");
+    extra[0] = psk; extra[1] = 0;
+    n = run_env(fd, a, extra, 1);
+    mset(psk, 0, sizeof psk);
+    return n;
+}
+
 static int op_allow(int fd, int argc, char **argv)
 {
     char p[160];
     unsigned long long st[16];
     if (seq(argv[1], "commands_reset") && argc == 3 && seq(argv[2], "on")) return forget_answers(fd);
     if (!seq(argv[1], "startup_notice") && !seq(argv[1], "block_ambient_light") && !seq(argv[1], "trust_commands")
-        && !seq(argv[1], "ota_updates") && !seq(argv[1], "testing_maps") && !seq(argv[1], "no_local_points") && !answer_name(argv[1])) {
-        say(fd, "unknown switch (startup_notice, block_ambient_light, trust_commands, ota_updates, testing_maps, no_local_points, cmd.<mod>.<command>, "
+        && !seq(argv[1], "ota_updates") && !seq(argv[1], "home_wifi") && !seq(argv[1], "testing_maps") && !seq(argv[1], "no_local_points") && !answer_name(argv[1])) {
+        say(fd, "unknown switch (startup_notice, block_ambient_light, trust_commands, ota_updates, home_wifi, testing_maps, no_local_points, cmd.<mod>.<command>, "
                 "nocmd.<mod>.<command>, commands_reset)\n");
         return 2;
     }
@@ -1750,6 +1822,7 @@ static int handle(int fd, int whoami, int argc, char **argv)
     if (seq(op, "vehicle") && argc >= 2) return op_vehicle(fd, 0, argc, argv);
     if (seq(op, "vehicle-do") && argc >= 2 && argc <= 5) return op_vehicle_do(fd, 0, argc, argv);
     if (seq(op, "allow") && (argc == 2 || argc == 3)) return op_allow(fd, argc, argv);
+    if (seq(op, "wifi") && argc >= 2 && argc <= 4) return op_wifi(fd, argc, argv);
     if (seq(op, "park-rule") && argc <= 2) return op_park_rule(fd, argc, argv);
     if (seq(op, "micom-watch") && argc <= 9) return op_micom_watch(fd, argc, argv);
     if (seq(op, "micom-log") && argc == 1) return op_svc_log(fd, "hmgapi", "micom");
@@ -1995,6 +2068,46 @@ static int client(int argc, char **argv)
     }
 }
 
+/* ---------------- home Wi-Fi's helper (run locally, not through the daemon) ----------------
+ * hmgapid wpa <ctrl socket> <cmd>  one wpa_supplicant (or hostapd) control command, its answer on stdout
+ * Used by HMG-API's home Wi-Fi keeper (state/wifi.sh). */
+#define x_send(fd, b, n) S4(289, fd, b, n, 0)
+#define x_recv(fd, b, n) S4(291, fd, b, n, 0)
+
+static u8 nlbuf[8192] __attribute__((aligned(4)));
+
+static int wpa_ctl(int argc, char **argv)
+{
+    struct { unsigned short fam; char path[108]; } to, me;
+    struct { int fd; short ev, rev; } pf;
+    int fd, i, r;
+    sl n, pid = x_getpid();
+    if (argc != 4 || slen(argv[2]) >= sizeof to.path) { out(2, "usage: hmgapid wpa <ctrl socket> <command>\n"); return 2; }
+    mset(&to, 0, sizeof to); mset(&me, 0, sizeof me);
+    to.fam = me.fam = 1;   /* AF_UNIX */
+    mcpy(to.path, argv[2], slen(argv[2]));
+    /* an abstract address for the answer: wpa_supplicant (user wifi) can always send to it */
+    mcpy(me.path + 1, "hmgapi-wpa-", 11);
+    for (i = 0; i < 8; i++) me.path[12 + i] = "0123456789abcdef"[(pid >> (28 - 4 * i)) & 15];
+    fd = (int)x_socket(1, 2, 0);   /* AF_UNIX, SOCK_DGRAM */
+    if (fd < 0 || x_bind(fd, &me, 2 + 20) < 0) { out(2, "hmgapid: wpa: no socket\n"); return 1; }
+    if (x_connect(fd, &to, sizeof to) < 0) { out(2, "hmgapid: wpa: wpa_supplicant isn't answering\n"); x_close(fd); return 1; }
+    if (x_send(fd, argv[3], slen(argv[3])) < 0) { out(2, "hmgapid: wpa: send failed\n"); x_close(fd); return 1; }
+    for (;;) {
+        pf.fd = fd; pf.ev = POLLIN; pf.rev = 0;
+        r = (int)x_poll(&pf, 1, 10000);
+        if (r == -EINTR) continue;
+        if (r <= 0) { out(2, "hmgapid: wpa: no answer\n"); x_close(fd); return 1; }
+        n = x_recv(fd, nlbuf, sizeof nlbuf - 1);
+        if (n <= 0) { x_close(fd); return 1; }
+        if (nlbuf[0] == '<') continue;   /* an unsolicited event ("<3>CTRL-EVENT-..."), not the answer */
+        wall(1, nlbuf, (ul)n);
+        if (nlbuf[n - 1] != '\n') out(1, "\n");
+        x_close(fd);
+        return 0;
+    }
+}
+
 int main(int argc, char **argv, char **envp)
 {
     g_env = envp;
@@ -2010,6 +2123,7 @@ int main(int argc, char **argv, char **envp)
     }
     if (seq(argv[1], "daemon")) return daemon_main();
     if (seq(argv[1], "boot") && argc == 2) return boot_main();
+    if (seq(argv[1], "wpa")) return wpa_ctl(argc, argv);
     return client(argc - 1, argv + 1);
 }
 

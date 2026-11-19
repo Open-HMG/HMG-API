@@ -2569,6 +2569,122 @@
         "static": true
       },
       "about": "onDoorAllStateChanged(unlock: driver, passenger, rear left, rear right; open: driver, passenger, rear left, rear right, trunk; hood): open 1, closed 0, -1 unknown; sent on registration and on change"
+    },
+    {
+      "id": "framework.pp_service",
+      "kind": "class",
+      "find": {
+        "name": "com.android.server.phoneprojection.PPService"
+      },
+      "about": "Phone Projection's service (services.jar, in system_server, binder \"phoneprojection\"): every CarPlay / Android Auto connect, disconnect and session report goes through it"
+    },
+    {
+      "id": "framework.pp_service.connect_pp",
+      "kind": "method",
+      "of": "framework.pp_service",
+      "find": {
+        "name": "connectPP",
+        "params": [
+          "int",
+          "java.lang.String",
+          "java.lang.String",
+          "int"
+        ],
+        "ret": "void"
+      },
+      "about": "a projection connect: (type 1 CarPlay / 2 Android Auto, Bluetooth address, name, connection 0 USB / 1 wireless), from any app (Device Connections, Phone Projection, auto connection)"
+    },
+    {
+      "id": "framework.pp_service.disconnect_pp",
+      "kind": "method",
+      "of": "framework.pp_service",
+      "find": {
+        "name": "disconnectPP",
+        "params": [
+          "int",
+          "java.lang.String",
+          "java.lang.String",
+          "int"
+        ],
+        "ret": "void"
+      }
+    },
+    {
+      "id": "framework.pp_service.cancel_connection_pp",
+      "kind": "method",
+      "of": "framework.pp_service",
+      "find": {
+        "name": "cancelConnectionPP",
+        "params": [
+          "int",
+          "java.lang.String",
+          "java.lang.String",
+          "int"
+        ],
+        "ret": "void"
+      }
+    },
+    {
+      "id": "framework.pp_service.send_connect_pp_from_bt",
+      "kind": "method",
+      "of": "framework.pp_service",
+      "find": {
+        "name": "sendConnectPPFromBT",
+        "params": [
+          "java.lang.String",
+          "java.lang.String"
+        ],
+        "ret": "void"
+      },
+      "about": "Bluetooth settings' Device Connections connects a phone for projection (address, type)"
+    },
+    {
+      "id": "framework.pp_service.on_wireless_connected",
+      "kind": "method",
+      "of": "framework.pp_service",
+      "find": {
+        "name": "onWirelessConnected",
+        "params": [
+          "int",
+          "java.lang.String"
+        ],
+        "ret": "void"
+      },
+      "about": "a wireless session is up (type, Bluetooth address)"
+    },
+    {
+      "id": "framework.pp_service.on_wireless_disconnected",
+      "kind": "method",
+      "of": "framework.pp_service",
+      "find": {
+        "name": "onWirelessDisconnected",
+        "params": [
+          "int",
+          "java.lang.String"
+        ],
+        "ret": "void"
+      },
+      "about": "a wireless session ended (type, Bluetooth address)"
+    },
+    {
+      "id": "framework.pp_service.aa_connected_address",
+      "kind": "method",
+      "of": "framework.pp_service",
+      "find": {
+        "name": "getAAConnectedBTAddress",
+        "params": [],
+        "ret": "java.lang.String"
+      }
+    },
+    {
+      "id": "framework.pp_service.cp_connected_address",
+      "kind": "method",
+      "of": "framework.pp_service",
+      "find": {
+        "name": "getCPConnectedBTAddress",
+        "params": [],
+        "ret": "java.lang.String"
+      }
     }
   ]
 }
