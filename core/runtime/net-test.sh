@@ -279,4 +279,27 @@ has "report: sysctl" "\"net.ipv4.ip_forward\": \"0\"" "$j"
 has "report: a car HMG-API has no name for goes by its model code" "# Car Report: ZZEV USA" "$(cat "$D"/public/reports/*.md)"
 has "... in the issue's title too (never \"null\")" "title=Car+Report%3A+ZZEV+USA" "$out"
 has "report: markdown has the network" "## Network" "$(cat "$D"/public/reports/*.md)"
+
+# SELinux in the report: a car that boots Enforcing (mode, what HMG-API did at start, labels, the kernel's denials)
+mkdir -p "$R/sys/fs/selinux" "$R/dev" "$R/proc"
+echo 1 > "$R/sys/fs/selinux/enforce"; echo "enforcing failed wrapper" > "$R/dev/.hmgapi-selinux"
+echo "console=ttyS0 androidboot.serialno=ABC1234567 androidboot.selinux=enforcing" > "$R/proc/cmdline"
+printf '#!/bin/sh\n[ "$1" = -Z ] || exit 1\ncase "$2" in */app_process) l=u:object_r:system_file:s0 ;; *) l=u:object_r:system_file:s0 ;; esac\n[ -e "$2" ] || case "$2" in */app_process|*/hmgapid) ;; *) exit 1 ;; esac\necho "-rwxr-xr-x root shell $l ${2##*/}"\n' > "$B/ls"
+printf '#!/bin/sh\necho "[    3.1] type=1400 audit: avc:  denied  { execute } for  pid=180 comm=\\"app_process\\" name=\\"libhmgapi_hook.so\\" scontext=u:r:zygote:s0 tcontext=u:object_r:system_file:s0 tclass=file"\necho "[  613.0] wlan0: associated"\n' > "$B/dmesg"
+chmod +x "$B/ls" "$B/dmesg"
+rm -f "$D"/public/reports/*
+set +e
+out=$(PATH=$B:$PATH HMGAPI_ROOT=$R HMGAPI_HOST=1 HMGAPI_TEST_ANY_CAR=1 HMGAPI_PRODUCT=CEEV.USA.0000.V015 HMGAPI_PROPS="init.svc.iptrules=stopped" java -cp "$CP" hmgapi.engine.Engine report 2>&1); rc=$?
+set -e
+check "report (selinux) runs" 0 $rc
+j=$(cat "$D"/public/reports/*.json); md=$(cat "$D"/public/reports/*.md)
+has "report: selinux mode" '"mode": "enforcing"' "$j"
+has "report: what HMG-API did at start" '"boot": "enforcing failed wrapper"' "$j"
+has "report: the kernel's selinux word" '"cmdline_androidboot.selinux": "enforcing"' "$j"
+hasnt "report: not the rest of the command line (serial number)" "ABC1234567" "$j"
+has "report: app_process's label" '"/system/bin/app_process": "u:object_r:system_file:s0"' "$j"
+has "report: the denial" 'name=\"libhmgapi_hook.so\"' "$j"
+has "report: markdown says it" "- SELinux: enforcing (at start: enforcing failed wrapper), 1 denial(s) logged" "$md"
+has "report: markdown lists the denials" "## SELinux denials" "$md"
+rm -rf "$R/sys" "$R/proc" "$R/dev/.hmgapi-selinux"
 exit $fail

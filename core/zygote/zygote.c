@@ -21,6 +21,14 @@
  * boot script lost HMG-API's hook (reinstalling NEMESIS rewrites
  * install-recovery.sh). hmgapid is single-instance (its socket bind): a second
  * start, here or from the boot hook, just exits.
+ * SELinux: on a car whose kernel boots Enforcing, the owner's option
+ * (/data/hmgapi/settings/allow/selinux_permissive, hmgapid allow) sets it to
+ * Permissive here, first thing on the zygote's first pass, so the hook loads
+ * with it off. Nothing is saved or put back: the mode is the kernel's, for this
+ * boot only, so with the option off (or HMG-API uninstalled) the next boot is
+ * stock again. Once per boot (SEL_NOTE): a zygote restart doesn't undo a change
+ * the owner made since (NEMESIS Manager's SELinux switch). What happened goes to the kernel log line and SEL_NOTE (tmpfs,
+ * read by boot.sh, which tries again if this couldn't).
  * Every start writes one line to the kernel log (tag "hmgapi-hook").
  * If the exec fails there is nothing left to fall back to, so this file stays
  * as small as possible.
@@ -43,6 +51,15 @@ typedef unsigned long ul;
 #endif
 #ifndef HMGAPID
 #define HMGAPID "/system/bin/hmgapid"
+#endif
+#ifndef SEL_ENFORCE
+#define SEL_ENFORCE "/sys/fs/selinux/enforce"
+#endif
+#ifndef SEL_ALLOW
+#define SEL_ALLOW "/data/hmgapi/settings/allow/selinux_permissive"
+#endif
+#ifndef SEL_NOTE
+#define SEL_NOTE "/dev/.hmgapi-selinux"
 #endif
 #define MAXSTARTS 3
 #ifndef GUARD_DELAY
@@ -75,7 +92,7 @@ static int seq(const char *a, const char *b) { while (*a && *a == *b) a++, b++; 
 static int spre(const char *s, const char *p) { while (*p && *s == *p) s++, p++; return !*p; }
 static int exists(const char *p) { long fd = xopen(p, O_RDONLY, 0); if (fd < 0) return 0; xclose(fd); return 1; }
 
-static char line[160];
+static char line[256];
 static ul lpos;
 static void put(const char *s) { while (*s && lpos < sizeof line - 2) line[lpos++] = *s++; }
 static void putn(long v)
@@ -165,6 +182,34 @@ static void start_hmgapid(char **ev)
     if (pid > 0) sys3(114, pid, 0, 0);
 }
 
+static void note(const char *s)
+{
+    long fd = xopen(SEL_NOTE, O_WR, 0644);
+    if (fd >= 0) { xwrite(fd, s, slen(s)); xclose(fd); }
+}
+
+/* Enforcing at boot and the owner's option on: Permissive. Not Enforcing (no
+   selinuxfs: SELinux disabled; or already Permissive): nothing to do. */
+static void selinux(void)
+{
+    char c = 0; long fd = xopen(SEL_ENFORCE, O_RDONLY, 0), r;
+    if (fd < 0) return;
+    r = xread(fd, &c, 1);
+    xclose(fd);
+    if (r != 1 || c != '1') return;
+    put(", selinux enforcing");
+    /* once per boot: a later zygote start (system_server crash) leaves the mode as the
+       owner set it since, e.g. Enforcing again from NEMESIS Manager */
+    if (exists(SEL_NOTE)) { put(" (left as it is: set once per boot)"); return; }
+    if (!exists(SEL_ALLOW)) { note("enforcing kept\n"); return; }
+    fd = xopen(SEL_ENFORCE, O_WRONLY, 0);
+    r = fd < 0 ? fd : xwrite(fd, "0", 1);
+    if (fd >= 0) xclose(fd);
+    if (r == 1) { put(", set permissive"); note("enforcing permissive wrapper\n"); return; }
+    put(", can't set permissive (errno "); putn(-r); put(")");
+    note("enforcing failed wrapper\n");
+}
+
 static char *env[MAXENV];
 static char preload[] = "LD_PRELOAD=" HOOKLIB;
 
@@ -181,7 +226,8 @@ int main(int argc, char **argv, char **envp)
     put("<6>hmgapi-hook: ");
     put(zygote ? "zygote" : "app_process");
     if (reexec) put(" (re-exec)");
-    else if (zygote && exists(HOOKDIR "/enable")) {
+    if (zygote && !reexec) selinux();
+    if (!reexec && zygote && exists(HOOKDIR "/enable")) {
         if (exists(HOOKDIR "/disable")) put(", hooks off (disable file)");
         else if (!exists(HOOKLIB)) put(", hooks off (no " HOOKLIB ")");
         else {
@@ -206,7 +252,6 @@ int main(int argc, char **argv, char **envp)
     put("<3>hmgapi-hook: exec " STOCK " failed, errno ");
     putn(-rc);
     flush();
-    (void)slen;
     return 127;
 }
 

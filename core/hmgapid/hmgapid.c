@@ -1604,7 +1604,8 @@ static int op_micom_watch(int fd, int argc, char **argv)
 
 /* The owner's switches, read by the vehicle service (settings/allow/<what>): startup_notice
    (mods may dismiss the startup notice), block_ambient_light (no mod may change the
-   ambient light). Both off unless the owner turns them on. No argument: whether it's on. */
+   ambient light), selinux_permissive (the zygote wrapper sets SELinux Permissive at boot on a
+   car that boots Enforcing). All off unless the owner turns them on. No argument: whether it's on. */
 /* the owner's answer for a mod's command: cmd.<mod>.<command> (allowed), nocmd.<mod>.<command> (not) */
 static int answer_name(const char *n)
 {
@@ -1642,8 +1643,10 @@ static int op_allow(int fd, int argc, char **argv)
     unsigned long long st[16];
     if (seq(argv[1], "commands_reset") && argc == 3 && seq(argv[2], "on")) return forget_answers(fd);
     if (!seq(argv[1], "startup_notice") && !seq(argv[1], "block_ambient_light") && !seq(argv[1], "trust_commands")
-        && !seq(argv[1], "ota_updates") && !seq(argv[1], "testing_maps") && !seq(argv[1], "no_local_points") && !answer_name(argv[1])) {
-        say(fd, "unknown switch (startup_notice, block_ambient_light, trust_commands, ota_updates, testing_maps, no_local_points, cmd.<mod>.<command>, "
+        && !seq(argv[1], "ota_updates") && !seq(argv[1], "testing_maps") && !seq(argv[1], "no_local_points")
+        && !seq(argv[1], "selinux_permissive") && !answer_name(argv[1])) {
+        say(fd, "unknown switch (startup_notice, block_ambient_light, trust_commands, ota_updates, testing_maps, no_local_points, "
+                "selinux_permissive, cmd.<mod>.<command>, "
                 "nocmd.<mod>.<command>, commands_reset)\n");
         return 2;
     }

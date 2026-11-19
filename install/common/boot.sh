@@ -5,7 +5,8 @@
 # the others stop there. So nothing here holds a boot script or NEMESIS's start.
 # Output: /data/hmgapi/boot.log.
 #
-# The app's installer if the app is still waiting; hook-check.sh, which puts the boot
+# SELinux Permissive if the owner asked and the zygote wrapper couldn't set it (lib.sh);
+# the app's installer if the app is still waiting; hook-check.sh, which puts the boot
 # hook back in a boot script something else rewrote; with NEMESIS, two minutes later,
 # engine nemesis-sync, so NEMESIS lists what HMG-API has installed. If an engine apply
 # was cut off (or a trial is waiting), roll it back, and restart once if anything was
@@ -22,6 +23,8 @@ fi
 D=$ROOT/data/hmgapi
 H=$ROOT/system/bin/hmgapid
 echo "$(date) boot"
+# SELinux: the owner's Permissive option, if the zygote wrapper couldn't; this boot's mode for the app
+if [ -f $D/lib.sh ]; then (. $D/lib.sh; selinux_boot); fi
 # Already detached (own session, output to boot.log), so the background jobs start from
 # here: through `hmgapid sh` they'd hold its output pipe (mksh's saved fds), and this with it.
 if [ -s $D/state/binds.txt ]; then $H binds > $D/binds.log 2>&1 & fi

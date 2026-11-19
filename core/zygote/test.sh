@@ -17,6 +17,7 @@ chmod +x "$T/stock"
 mkdir -p "$T/hook"
 . ../../tools/env.sh
 clang $ARM_STATIC -DGUARD_DELAY=1 -DSTOCK="\"$T/stock\"" -DKMSG="\"$T/kmsg\"" -DHOOKDIR="\"$T/hook\"" -DHOOKLIB="\"$T/lib.so\"" -DHMGAPID="\"$T/hmgapid\"" \
+  -DSEL_ENFORCE="\"$T/sel/enforce\"" -DSEL_ALLOW="\"$T/allow-permissive\"" -DSEL_NOTE="\"$T/sel-note\"" \
   -o "$T/wrap" zygote.c
 fail=0
 check() {  # name, expected-substring, actual
@@ -81,6 +82,40 @@ echo 0 > "$T/hook/starts"
 : > "$T/kmsg"; STAY= LD_PRELOAD=old.so "$T/wrap" --zygote >/dev/null 2>&1
 sleep 2
 check "watcher: no reset after zygote died" "1" "$(cat "$T/hook/starts")"
+
+# SELinux: Enforcing at boot + the owner's option -> Permissive, once per boot
+echo 0 > "$T/hook/starts"; mkdir -p "$T/sel"
+out=$(run --zygote)
+check "no selinuxfs: nothing said" "" "$(grep -o selinux "$T/kmsg" || true)"
+echo 1 > "$T/sel/enforce"
+out=$(run --zygote)
+check "enforcing, option off: kept" "1" "$(cat "$T/sel/enforce")"
+check "... noted" "enforcing kept" "$(cat "$T/sel-note")"
+check "... logged" "selinux enforcing, hooks on" "$(cat "$T/kmsg")"
+rm "$T/sel-note"; touch "$T/allow-permissive"
+out=$(run --zygote)
+check "option on: permissive" "0" "$(cat "$T/sel/enforce")"
+check "... noted" "enforcing permissive wrapper" "$(cat "$T/sel-note")"
+check "... logged" "selinux enforcing, set permissive, hooks on" "$(cat "$T/kmsg")"
+check "... zygote still runs" "ARGS:--zygote" "$out"
+echo 1 > "$T/sel/enforce"
+out=$(run --zygote)
+check "zygote restart: owner's later Enforcing left alone" "1" "$(cat "$T/sel/enforce")"
+check "... logged" "left as it is" "$(cat "$T/kmsg")"
+rm "$T/sel-note"
+NO_ADDR_COMPAT_LAYOUT_FIXUP=1 "$T/wrap" --zygote >/dev/null 2>&1
+check "re-exec: doesn't touch it" "1" "$(cat "$T/sel/enforce")"
+"$T/wrap" /system/bin com.android.commands.am.Am >/dev/null 2>&1
+check "plain app_process: doesn't touch it" "1" "$(cat "$T/sel/enforce")"
+chmod 444 "$T/sel/enforce"
+if [ "$(id -u)" != 0 ]; then
+    out=$(run --zygote)
+    check "can't write: logged" "can't set permissive (errno 13)" "$(cat "$T/kmsg")"
+    check "... noted for boot.sh" "enforcing failed wrapper" "$(cat "$T/sel-note")"
+    check "... zygote still runs" "ARGS:--zygote" "$out"
+fi
+chmod 644 "$T/sel/enforce"; rm -rf "$T/sel" "$T/sel-note" "$T/allow-permissive"
+echo 0 > "$T/hook/starts"
 
 rm "$T/stock"
 : > "$T/kmsg"; set +e; "$T/wrap" --zygote 2>/dev/null; rc=$?; set -e

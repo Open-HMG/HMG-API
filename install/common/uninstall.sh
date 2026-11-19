@@ -107,7 +107,8 @@ fi
 # 3. hooks off at the next start even if a step below fails
 : > "$D/hook/disable" 2>/dev/null
 
-# 4. /system back
+# 4. /system back (app_process with its stock SELinux label, when install.sh found one)
+LBL=$(cat "$D/stock/app_process.label" 2>/dev/null)
 remount rw || fail "can't remount /system rw"
 REMOUNTED=1
 if [ -n "$RESET" ]; then
@@ -116,9 +117,11 @@ else
     if [ "$(sum "$B")" != "$ORIG" ]; then
         cp "$BAK" "$B.hmgapi-new" || fail "copy the app_process backup"
         chmod 755 "$B.hmgapi-new"; chown root:shell "$B.hmgapi-new" 2>/dev/null
+        label_set "$LBL" "$B.hmgapi-new" || { rm -f "$B.hmgapi-new"; fail "can't give app_process its stock SELinux label ($LBL)"; }
         [ "$(sum "$B.hmgapi-new")" = "$ORIG" ] || { rm -f "$B.hmgapi-new"; fail "app_process md5 mismatch after copy"; }
         mv "$B.hmgapi-new" "$B" || { rm -f "$B.hmgapi-new"; fail "rename onto app_process"; }
     fi
+    label_fix "$LBL" "$B" || fail "can't give app_process its stock SELinux label ($LBL)"
     log "app_process: stock again ($ORIG)"
 fi
 rm -f "$KEEP"
@@ -152,7 +155,7 @@ if [ -z "$ROOT" ]; then
     done
     [ -s "$D/state/apps.installed" ] && : > "$D/state/apps.alloff"   # a reinstall turns them on again
 fi
-rm -f "$D/installed.txt" "$D/hook/enable" "$D/public/HmgApi.apk" "$D/HmgApi.apk" "$D/open.sh" "$D/hook-check.sh" "$D/boot.sh"
+rm -f "$D/installed.txt" "$D/hook/enable" "$D/public/HmgApi.apk" "$D/HmgApi.apk" "$D/open.sh" "$D/hook-check.sh" "$D/boot.sh" "$D/rescue.sh"
 
 # 6. NEMESIS's package list: HMG-API and its mods off it too, the mods first (they depend on
 # HMG-API's package). HMGAPI_NEMESIS_SYNC=1: their scripts only unlist (refreshed first: an
