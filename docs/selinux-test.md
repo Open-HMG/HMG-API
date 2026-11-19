@@ -143,7 +143,7 @@ Then restart (`adb reboot`), wait two minutes and run `./hmgapi-adb.sh rescue` a
 
 ## What to send
 
-Post on the test issue:
+Post on the test issue, [#343](https://github.com/Open-HMG/HMG-API/issues/343):
 
 - every `selinux-check-<date>.txt` file;
 - the Car Reports from steps 3 and 4 (the `reports` folder `adb pull` made);
