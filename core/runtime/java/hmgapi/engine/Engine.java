@@ -128,6 +128,67 @@ public final class Engine {
     Map<String, Object> hmgapi = new LinkedHashMap<String, Object>();
     SystemCheck.Facts facts;
 
+    /**
+     * One engine run at a time: two at once (the app's status plan and its plan after an
+     * install, a background publish-state, a USB scan) wrote the same files and wiped each
+     * other's stage/ (rc.5: a mod's .features file "rename ... .tmp" failed). A run waits for
+     * state/engine.lock (HMGAPI_LOCK_WAIT seconds, 15 minutes: an apply's length), then gives
+     * up saying who holds it. The engine's own child processes (the installer's engine
+     * firmware-reset, NEMESIS scripts) run inside the holder's run: HMGAPI_ENGINE_LOCKED=1
+     * passes them through. status and map only read, for the app's screens: never wait.
+     * problem neither: it only reads, and writes its own file in public/reports and its stop
+     * flag; a recording lasts up to 30 minutes and its "problem stop" must get through.
+     */
+    static final String LOCKED_ENV = "HMGAPI_ENGINE_LOCKED";
+    static volatile boolean locked;
+    static java.io.RandomAccessFile lockFile;   // held open (the lock goes with the process)
+
+    boolean lock(String cmd) throws IOException, InterruptedException {
+        if ("status".equals(cmd) || "map".equals(cmd) || "problem".equals(cmd) || "1".equals(env(LOCKED_ENV, null))) return true;
+        File f = new File(stateDir, "engine.lock");
+        java.io.RandomAccessFile raf = new java.io.RandomAccessFile(f, "rw");
+        long wait = Long.parseLong(env("HMGAPI_LOCK_WAIT", "900")) * 1000000000L, start = System.nanoTime();
+        while (true) {
+            java.nio.channels.FileLock l;
+            try {
+                l = raf.getChannel().tryLock();
+            } catch (IOException e) {
+                l = null;
+            }
+            if (l != null) {
+                raf.setLength(0);
+                raf.write((cmd + " " + pid() + "\n").getBytes("UTF-8"));
+                lockFile = raf;
+                locked = true;
+                return true;
+            }
+            if (System.nanoTime() - start >= wait) {
+                byte[] b = new byte[200];
+                raf.seek(0);
+                int n = Math.max(0, raf.read(b));
+                raf.close();
+                String who = new String(b, 0, n, "UTF-8").trim();
+                out.add("busy: another engine run" + (who.isEmpty() ? "" : " (" + who + ")") + " hasn't finished; try again when it has");
+                return false;
+            }
+            Thread.sleep(200);
+        }
+    }
+
+    static String pid() {
+        try {
+            return new File("/proc/self").getCanonicalFile().getName();
+        } catch (IOException e) {
+            return "?";
+        }
+    }
+
+    /** a child process of a locked run: it runs inside this run's lock */
+    static ProcessBuilder child(ProcessBuilder pb) {
+        if (locked) pb.environment().put(LOCKED_ENV, "1");
+        return pb;
+    }
+
     static String env(String k, String d) {
         String v = System.getenv(k);
         return v == null ? d : v;
@@ -297,6 +358,7 @@ public final class Engine {
             else if ("--force".equals(args[i])) force = true;
         }
         stateDir.mkdirs();
+        if (!lock(cmd)) return 4;
         File lj = new File(data, "settings/hmgapi.json");
         if (lj.isFile()) hmgapi = Json.object(read(lj));
         product = env("HMGAPI_PRODUCT", null);
@@ -309,6 +371,7 @@ public final class Engine {
         if ("verify-map".equals(cmd)) return MapCheck.run(this);
         if ("map-car".equals(cmd)) return MapProbe.run(this, args);
         if ("report".equals(cmd)) return Report.run(this, args.length > 1 && "--usb".equals(args[1]));
+        if ("problem".equals(cmd)) return ProblemLog.run(this, args);
         if ("usb-scan".equals(cmd)) return UsbUpdates.scan(this);
         if ("publish-state".equals(cmd)) return LiveState.publish(this);
         if ("apps".equals(cmd)) return ModApps.sync(this);
@@ -645,7 +708,7 @@ public final class Engine {
             } else {
                 cmd.add("/system/bin/app_process"); cmd.add("/system/bin"); cmd.add(cls);
             }
-            ProcessBuilder pb = new ProcessBuilder(cmd);
+            ProcessBuilder pb = child(new ProcessBuilder(cmd));
             pb.environment().put("HMGAPI_MOD", m.id);
             pb.environment().put("HMGAPI_MOD_DIR", m.dir.getPath());
             if (jar != null && !host) pb.environment().put("CLASSPATH", f.getPath());
@@ -2195,7 +2258,7 @@ public final class Engine {
     }
 
     static Run exec(String... cmd) throws IOException, InterruptedException {
-        ProcessBuilder pb = new ProcessBuilder(cmd);
+        ProcessBuilder pb = child(new ProcessBuilder(cmd));
         pb.redirectErrorStream(true);
         Process pr = pb.start();
         Run r = new Run();
@@ -2240,7 +2303,7 @@ public final class Engine {
 
     static void write(File f, String s) throws IOException {
         f.getParentFile().mkdirs();
-        File tmp = new File(f.getPath() + ".tmp");
+        File tmp = new File(f.getPath() + "." + pid() + ".tmp");   // its own: never another run's
         OutputStream o = new FileOutputStream(tmp);
         try {
             o.write(s.getBytes("UTF-8"));
@@ -2248,7 +2311,10 @@ public final class Engine {
         } finally {
             o.close();
         }
-        if (!tmp.renameTo(f)) throw new IOException("rename " + tmp);
+        if (!tmp.renameTo(f)) {
+            tmp.delete();
+            throw new IOException("rename " + tmp);
+        }
     }
 
     static void copy(File src, File dst) throws IOException {

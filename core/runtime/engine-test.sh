@@ -395,4 +395,40 @@ mkdir -p $R/data/hmgapi/mods/hc; printf '{"id": "hc", "version": "1.0.0", "wifi"
 eng plan
 has "\"wifi\" with another value: refused, with the form" '"wifi": {"client": true}, {"hotspot": true} and/or {"home": true}' "$out"
 rm -rf $R/data/hmgapi/mods/hc
+
+# ---- one engine run at a time (rc.5: the app's two plans after a USB install raced on .features/*.tmp)
+rm -rf $R/data/hmgapi/mods/* $R/data/hmgapi/state $R/data/hmgapi/stock
+mkdir -p $R/data/hmgapi/mods/wa $R/data/hmgapi/state
+printf '{"id": "wa", "version": "1.0.0", "wifi": {"client": true}}\n' > $R/data/hmgapi/mods/wa/mod.json
+python3 -c '
+import fcntl, os, sys, time
+f = open(sys.argv[1], "a+"); fcntl.lockf(f, fcntl.LOCK_EX); f.truncate(0); f.write("apply 999\n"); f.flush()
+open(sys.argv[2], "w").close(); time.sleep(60)' $R/data/hmgapi/state/engine.lock $T/held &
+holder=$!
+while [ ! -f $T/held ]; do sleep 0.1; done
+export HMGAPI_LOCK_WAIT=1
+eng plan
+check "lock held elsewhere: the run gives up" 4 $rc
+has "... saying who holds it" "busy: another engine run (apply 999)" "$out"
+eng status
+hasnt "status doesn't wait for the lock" "busy:" "$out"
+export HMGAPI_ENGINE_LOCKED=1
+eng plan
+check "a child of the holder's run passes through" 0 $rc
+unset HMGAPI_ENGINE_LOCKED HMGAPI_LOCK_WAIT
+kill $holder; wait $holder 2>/dev/null || true
+for i in 1 2 3; do
+    rm -rf $R/data/hmgapi/mods/wa/.features
+    for j in 1 2 3; do
+        (HMGAPI_ROOT=$R HMGAPI_HOST=1 HMGAPI_TEST_ANY_CAR=1 HMGAPI_PRODUCT=CVEV.USA.0000.V015 HMGAPI_ONEBIN=cvev_us \
+            HMGAPI_LPATCH=$REPO/out/lpatch-host java -cp "$CP" hmgapi.engine.Engine plan > $T/race.$j 2>&1; echo $? >> $T/race.$j) &
+    done
+    wait
+    for j in 1 2 3; do
+        r=$(cat $T/race.$j)
+        case "$r" in *"engine error"*|*busy:*) echo "FAIL  three plans at once on a fresh mod (round $i): $r"; fail=1 ;; esac
+    done
+done
+echo "ok    three plans at once on a fresh mod, three rounds"
+check "... the feature file written once, no .tmp left" "android.hardware.wifi.xml" "$(ls -A $R/data/hmgapi/mods/wa/.features)"
 exit $fail

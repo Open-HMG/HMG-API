@@ -17,8 +17,14 @@ the parts that change the car's own apps stay off, and the app says which.
 | Kia Telluride | USA | 260507 | made on an owner's car by HMG-API's own mapper (351 of 351 hook points); waiting for a check on a car |
 | Kia Niro EV | USA | 260507 | made on 3 owners' cars by HMG-API's own mapper (343 of 351 hook points: the 8 newest need a Car Report from 1.1.0 or newer); waiting for a check on a car |
 | Kia Carnival | USA | 260507 | made on an owner's car by HMG-API's own mapper (343 of 351 hook points: the 8 newest need a Car Report from 1.1.0 or newer); waiting for a check on a car |
+<<<<<<< HEAD
+| Hyundai Palisade | USA | 260903 | made on an owner's car by HMG-API's own mapper (351 of 391 hook points, from an rc.3 Car Report, #54: the 40 newest need a Car Report from 1.1.0-rc.5 or newer); waiting for a check on a car |
+| Hyundai Ioniq 6 | Canada and USA | 260206 | ✅ checked on a Canadian car (351 hook points), from a Car Report and stock Bluetooth settings files; all 391 from rc.5 Car Reports of a Canadian and a US car, which agree (#354, #319) |
+=======
+| Hyundai Palisade | USA | 260507 | 351 of 391 hook points: original 343 checked on the owner's car; eight more resolved off-car; 40 newer points need mapping; status remains mapped, pending a current vehicle check |
 | Hyundai Palisade | USA | 260903 | made on an owner's car by HMG-API's own mapper (343 of 351 hook points: the 8 newest need a Car Report from 1.1.0 or newer); waiting for a check on a car |
 | Hyundai Ioniq 6 | Canada and USA | 260206 | ✅ checked on a Canadian car (351 of 351 hook points), from a Car Report and stock Bluetooth settings files; a US car on 260206 has the same 18 stock files (#319) |
+>>>>>>> origin/main
 | Hyundai Ioniq 6 | USA | 260507 | all 351 hook points, from stock files and an rc.3 Car Report (#253); waiting for a check on a car |
 | Hyundai Elantra (and Hybrid), Sonata (and Hybrid), Santa Fe (and Hybrid, Plug-in Hybrid), Kona, Kona Electric, Ioniq (Electric, Hybrid, Plug-in Hybrid), Venue, Veloster N, Palisade 2020-22 | USA | 260507 | 351 of 351 hook points found in stock files; waiting for a check on a car |
 | Kia K5, Sorento (and Hybrid, Plug-in Hybrid), Stinger, Soul, Seltos 2021, Niro 2020-22 (EV, Hybrid, Plug-in Hybrid), Cadenza, Telluride 2020-21 | USA | 260507 | 351 of 351 hook points found in stock files; waiting for a check on a car |
@@ -29,15 +35,15 @@ the parts that change the car's own apps stay off, and the app says which.
 | Hyundai Ioniq 5 | Korea | 260902 | 351 of 351 hook points found in stock files; waiting for a check on a car |
 | Hyundai Sonata (and Hybrid), Santa Fe, Palisade, Avante (`CN7`) | Korea | 260902 | made on owners' cars by HMG-API's own mapper (351 of 351 hook points: 5 reports from 3 models agree, and an rc.3 Car Report from a Santa Fe, #276, maps the newest; the Avante's 18 stock files are the same, #275); waiting for a check on a car |
 | Kia Niro (EV, Hybrid, Plug-in Hybrid), Sportage (and Hybrid, Plug-in Hybrid), Carnival, Telluride, Forte, Soul (and EV), Seltos 2024 | Canada | 260206 | made on an owner's Niro EV by HMG-API's own mapper (347 of 351 hook points); the others run the same software; waiting for a check on a car |
-| Genesis G70 | USA | 260507 | made on an owner's car by HMG-API's own mapper (325 of 351 hook points: the 26 newest need a Car Report from 1.1.0 or newer); waiting for a check on a car |
+| Genesis G70 | USA | 260507 | made on an owner's car by HMG-API's own mapper (351 of 391 hook points, from an rc.4 Car Report, #2: the 40 newest need a Car Report from 1.1.0-rc.5 or newer); waiting for a check on a car |
 | Genesis G70 | Korea | 260902 | made on an owner's car by HMG-API's own mapper (341 of 351 hook points: the 9 newest, and the panel's test switch, need a Car Report from a newer HMG-API); waiting for a check on a car |
 | Hyundai Ioniq 6 | USA and Canada | 260903 | ✅ checked on a US car (351 of 351 hook points), from stock files; the US and Canadian cars have the same 18 stock files, so one map covers both, with no mapping to the USA needed on a Canadian car: the Canadian car's own mapper agrees point for point |
 | Kia EV6 | Korea | 260902 | made on an owner's car by HMG-API's own mapper (319 of 351 hook points: the newer ones need a Car Report from a newer HMG-API); waiting for a check on a car |
 | Kia K3 | Korea | 260902 | made on an owner's car by HMG-API's own mapper (323 of 351 hook points: the newer ones need a Car Report from a newer HMG-API); waiting for a check on a car |
-| Genesis G70 | Canada | 260903 | made on an owner's car by HMG-API's own mapper (351 of 351 hook points, from an rc.3 Car Report, #231); waiting for a check on a car |
+| Genesis G70 | Canada | 260903 | made on an owner's car by HMG-API's own mapper (381 of 391 hook points, from rc.3 and rc.5 Car Reports, #231: the 10 newest DiPO and GPM points wait for stock files of the projection apps, which this car's EPP replaces); waiting for a check on a car |
 | Hyundai Ioniq 6 | Singapore | 260907 | made on an owner's car by HMG-API's own mapper (312 of 351 hook points: this build's button settings and iAP2 server differ, #265); waiting for a check on a car |
 | Hyundai Creta | India | 260430 | made on an owner's car by HMG-API's own mapper (339 of 351 hook points); waiting for a check on a car |
-| Hyundai Elantra (`CN7PE`) | USA | 260507 | made on an owner's car by HMG-API's own mapper (351 of 351 hook points, #252); waiting for a check on a car |
+| Hyundai Elantra (`CN7PE`) | USA | 260507 | made on an owner's car by HMG-API's own mapper (391 of 391 hook points, from an rc.5 Car Report, #252); waiting for a check on a car |
 | Hyundai Elantra N 2024 (`CN7NPE`) | USA | 260903 | made on an owner's car by HMG-API's own mapper (351 of 351 hook points, #254); waiting for a check on a car |
 | Hyundai Kona (`OSPE`) | USA | 260903 | made on an owner's car by HMG-API's own mapper (351 of 351 hook points, #257); waiting for a check on a car |
 | Hyundai Avante facelift (`CN7PE`) | Korea | 260902 | made on an owner's car by HMG-API's own mapper (351 of 351 hook points, #297); waiting for a check on a car |

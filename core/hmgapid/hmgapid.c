@@ -639,9 +639,10 @@ static int op_engine(int fd, int argc, char **argv)
     if (!(seq(sub, "plan") || seq(sub, "apply") || seq(sub, "keep") || seq(sub, "restore") || seq(sub, "status")
           || seq(sub, "recover") || seq(sub, "install") || seq(sub, "remove") || seq(sub, "map") || seq(sub, "verify-map")
           || seq(sub, "usb-scan") || seq(sub, "update-hmgapi") || seq(sub, "apps") || seq(sub, "probe")
-          || seq(sub, "map-car") || seq(sub, "report") || seq(sub, "nemesis-sync"))) {
+          || seq(sub, "map-car") || seq(sub, "report") || seq(sub, "problem") || seq(sub, "nemesis-sync"))) {
         say(fd, "usage: engine plan | apply [--trial] [--force] | keep | restore | status | recover | install <zip> | remove <id>"
-                " | nemesis-sync | map | map-car [--local | --write | --forget] | verify-map | report [--usb]\n");
+                " | nemesis-sync | map | map-car [--local | --write | --forget] | verify-map | report [--usb]"
+                " | problem record [--no-log] [--crash-dumps] [--crash-reports] [--kernel] [--usb] [--seconds N] | problem stop\n");
         return 2;
     }
     a[n++] = APP_PROCESS;
@@ -1681,7 +1682,7 @@ static int forget_answers(int fd)
 }
 
 /* home Wi-Fi for HMG-API's app: wifi saved | seen | join <ssid> [key] | forget <ssid> | now [minutes] | back
- * (on request, in P: the updater's way in later). The keeper's
+ * (on request, in P; now 0: until out of P. The updater's way in later). The keeper's
  * script does it (state/wifi.sh); the key goes in its environment (HMGAPI_WIFI_PSK), never on a command
  * line, which any process on the unit can read. */
 static int op_wifi(int fd, int argc, char **argv)

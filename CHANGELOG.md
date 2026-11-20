@@ -1,5 +1,70 @@
 # Changelog
 
+## Unreleased
+
+- **Record a problem** (Logs tab; `engine problem record [--crash-dumps] [--usb] [--seconds N]`,
+  `engine problem stop`): for an owner with an issue (a crash, CarPlay with no sound) to send to
+  whoever helps them. The page says what it takes before it starts; the owner makes the problem
+  happen and stops it (30 minutes at most). The file (`problem-<car>-<stamp>.txt`, on the USB stick
+  and in `public/reports`) holds the unit, the mods and the md5 of the libraries their native
+  patches are for, HMG-API's errors, and logcat lines (main and system) from crash, CarPlay,
+  Android Auto, audio, Bluetooth connection, Wi-Fi hotspot and HMG-API tags only, every other line dropped and only
+  counted; messages are scrubbed (addresses, numbers, VIN, phone ids, GPS positions). Always in
+  it: HMG-API's state (hook switches, the boot guard, its own kernel lines from each start) and
+  each mod's added system files with whether they're there. The owner picks the rest, each off
+  by default and said what it takes: crash dumps (the newest 5 tombstones, cut to the crashed
+  process, signal, registers, backtraces and the map near the fault; no stack or memory, no log
+  lines), Android's crash reports (`/data/system/dropbox`: app and system crashes, freezes and
+  native crashes, kept across restarts, so a crash while the head unit starts is there; the
+  newest 10, cut to header and stack trace), and the kernel log. With recording off it
+  collects at once, for a problem that already happened.
+- **New hook point `framework.activity.start_activity_for_result`** (`android.app.Activity`,
+  `startActivityForResult(Intent, int, Bundle)`, which `startActivity` goes through too), in
+  the base map for every car. First user: the Wireless mod, whose wireless features make the
+  car's "connect a phone" popup (`com.mobis.system`) open an app the US/Canadian builds don't
+  have; it sends that one intent to Phone Projection's own Device Connections page.
+- **The boot guard no longer mistakes quick restarts for crashes.** It turned HMG-API's hooks
+  off after three zygote starts in a row that didn't last 120 s, so restarting the head unit
+  (or switching the car off) within two minutes of starting, three times, as during an
+  install, an apply and a restart, turned them off with nothing wrong (seen on a US K5; the
+  v1.0.1 and v1.0.2 notes describe the same). The zygote wrapper now also keeps the kernel's
+  `boot_id` with a count for that boot (`/data/hmgapi/hook/boot`): three failed starts within
+  one boot (a hook crashing the system: init starts the zygote again in the same boot) turn
+  the hooks off as before, and starts across restarts count only toward six in a row, which
+  still stops a loop of full restarts. With no `boot_id`, every start counts as before.
+- **Maps from rc.4 and rc.5 Car Reports: the newest hook points on five builds.** Ioniq 6
+  260206 (Canada and US, #354, #319: two cars, same points) and Elantra `CN7PE` USA 260507
+  (#252) now map all 391 points; Genesis G70 USA 260507 (#2) and Palisade USA 260903 (#54)
+  gain the 26 and 8 points their older reports lacked, and the points those maps had from
+  before code signatures (#233) are now confirmed. Genesis G70 Canada 260903 (#231) gains
+  the 30 framework points; its 10 newest DiPO and GPM points stay missing, since this car's
+  EPP replaces the projection apps and their stock files aren't known yet. Off-car only.
+- Add the Palisade USA 260507 hook map: 343 points checked in the November 5
+  owner Car Report and eight more resolved off-car. Keep the map marked `mapped`
+  and explicitly list the 40 newer, unresolved points as missing.
+- **A mod's settings save themselves; no more "Save settings" button.** Changing a
+  setting and pressing Apply changes without saving first lost the change. Now a switch
+  or choice saves when tapped, a text or number field when you tap Done or move on, and
+  anything still being typed is saved before Apply changes runs, before another tab or
+  mod is shown, and when you leave the app. A value that can't be saved (a number field
+  with letters) stops Apply and says why. Fast taps no longer start overlapping saves or
+  show "Changes not applied" twice. Built only: not tried on a car.
+- **Installing a mod from Updates could stop at "engine error: java.io.IOException: rename
+  …/.features/….xml.tmp"** (the wireless mod, and any mod with `"feature_flags"` or
+  `"wifi"`). Back from Updates, the app checked what would change twice at once, and both
+  runs wrote the mod's new feature file through the same temporary file. Opening HMG-API
+  again and applying worked. Now only one engine run happens at a time (`state/engine.lock`;
+  a run waits up to 15 minutes, then says which run is still busy), each run writes its own
+  temporary files, and the app checks once. A plan could also wipe the folder an install
+  or USB scan was using; the lock fixes that too.
+- **Home Wi-Fi's "Connect now" can run until you drive off.** The page has a "Turn off
+  after [30] minutes" box (the minutes and the box are remembered); unticked, home Wi-Fi
+  stays on, with wireless CarPlay and Android Auto off, until you shift out of P, tap
+  Back, or the head unit restarts. Leaving the app doesn't end it (it never did: the
+  keeper runs on its own). `hmgapid wifi now 0` is the same from a shell; minutes with a
+  leading zero (`030`) are read as decimal. The status line says "connected" instead of
+  "connected (the car is off)", since Connect now runs with the car on. Off-car only.
+
 ## 1.1.0-rc.5 (2026-11-19)
 
 - **The older Hyundai models on 260903, US and Canada: a hook map from stock files**

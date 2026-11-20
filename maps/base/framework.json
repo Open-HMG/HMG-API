@@ -1,4 +1,17 @@
 {
+  "framework.activity": {
+    "class": "android.app.Activity"
+  },
+  "framework.activity.start_activity_for_result": {
+    "method": "startActivityForResult",
+    "params": [
+      "android.content.Intent",
+      "int",
+      "android.os.Bundle"
+    ],
+    "ret": "void",
+    "static": false
+  },
   "framework.activity_thread": {
     "class": "android.app.ActivityThread"
   },

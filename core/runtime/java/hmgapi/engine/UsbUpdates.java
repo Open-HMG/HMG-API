@@ -182,7 +182,7 @@ final class UsbUpdates {
                 return 3;
             }
             e.out.add("HMG-API " + r.version + " (" + r.status + "), signed with the release key; running its installer");
-            ProcessBuilder pb = new ProcessBuilder("/system/bin/sh", new File(dir, "install.sh").getPath(), dir.getPath());
+            ProcessBuilder pb = Engine.child(new ProcessBuilder("/system/bin/sh", new File(dir, "install.sh").getPath(), dir.getPath()));
             if (e.host) {
                 pb.command("sh", new File(dir, "install.sh").getPath(), dir.getPath());
                 pb.environment().put("ROOT", e.root);
