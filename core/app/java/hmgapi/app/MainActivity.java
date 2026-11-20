@@ -29,7 +29,7 @@ public class MainActivity extends Activity {
     private FrameLayout content;
     private final TextView[] tabs = new TextView[TABS.length];
     private final View[] marks = new View[TABS.length];
-    private int current;
+    int current;   // the tab shown (ProblemPage redraws only its own)
     private boolean pendingChanges;
     private boolean planning;   // plan() is running: the status pill comes from its answer
     /** the mod settings on screen (Mods tab), saved before Apply or a change of screen */
