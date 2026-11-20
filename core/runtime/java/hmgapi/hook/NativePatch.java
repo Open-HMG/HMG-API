@@ -19,7 +19,9 @@ import hmgapi.engine.MemRecipe;
  * Mixing: each recipe owns its verify regions in the library; a recipe overlapping
  * another mod's on the same library isn't applied, and the log names both. The first
  * of a mod's recipes that fits the library (its stock bytes) is the one used, so one
- * mod can carry a recipe per build of a library.
+ * mod can carry a recipe per build of a library. Its relocatable recipes (native_sites,
+ * hmgapi.engine.SiteRecipes) come after its fixed ones, each as the plain recipe resolved
+ * for this build of the library, and go through the same checks.
  */
 final class NativePatch {
     private NativePatch() {}
@@ -28,12 +30,15 @@ final class NativePatch {
         final ModContext mod;
         final String lib;
         final List<MemRecipe> recipes;
+        /** relocatable recipes: {file name in the mod, text} */
+        final List<String[]> sites;
         boolean done;
 
-        Want(ModContext mod, String lib, List<MemRecipe> recipes) {
+        Want(ModContext mod, String lib, List<MemRecipe> recipes, List<String[]> sites) {
             this.mod = mod;
             this.lib = lib;
             this.recipes = recipes;
+            this.sites = sites;
         }
     }
 
@@ -70,9 +75,9 @@ final class NativePatch {
         }
     };
 
-    static synchronized void request(ModContext mod, String lib, List<MemRecipe> recipes) {
+    static synchronized void request(ModContext mod, String lib, List<MemRecipe> recipes, List<String[]> sites) {
         hookLoads();
-        Want w = new Want(mod, lib, recipes);
+        Want w = new Want(mod, lib, recipes, sites);
         wants.add(w);
         tryAll();
     }
@@ -116,7 +121,19 @@ final class NativePatch {
         List<Owned> here = owned.get(path);
         if (here == null) owned.put(path, here = new ArrayList<Owned>());
         StringBuilder tried = new StringBuilder();
-        for (MemRecipe r : w.recipes) {
+        int n = w.recipes.size() + w.sites.size();
+        for (int i = 0; i < n; i++) {
+            MemRecipe r;
+            if (i < w.recipes.size()) {
+                r = w.recipes.get(i);
+            } else {   // relocatable, after every fixed one: the plain recipe for this build, if it has one
+                String[] s = w.sites.get(i - w.recipes.size()), why = new String[1];
+                r = hmgapi.engine.SiteRecipes.forLibrary(Mods.ROOT, w.mod.id, s[0], s[1], path, md5, why);
+                if (r == null) {
+                    tried.append("; ").append(why[0]);
+                    continue;
+                }
+            }
             Owned clash = overlap(here, r.regions());
             if (clash != null) {
                 tried.append("; ").append(r.id).append(": conflict with ").append(clash.mod).append("'s ").append(clash.recipe);
@@ -179,6 +196,13 @@ final class NativePatch {
     static List<MemRecipe> read(ModContext mod, List<String> files) throws Exception {
         List<MemRecipe> r = new ArrayList<MemRecipe>();
         for (String f : files) r.add(MemRecipe.parse(Mods.read(new File(mod.dir, f))));
+        return r;
+    }
+
+    /** a mod's relocatable recipe files: {name, text}, resolved when the library is loaded */
+    static List<String[]> readSites(ModContext mod, List<String> files) throws Exception {
+        List<String[]> r = new ArrayList<String[]>();
+        for (String f : files) r.add(new String[] { f, Mods.read(new File(mod.dir, f)) });
         return r;
     }
 }

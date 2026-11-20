@@ -269,7 +269,7 @@ A car without a button ignores bindings to it. The key names are the car's own
 - `aa_sensors`: `remove: ["speed"]` doesn't offer the phone the speed sensor (no
   tap/scroll limit while moving; for every mod, the plan says so); `add` offers more
   sensor types (23: EV data). Library changes a new type needs stay the mod's own
-  native patches (`hooks.native`).
+  native patches (`hooks.native`, `hooks.native_sites`: "Native patches" below).
 - `aa_fuel_types`, `aa_ev_connectors`: instead of GPM's "unknown".
 - `events`: your apps hear `hmgapi.intent.action.PROJECTION` with `event`
   `aa_connected`, `aa_disconnected`, `aa_navigation_focus` (value: who navigates),
@@ -279,6 +279,76 @@ A car without a button ignores bindings to it. The key names are the car's own
   library patch (the Wireless CarPlay/AA mod): require it to get them.
 
 Settings apply through hooks when GPM starts, and every mod's asks are combined.
+
+## Native patches
+
+A mod patches a native library in an app's memory, never its file:
+
+```json
+"hooks": {
+  "native": {"libautoreceiver_infobank.so": ["recipes/ev-sensor-48ee793a.recipe"]},
+  "native_sites": {"libautoreceiver_infobank.so": ["recipes/ev-sensor.sites"]}
+}
+```
+
+and calls `mod.nativePatch(app, "libautoreceiver_infobank.so")` in `appLoaded`. The
+recipes are the mod's: HMG-API ships the mechanism, never a patch.
+
+- **`native`**: fixed recipes (`tools/mkrecipe.py`, `tools/mkmemrecipe.py`), one per build
+  of the library. The first whose stock bytes are in memory is applied.
+- **`native_sites`** (HMG-API after 1.1.0-rc.2): relocatable recipes, tried after every fixed
+  one. Their offsets are found on the unit by what the code looks like. One recipe then
+  works on every build whose code around the patch is the same, without a new release of the
+  mod. Older HMG-API versions ignore the key, so keep a fixed recipe for them in `native`,
+  or set the mod's `"hmgapi"` floor.
+
+A relocatable recipe is a fixed one with sites (`hmgapi.engine.SiteFind`):
+
+```
+site v0 36 <md5> in AirPlayReceiverSessionStart   # a window found by its md5, in that function
+verify v0 36                                      # its md5s are taken from the library
+jump v0+0x10                                      # the beq.w there made a b.w, same target
+```
+
+- `site <name> <len> <md5> [mask <hex>] [in <function> | at sym:<function>+<off>]`: a
+  window of the library found where exactly one window has that md5. A `mask` bit 0 is a
+  wildcard byte (counted as 0). `in` searches only an exported function, `at` only that
+  place (a symbol plus an offset, still checked by its md5). It compares 16 bytes at least.
+- `verify <ref> <len>`, `patch <ref> <hex>`, `branch`, `rel32`, `segment`: as in a fixed
+  recipe, with `<ref>` a `<site>+<off>` or `sym:<function>+<off>`.
+- `jump <ref>` (a conditional `b<c>.w` made a `b.w`, same target), `bw <ref> <target>` and
+  `bl <ref> <target>`: branches whose bytes are computed for each build.
+- `built-for <md5>`: a plain offset is allowed only on that build.
+
+Nothing is written unless all of this holds:
+- every site matches exactly once;
+- a plain patch writes no wildcard byte;
+- a plain patch has no instruction whose target leaves its site (a branch, a literal load:
+  those are `jump`/`bw`/`bl`, or the recipe is pinned with `built-for`);
+- the bytes the resolver saw are the bytes in memory (`MemRecipe`'s verify, as for every recipe).
+
+The engine finds the sites when a mod is installed, applied or turned on, and at every
+start for a library that changed. It keeps the result by the recipe's and the library's md5
+in `/data/hmgapi/public/sites/`. A slow search (a whole library) never runs in the app.
+When every site has `in` or `at`, an app that has no result yet finds the sites itself (it's
+quick). Otherwise the patch waits for the engine, at the next start.
+
+Making one: `tools/sitefind.py relocate <recipe> --lib <the stock library it was made from>`
+turns a fixed recipe into a relocatable one. It:
+- makes each site unique, inside its function where it can;
+- writes branches as `jump`/`bw`/`bl`;
+- names call targets by symbol or by a site of their own;
+- pins (`built-for`) whatever still depends on where it is.
+
+`tools/sitefind.py make <lib> <off> <len> --also <other builds>` makes a site with
+wildcards where builds differ. `java -cp <sdk>/lib/hmgapi-engine.jar:<sdk>/test/hmgapi-engine-test.jar
+hmgapi.engine.SiteFindTest --same <relocatable> <stock lib> <fixed recipe>` checks it comes
+out as the fixed recipe on its own build. `--fuzz <n> <lib>...` checks random sites in your
+libraries are found only where they are.
+
+Added code written into a library's free space (a code cave) uses PC-relative calls and
+can't move; put such code in a `segment` (`tools/mkmemrecipe.py`), with calls into the library
+as `rel32 … sym:<function>`.
 
 ## Network
 
