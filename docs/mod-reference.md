@@ -516,9 +516,10 @@ yours again.
 
 A mod in its own repository builds with the HMG-API mod SDK, `hmgapi-mod-sdk-<version>.zip`
 on each HMG-API release from 1.1.0, its betas and release candidates included (or `./build.sh sdk` here, into `out/dist`). Put the
-mod in a folder named by its id (`my-mod/mod.json`), with `README.md`, `LICENSE` and
+mod in its own folder (`my-mod/mod.json`), with `README.md`, `LICENSE` and
 `.github/` at the repository root: everything in the mod folder but `build.sh`,
-`test.sh`, `src`, `tools` and `native` goes into the package.
+`test.sh`, `src`, `tools` and `native` goes into the package. The folder is usually
+named by the mod's id, but needn't be: the id is always `mod.json`'s `"id"`.
 
 Pin the SDK in `hmgapi-sdk.json` at the root, and call HMG-API's mod workflow from
 `.github/workflows/ci.yml` (`jobs: mod: uses: Open-HMG/HMG-API/.github/workflows/mod.yml@<same pin>`):
@@ -529,22 +530,65 @@ Pin the SDK in `hmgapi-sdk.json` at the root, and call HMG-API's mod workflow fr
 | a release (from 1.1.0-beta.1) | `{"version": "1.1.0", "sha256": "<the zip's, from SHA256SUMS>"}` | `@v1.1.0` |
 
 The workflow checks the mod's `"hmgapi"` floor (at or below the SDK; every
-`hooks.points` entry in that release's points), builds it, runs its `test.sh` and
-`tools/*/test.sh`, checks its scripts, and packages it with a throwaway key. Your
+`hooks.points` entry in that release's points), builds it (into `out/build/<id>`), runs its
+`test.sh` and `tools/*/test.sh` (with that build in `HMGAPI_MOD_BUILD`), checks its scripts,
+and packages that build with a throwaway key. Your
 release workflow signs with your own key. A new hook point is a HMG-API pull request
 first (`docs/mod-repos.md`, section 4).
+
+`build-mod.sh` builds `hooks.jar` from `src/` and the app from `app/`. Anything else the
+package needs (a service's jar, a native binary, files made from others) comes from the
+mod's own build step: an executable `build.sh` in the mod folder (`chmod +x`, and
+`git update-index --chmod=+x`; one that isn't executable is skipped, with a warning).
+`build-mod.sh` runs it last, as `sh <mod>/build.sh <out dir>` (SDKs after 1.1.0-rc.2; older
+ones run it only in `mkmodpkg.sh`, on the package's folder):
+
+- `<out dir>` is an absolute path, and already holds the mod's `*.json`, `hooks.jar` and
+  the APK, nothing else from the folder. Whatever the script writes there goes into the
+  package, over the folder's own file at the same path: a `hooks.jar` built its own way,
+  a script edited at build time. It can't take one of the folder's files out.
+- It runs from the directory `build-mod.sh` was run in (the repository root in the
+  workflow), so it finds its own folder with `$(dirname "$0")`.
+- It gets `HMGAPI_SDK`, `HMGAPI_CP` (HMG-API's runtime, compile only), `HMGAPI_CLIENT`
+  (`hmgapi-client.jar`, for a service or app to bundle), `HMGAPI_MOD_CP`, `ANDROID_JAR`,
+  `D8` and `BT` (the build-tools folder).
+- Its sources stay out of the package: in `tools/` or outside the mod folder. Not in
+  `src/` if `build.sh` builds `hooks.jar` itself: `build-mod.sh` compiles `src/` alone
+  first, with nothing but HMG-API and `stubs/` on the class path.
+
+`mkmodpkg.sh` packages the mod folder with the build on top: from `HMGAPI_MOD_BUILD`
+(as the workflow does, so the package is what the tests saw), or it runs `build-mod.sh`
+itself.
+
+A `build.sh` written for older SDKs: their `mkmodpkg.sh` ran it on the package's folder, a
+copy of the whole mod folder (`scripts/` and all), and `build-mod.sh` didn't run it. Now it
+gets `build-mod.sh`'s out dir, which has no copy of the folder's other files. One that only
+adds files (hmgapi-adbd's `files/hmgapi-adbd`) works as it is. One that changed a file of
+the folder in place (a script, an asset) now finds nothing there to change: have it read
+the folder's file and write the changed one to the same path in `<out dir>` instead, for
+example `mkdir -p "$1/scripts" && sed 's/x/y/' "$(dirname "$0")/scripts/a.sh" > "$1/scripts/a.sh"`. For example, a service jar with `hmgapi-client.jar` inside, from `tools/relay/src`:
+
+```
+#!/bin/sh
+set -e
+W=$(mktemp -d); trap 'rm -rf "$W"' EXIT
+(cd "$W" && jar xf "$HMGAPI_CLIENT" hmgapi)
+javac --release 8 -cp "$ANDROID_JAR:$HMGAPI_CLIENT" -d "$W" $(find "$(dirname "$0")/tools/relay/src" -name '*.java')
+"$D8" --release --min-api 19 --lib "$ANDROID_JAR" --output "$1/relay.jar" $(find "$W" -name '*.class')
+```
 
 A mod whose `build.sh` compiles native code can ask for an Android NDK with
 `with: ndk: "<version>"`, as `sdkmanager` names it (hmgapi-adbd: `21.4.7075529`, r21e).
 The workflow installs it before the build, with `NDK` and `ANDROID_NDK_HOME` pointing at it.
 
-On your machine, with the SDK unpacked in `$HMGAPI_SDK` and the Android SDK in `ANDROID_HOME`:
+On your machine, with the SDK unpacked in `$HMGAPI_SDK` and the Android SDK in `ANDROID_HOME`
+(`my-mod` is the folder, `<id>` its `mod.json` id):
 
 ```
-$HMGAPI_SDK/bin/build-mod.sh my-mod out/build/my-mod
-HMGAPI_SDK=$HMGAPI_SDK HMGAPI_MOD_BUILD=out/build/my-mod sh my-mod/test.sh
+$HMGAPI_SDK/bin/build-mod.sh my-mod out/build/<id>
+HMGAPI_SDK=$HMGAPI_SDK HMGAPI_MOD_BUILD=$PWD/out/build/<id> sh my-mod/test.sh
 $HMGAPI_SDK/bin/check-scripts.sh my-mod
-$HMGAPI_SDK/bin/mkmodpkg.sh my-mod <your key>
+HMGAPI_MOD_BUILD=$PWD/out/build/<id> $HMGAPI_SDK/bin/mkmodpkg.sh my-mod <your key>
 ```
 
 A `test.sh` sources `$HMGAPI_SDK/test/lib.sh` for `check`, `has`, `eng` (the engine on
