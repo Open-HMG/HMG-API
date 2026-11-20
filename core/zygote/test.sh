@@ -15,8 +15,9 @@ S
 chmod +x "$T/stock"
 : > "$T/lib.so"
 mkdir -p "$T/hook"
+echo 5e1d0c34-aaaa-4bbb-8ccc-000000000001 > "$T/boot_id"   # one kernel boot, until a test changes it
 . ../../tools/env.sh
-clang $ARM_STATIC -DGUARD_DELAY=1 -DSTOCK="\"$T/stock\"" -DKMSG="\"$T/kmsg\"" -DHOOKDIR="\"$T/hook\"" -DHOOKLIB="\"$T/lib.so\"" -DHMGAPID="\"$T/hmgapid\"" \
+clang $ARM_STATIC -DGUARD_DELAY=1 -DSTOCK="\"$T/stock\"" -DKMSG="\"$T/kmsg\"" -DHOOKDIR="\"$T/hook\"" -DHOOKLIB="\"$T/lib.so\"" -DHMGAPID="\"$T/hmgapid\"" -DBOOTID="\"$T/boot_id\"" \
   -o "$T/wrap" zygote.c
 fail=0
 check() {  # name, expected-substring, actual
@@ -49,7 +50,7 @@ check "... and logs it" ", hmgapid, exec" "$(cat "$T/kmsg")"
 NO_ADDR_COMPAT_LAYOUT_FIXUP=1 "$T/wrap" --zygote >/dev/null 2>&1; "$T/wrap" /system/bin com.android.commands.am.Am >/dev/null 2>&1; sleep 0.3
 check "re-exec and plain app_process don't" "" "$(cat "$T/hmgapid.ran")"
 rm "$T/hmgapid" "$T/hmgapid.ran"
-echo 1 > "$T/hook/starts"
+echo 1 > "$T/hook/starts"; echo "$(cat "$T/boot_id") 1" > "$T/hook/boot"   # one earlier start, in this boot
 
 out=$(run /system/bin com.android.commands.am.Am)
 check "not zygote: no preload" "PRELOAD:old.so" "$out"
@@ -59,7 +60,7 @@ out=$(run --zygote)
 check "boot guard after 3 starts" "PRELOAD:old.so" "$out"
 check "log says boot guard" "boot guard, starts=3" "$(cat "$T/kmsg")"
 
-echo 0 > "$T/hook/starts"; touch "$T/hook/disable"
+echo 0 > "$T/hook/starts"; rm -f "$T/hook/boot"; touch "$T/hook/disable"
 out=$(run --zygote)
 check "disable file" "PRELOAD:old.so" "$out"
 rm "$T/hook/disable"; rm "$T/lib.so"
@@ -68,7 +69,7 @@ check "missing lib" "hooks off (no $T/lib.so)" "$(cat "$T/kmsg")"
 
 # boot guard reset by the watcher: zygote alive past GUARD_DELAY -> starts=0
 : > "$T/lib.so"
-echo 0 > "$T/hook/starts"
+echo 0 > "$T/hook/starts"; rm -f "$T/hook/boot"
 : > "$T/kmsg"; STAY=3 LD_PRELOAD=old.so "$T/wrap" --zygote >/dev/null 2>&1 &
 zp=$!
 sleep 0.4
@@ -77,6 +78,29 @@ sleep 1.4
 check "watcher: reset while zygote alive" "0" "$(cat "$T/hook/starts")"
 wait $zp
 check "watcher: logged" "boot guard reset" "$(cat "$T/kmsg")"
+check "watcher: this boot's count gone too" no "$([ -e "$T/hook/boot" ] && echo yes || echo no)"
+echo 0 > "$T/hook/starts"
+
+# the boot guard tells a crash loop (one kernel boot) from restarts (a new boot_id each)
+id() { echo "5e1d0c34-aaaa-4bbb-8ccc-00000000000$1" > "$T/boot_id"; }
+echo 0 > "$T/hook/starts"; rm -f "$T/hook/boot"; id 1
+run --zygote >/dev/null; run --zygote >/dev/null; run --zygote >/dev/null
+out=$(run --zygote)
+check "crash loop in one boot: off after 3" "PRELOAD:old.so" "$out"
+check "... logged with this boot's count" "boot guard, starts=3, this boot 3" "$(cat "$T/kmsg")"
+check "... this boot's count kept" "5e1d0c34-aaaa-4bbb-8ccc-000000000001 4" "$(cat "$T/hook/boot")"
+echo 0 > "$T/hook/starts"; rm -f "$T/hook/boot"
+for n in 1 2 3 4 5 6; do id $n; out=$(run --zygote); done
+check "6 short restarts (6 boots): hooks still on" "PRELOAD:$T/lib.so" "$out"
+check "... logged as the first start of its boot" "hooks on, start 6 (this boot 1)" "$(cat "$T/kmsg")"
+id 7; out=$(run --zygote)
+check "the 7th in a row: off (a restart loop)" "PRELOAD:old.so" "$out"
+check "... logged" "boot guard, starts=6, this boot 0" "$(cat "$T/kmsg")"
+echo 0 > "$T/hook/starts"; rm -f "$T/hook/boot" "$T/boot_id"
+run --zygote >/dev/null; run --zygote >/dev/null; run --zygote >/dev/null
+out=$(run --zygote)
+check "no boot_id: every start counts, off after 3 as before" "PRELOAD:old.so" "$out"
+check "... no boot file written" no "$([ -e "$T/hook/boot" ] && echo yes || echo no)"
 echo 0 > "$T/hook/starts"
 : > "$T/kmsg"; STAY= LD_PRELOAD=old.so "$T/wrap" --zygote >/dev/null 2>&1
 sleep 2

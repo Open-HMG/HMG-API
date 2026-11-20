@@ -102,6 +102,31 @@ check "the override goes with it" "[]" "$(ign)"
 eng install $T/demo.zip --any-car; check "--any-car on a mod for this unit: plain install" 0 $rc
 check "... nothing recorded" "[]" "$(ign)"
 
+# "Install anyway" also covers a patches.json with no set for this unit (a K5 on a mod made for
+# other cars: before, every apply refused it while its hooks loaded): the changes that need no set apply
+eng remove demo
+mk 2.1.0 '{"platform": ["tcc897x"]}'
+printf '{"cars": {"ZZEV.KOR.": "kr"}, "changes": [{"type": "prop", "key": "persist.demo.on", "value": "1"}]}\n' > $T/m/patches.json
+sig sign $T/m $T/author.key > /dev/null; pkg $T/m $T/noset.zip
+eng install $T/noset.zip --any-car; check "no set: install anyway" 0 $rc
+eng plan; check "no set: plan goes on" 0 $rc
+has "... with a warning" "WARNING: demo: its patches.json has no set for this head unit" "$out"
+eng apply; check "no set: apply" 0 $rc
+has "... its prop is live" "prop/persist.demo.on=1" "$(cat $R/settings.txt 2>/dev/null)"
+# a change that needs the set's stock list (no "stock" of its own) still finds none: refused for that file
+mkdir -p $R/system/etc; printf 'keep\nx\n' > $R/system/etc/demo.cfg
+printf '{"cars": {"ZZEV.KOR.": "kr"}, "changes": [{"type": "prop", "key": "persist.demo.on", "value": "1"}, {"type": "lines", "path": "/system/etc/demo.cfg", "remove": ["x"]}]}\n' > $R/data/hmgapi/mods/demo/patches.json
+eng plan; check "no set, a change that needs one: refused" 3 $rc
+has "... says the set is missing" "/system/etc/demo.cfg: demo has no patch set for this head unit" "$out"
+hasnt "... not blamed on NEMESIS" "NEMESIS package" "$out"
+check "... file untouched" "keep x" "$(cat $R/system/etc/demo.cfg | tr '\n' ' ' | sed 's/ $//')"
+printf '{"cars": {"ZZEV.KOR.": "kr"}, "changes": [{"type": "prop", "key": "persist.demo.on", "value": "1"}]}\n' > $R/data/hmgapi/mods/demo/patches.json
+python3 -c "import json,sys; p=sys.argv[1]; d=json.load(open(p)); d['overrides']['ignore_system']=[]; json.dump(d, open(p, 'w'))" $R/data/hmgapi/settings/hmgapi.json
+eng plan; check "no set, no override: refused" 3 $rc
+has "... at the supported-car check, as before" "demo: needs platform tcc897x" "$out"
+eng remove demo; eng apply
+eng install $T/demo.zip; check "back to the plain demo" 0 $rc
+
 # a symlink in a mod's folder (one of its scripts made it: to a USB stick, to another place
 # under /data) goes as the link it is: what it points at stays
 mkdir -p $T/victim/sub; echo keep > $T/victim/sub/file; echo keep > $T/victim/top

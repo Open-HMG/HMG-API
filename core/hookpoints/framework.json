@@ -11,6 +11,29 @@
   ],
   "points": [
     {
+      "id": "framework.activity",
+      "kind": "class",
+      "find": {
+        "name": "android.app.Activity"
+      },
+      "about": "Android's activity class: every screen of every app"
+    },
+    {
+      "id": "framework.activity.start_activity_for_result",
+      "kind": "method",
+      "of": "framework.activity",
+      "find": {
+        "name": "startActivityForResult",
+        "params": [
+          "android.content.Intent",
+          "int",
+          "android.os.Bundle"
+        ],
+        "ret": "void"
+      },
+      "about": "an activity starts another (startActivity comes through here too); the Wireless mod: the car's \"connect a phone\" popup opens the Phone Projection settings these builds have"
+    },
+    {
       "id": "framework.activity_thread",
       "kind": "class",
       "find": {

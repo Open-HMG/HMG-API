@@ -9,7 +9,7 @@ import android.widget.TextView;
 /**
  * Logs: HMG-API's log (hmgapid log: the log keeper's file, every process's HMG-API
  * lines), newest last, filtered: everything, HMG-API itself, mods (their "[mod]"
- * lines), or warnings and errors only.
+ * lines), or warnings and errors only. "Record a problem" opens ProblemPage.
  */
 final class LogsTab {
     static final String[] FILTERS = { "Everything", "HMG-API", "Mods", "Warnings and errors" };
@@ -18,17 +18,26 @@ final class LogsTab {
     TextView text;
     String raw = "";
     static int filter;
+    static boolean problem;   // the "Record a problem" page is open
 
     LogsTab(MainActivity a) {
         this.a = a;
     }
 
     View view() {
+        if (problem) return new ProblemPage(a).view();
         LinearLayout root = Ui.column(a);
         root.setPadding(Ui.dp(a, 24), Ui.dp(a, 12), Ui.dp(a, 24), Ui.dp(a, 12));
         LinearLayout bar = Ui.row(a);
         chips = Ui.row(a);
         bar.addView(chips, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        Ui.button(bar, ProblemPage.recording ? "Recording a problem…" : "Record a problem", new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                problem = true;
+                a.show(3);
+            }
+        });
         Ui.button(bar, "Refresh", new View.OnClickListener() {
             @Override
             public void onClick(View v) {

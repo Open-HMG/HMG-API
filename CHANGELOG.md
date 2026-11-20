@@ -2,6 +2,53 @@
 
 ## Unreleased
 
+- **"Install anyway" now covers a mod's patch sets too.** A mod's `patches.json` can list the
+  builds it has a set for (`"cars"`); on a head unit missing there, every plan was refused
+  ("doesn't support this head unit") even after the owner chose Install anyway, while the
+  mod's hooks still loaded. So the mod ran half-installed: its code without its system files
+  (seen on a US K5 with the Wireless mod: no audio converter, so CarPlay failed as soon as
+  music started). With `overrides.ignore_system` set for the mod, a missing set is now a
+  warning, and a plan whose changes need no set (props, added files, merges onto any version)
+  applies. A change made against a set's stock files still refuses the plan, and now says why
+  ("<mod> has no patch set for this head unit ... turn <mod> off, or install a version made
+  for this car") instead of blaming a NEMESIS package.
+- **Record a problem** (Logs tab; `engine problem record [--crash-dumps] [--usb] [--seconds N]`,
+  `engine problem stop`): for an owner with an issue (a crash, CarPlay with no sound) to send to
+  whoever helps them. The page says what it takes before it starts; the owner makes the problem
+  happen and stops it (30 minutes at most). The file (`problem-<car>-<stamp>.txt`, on the USB stick
+  and in `public/reports`) holds the unit, the mods and the md5 of the libraries their native
+  patches are for, HMG-API's errors, and logcat lines (main and system) from crash, CarPlay,
+  Android Auto, audio, Bluetooth connection, Wi-Fi hotspot and HMG-API tags only, every other line dropped and only
+  counted; messages are scrubbed (addresses, numbers, VIN, phone ids, GPS positions). Always in
+  it: HMG-API's state (hook switches, the boot guard, its own kernel lines from each start) and
+  each mod's added system files with whether they're there. The owner picks the rest, each off
+  by default and said what it takes: crash dumps (the newest 5 tombstones, cut to the crashed
+  process, signal, registers, backtraces and the map near the fault; no stack or memory, no log
+  lines), Android's crash reports (`/data/system/dropbox`: app and system crashes, freezes and
+  native crashes, kept across restarts, so a crash while the head unit starts is there; the
+  newest 10, cut to header and stack trace), and the kernel log. With recording off it
+  collects at once, for a problem that already happened.
+- **New hook point `framework.activity.start_activity_for_result`** (`android.app.Activity`,
+  `startActivityForResult(Intent, int, Bundle)`, which `startActivity` goes through too), in
+  the base map for every car. First user: the Wireless mod, whose wireless features make the
+  car's "connect a phone" popup (`com.mobis.system`) open an app the US/Canadian builds don't
+  have; it sends that one intent to Phone Projection's own Device Connections page.
+- **The boot guard no longer mistakes quick restarts for crashes.** It turned HMG-API's hooks
+  off after three zygote starts in a row that didn't last 120 s, so restarting the head unit
+  (or switching the car off) within two minutes of starting, three times, as during an
+  install, an apply and a restart, turned them off with nothing wrong (seen on a US K5; the
+  v1.0.1 and v1.0.2 notes describe the same). The zygote wrapper now also keeps the kernel's
+  `boot_id` with a count for that boot (`/data/hmgapi/hook/boot`): three failed starts within
+  one boot (a hook crashing the system: init starts the zygote again in the same boot) turn
+  the hooks off as before, and starts across restarts count only toward six in a row, which
+  still stops a loop of full restarts. With no `boot_id`, every start counts as before.
+- **Maps from rc.4 and rc.5 Car Reports: the newest hook points on five builds.** Ioniq 6
+  260206 (Canada and US, #354, #319: two cars, same points) and Elantra `CN7PE` USA 260507
+  (#252) now map all 391 points; Genesis G70 USA 260507 (#2) and Palisade USA 260903 (#54)
+  gain the 26 and 8 points their older reports lacked, and the points those maps had from
+  before code signatures (#233) are now confirmed. Genesis G70 Canada 260903 (#231) gains
+  the 30 framework points; its 10 newest DiPO and GPM points stay missing, since this car's
+  EPP replaces the projection apps and their stock files aren't known yet. Off-car only.
 - Add the Palisade USA 260507 hook map: 343 points checked in the November 5
   owner Car Report and eight more resolved off-car. Keep the map marked `mapped`
   and explicitly list the 40 newer, unresolved points as missing.
