@@ -140,6 +140,17 @@ public final class ModContext {
     }
 
     /**
+     * Whether one of this mod's recipes for lib (nativePatch) is in place in this
+     * process: applied, already there, or built into this build of the library. False
+     * until the library is loaded, so ask when you use the patch, not in appLoaded; and
+     * false when another mod's recipe on the same bytes went on first (the log says so).
+     * Raw Android Auto sends check it for libautoreceiver_infobank.so (ProjectionHooks.rawReady).
+     */
+    public boolean nativePatched(String lib) {
+        return NativePatch.patched(id, lib);
+    }
+
+    /**
      * Car events in this app's process: parked, unparked, shutdown, wake (CarEvents). The mod
      * asks for the ones it wants in mod.json ("car_events": {"parked": {}, "shutdown": {}});
      * the listener hears only those, and only while the mod is on. It runs off the app's main

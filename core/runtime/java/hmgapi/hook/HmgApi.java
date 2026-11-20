@@ -158,7 +158,7 @@ final class HmgApi {
             } else if ("com.android.settings".equals(app.packageName)) {
                 if (Points.need("split-screen settings", "settings")) Panel.settings(app.classLoader);
             } else if ("com.google.android.projection.sink".equals(app.packageName)) {
-                if (Points.need("Android Auto projection", "gpm")) ProjectionHooks.gpm(app);
+                ProjectionHooks.gpm(app);   // needs only the points it hooks (ProjectionHooks.GPM_POINTS)
             } else if ("com.daudio.app.dipo".equals(app.packageName)) {
                 if (Points.need("CarPlay projection", "dipo")) ProjectionHooks.dipo(app);
             }

@@ -4,7 +4,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,39 +18,11 @@ import hmgapi.engine.MemRecipe;
  * Mixing: each recipe owns its verify regions in the library; a recipe overlapping
  * another mod's on the same library isn't applied, and the log names both. The first
  * of a mod's recipes that fits the library (its stock bytes) is the one used, so one
- * mod can carry a recipe per build of a library.
+ * mod can carry a recipe per build of a library. HMG-API itself ships no recipe: native
+ * patches stay in the mods. Who owns what: NativeOwners.
  */
 final class NativePatch {
     private NativePatch() {}
-
-    static final class Want {
-        final ModContext mod;
-        final String lib;
-        final List<MemRecipe> recipes;
-        boolean done;
-
-        Want(ModContext mod, String lib, List<MemRecipe> recipes) {
-            this.mod = mod;
-            this.lib = lib;
-            this.recipes = recipes;
-        }
-    }
-
-    static final class Owned {
-        final String mod, recipe;
-        final List<long[]> regions;
-
-        Owned(String mod, String recipe, List<long[]> regions) {
-            this.mod = mod;
-            this.recipe = recipe;
-            this.regions = regions;
-        }
-    }
-
-    static final List<Want> wants = new ArrayList<Want>();
-    /** library path -> recipes applied to it in this process */
-    static final Map<String, List<Owned>> owned = new HashMap<String, List<Owned>>();
-    static boolean hooked;
 
     static final MemRecipe.Memory MEMORY = new MemRecipe.Memory() {
         @Override
@@ -70,11 +41,28 @@ final class NativePatch {
         }
     };
 
-    static synchronized void request(ModContext mod, String lib, List<MemRecipe> recipes) {
+    static boolean hooked;
+
+    static synchronized void request(final ModContext mod, String lib, List<MemRecipe> recipes) {
         hookLoads();
-        Want w = new Want(mod, lib, recipes);
-        wants.add(w);
+        NativeOwners.Log log = new NativeOwners.Log() {
+            @Override
+            public void info(String msg) {
+                mod.log(msg);
+            }
+
+            @Override
+            public void error(String msg, Throwable t) {
+                mod.error(msg, t);
+            }
+        };
+        NativeOwners.add(new NativeOwners.Want(mod.id, lib, recipes, log));
         tryAll();
+    }
+
+    /** whether one of a mod's recipes for lib is in place in this process */
+    static boolean patched(String mod, String lib) {
+        return NativeOwners.patched(mod, lib);
     }
 
     /** after every library load in this process, the patches still waiting are tried */
@@ -94,8 +82,7 @@ final class NativePatch {
 
     static synchronized void tryAll() {
         Map<String, long[]> maps = null;
-        for (Want w : wants) {
-            if (w.done) continue;
+        for (NativeOwners.Want w : NativeOwners.waiting()) {
             if (maps == null) maps = maps();
             long[] m = null;
             String path = null;
@@ -106,49 +93,8 @@ final class NativePatch {
                 }
             }
             if (m == null) continue;
-            w.done = true;
-            apply(w, path, m[0], m[1]);
+            NativeOwners.apply(w, path, m[0], m[1], ModContext.md5(path), MEMORY);
         }
-    }
-
-    private static void apply(Want w, String path, long base, long textEnd) {
-        String md5 = ModContext.md5(path);
-        List<Owned> here = owned.get(path);
-        if (here == null) owned.put(path, here = new ArrayList<Owned>());
-        StringBuilder tried = new StringBuilder();
-        for (MemRecipe r : w.recipes) {
-            Owned clash = overlap(here, r.regions());
-            if (clash != null) {
-                tried.append("; ").append(r.id).append(": conflict with ").append(clash.mod).append("'s ").append(clash.recipe);
-                continue;
-            }
-            MemRecipe.Result res;
-            try {
-                res = r.apply(MEMORY, base, textEnd, md5);
-            } catch (Throwable t) {
-                w.mod.error("native patch " + r.id + " on " + w.lib, t);
-                return;
-            }
-            if (res.ok()) {
-                here.add(new Owned(w.mod.id, r.id, r.regions()));
-                w.mod.log("native patch " + w.lib + ": " + res.message);
-                return;
-            }
-            tried.append("; ").append(res.message);
-            if (res.status == MemRecipe.Result.FAILED) break;   // something was written: no other recipe on top
-        }
-        w.mod.error("native patch " + w.lib + " not applied" + tried, null);
-    }
-
-    static Owned overlap(List<Owned> here, List<long[]> regions) {
-        for (Owned o : here) {
-            for (long[] a : o.regions) {
-                for (long[] b : regions) {
-                    if (a[0] < b[1] && b[0] < a[1]) return o;
-                }
-            }
-        }
-        return null;
     }
 
     /** loaded libraries: path -> {address of file offset 0 (its code mapping), the code mapping's length} */

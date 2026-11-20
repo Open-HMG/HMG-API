@@ -484,6 +484,30 @@ NEMESIS in the app menu.
   - `framework.datc_service.vr_climate_status` and `framework.datc_service.is_unit_celsius`, climate control's state.
 
   Mapped on the US Ioniq 5 260507 and listed missing elsewhere. (docs/hook-points.md)
+- **Raw Android Auto sensor data from hook code** (#44). An EV mod no longer calls
+  `SensorSource` by name. Its library recipes stay its own: HMG-API ships no native patch.
+  - `"projection": {"aa_raw": true}` declares that the mod's hook code sends raw sensor
+    batches. It needs the mod's own `hooks.native` recipe for
+    `libautoreceiver_infobank.so` (egmp-aa-ev's `ev-sensor-<build>.recipe` are the
+    example), and the plan and the HMG-API app show it;
+  - `ProjectionHooks.sendRaw(mod, message)` sends one sensor batch (`80 03`, then the
+    SensorBatch), and `ProjectionHooks.rawReady(mod)` says whether it can: the mod
+    declares `aa_raw`, one of its recipes for that library is in place, and a session is
+    up. A send never overlaps the session's end;
+  - a sensor type above 21 in `aa_sensors` `add` (the stock library reads up to 21) needs
+    the mod's own recipe for that library, and is offered only where it is in place;
+  - `ModContext.nativePatched(lib)` says whether one of the mod's own `hooks.native`
+    recipes is in place. A second mod's recipe on the same bytes isn't applied, so it's
+    false for that mod;
+  - `ProjectionHooks.addNavigationListener` gives hook code the 0x8006/0x8007 navigation
+    messages apps get as `aa_navigation_message`.
+
+  HMG-API's own Android Auto settings now need only the GPM points they hook, so a car
+  missing one of the new #46 points keeps them. (docs/mod-reference.md, Phone projection)
+- **An already patched library reads "already patched".** A memory recipe region that is
+  only checked (the same before and after) counted as stock only, so a library that
+  already had the patches, such as a file patched by another package, read as "not this
+  library's stock bytes". It now counts as both.
 
 ## 1.1.0-rc.2 (2026-11-15)
 

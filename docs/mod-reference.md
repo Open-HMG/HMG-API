@@ -266,6 +266,7 @@ A car without a button ignores bindings to it. The key names are the car's own
   "aa_density": 200,
   "aa_sensors": {"remove": ["speed"], "add": [23]},
   "aa_fuel_types": [10], "aa_ev_connectors": [4, 1],
+  "aa_raw": true,
   "events": true
 }
 ```
@@ -276,9 +277,13 @@ A car without a button ignores bindings to it. The key names are the car's own
   (`overrides.projection {"aa_density": "<mod>"}`).
 - `aa_sensors`: `remove: ["speed"]` doesn't offer the phone the speed sensor (no
   tap/scroll limit while moving; for every mod, the plan says so); `add` offers more
-  sensor types (23: EV data). Library changes a new type needs stay the mod's own
-  native patches (`hooks.native`).
+  sensor types (1-64). The stock library reads types up to 21. A type above 21 (23: EV
+  energy model) needs your own recipe for Android Auto's library (below), and is
+  offered only where it is in place.
 - `aa_fuel_types`, `aa_ev_connectors`: instead of GPM's "unknown".
+- `aa_raw`: your hook code sends raw sensor batches (`ProjectionHooks.sendRaw`,
+  below). Needs your own recipe for Android Auto's library. The plan and the HMG-API
+  app show it.
 - `events`: your apps hear `hmgapi.intent.action.PROJECTION` with `event`
   `aa_connected`, `aa_disconnected`, `aa_navigation_focus` (value: who navigates),
   `aa_guidance` (1 active, 2 inactive, 3 rerouting) and `aa_navigation_message`
@@ -287,6 +292,54 @@ A car without a button ignores bindings to it. The key names are the car's own
   library patch (the Wireless CarPlay/AA mod): require it to get them.
 
 Settings apply through hooks when GPM starts, and every mod's asks are combined.
+
+**Your own recipe for Android Auto's library.** HMG-API ships no native patch: they stay
+in the mods. A type above 21 and raw sends need changes to
+`libautoreceiver_infobank.so` that only your mod's `hooks.native` recipes make, one per
+build of the library:
+
+```json
+"hooks": {"native": {"libautoreceiver_infobank.so": ["recipes/ev-sensor-48ee793a.recipe", "recipes/ev-sensor-dbfe7bd2.recipe"]}}
+```
+
+Call `mod.nativePatch(app, "libautoreceiver_infobank.so")` in `appLoaded` for GPM.
+egmp-aa-ev's `ev-sensor-<build>.recipe` files are the example: they let the library read
+sensor types up to 26, answer SUCCESS to the phone for a registered type above 21, and
+turn `SensorSource.nativeReportDiagnosticsData` into a send of the whole message.
+HMG-API checks only that one of your recipes for the library is in place, not what it
+changes: without the `reportDiagnosticsData` change, `sendRaw` hands your bytes to the
+library as a diagnostics report. Without
+`hooks.native` recipes for that library, `aa_raw` and types above 21 are left out, and
+the plan says why. On a build none of your recipes fits, nothing is patched:
+your types above 21 aren't offered, `rawReady(mod)` stays false, and the log says
+`native patch libautoreceiver_infobank.so not applied`.
+
+Two mods' recipes on the same bytes don't both go on: the one asked for first applies,
+and the other's log says `not applied; <recipe>: conflict with <mod>'s <recipe>`. For
+that other mod, `nativePatched` and `rawReady` stay false, and its types above 21 aren't
+offered, even though the library is patched. Mods that patch the same sites should say
+so in `"conflicts"`.
+
+**From hook code** (GPM's process, `hmgapi.hook.ProjectionHooks`):
+
+- `rawReady(mod)`: true while your mod is on and declares `aa_raw`, one of your recipes
+  for `libautoreceiver_infobank.so` is in place, an Android Auto session is up, and this
+  car's map has `gpm.sensor_source.report_diagnostics`.
+- `sendRaw(mod, byte[] message)`: one sensor batch, the whole message with its type
+  first (`80 03`, then the SensorBatch). True when handed to the library; false, and
+  nothing sent, when not ready (the first time for a reason other than the session, your
+  log says why). Other message types throw `IllegalArgumentException`. Safe from any
+  thread: a send never overlaps the session's end. A session starts when
+  `gpm.sensor_source.init` returns true: `rawReady(mod)` is already true in your own
+  after hook on it. It can end at any moment, so check the result of each send.
+- `addNavigationListener(mod, listener)`: the navigation messages apps get as
+  `aa_navigation_message` (`onNavigationMessage(type, data)`: 0x8006 or 0x8007),
+  while your mod is on. Called on Android Auto's thread: return quickly. They come from
+  the Wireless CarPlay/AA mod's library patch: require it.
+- `mod.nativePatched(lib)` (`ModContext`): whether one of your own `hooks.native`
+  recipes for `lib` is in place in this process (applied, already there, or built into
+  that build of the library). False until the library is loaded, and false when another
+  mod's recipe on the same bytes went on first.
 
 ## Network
 
