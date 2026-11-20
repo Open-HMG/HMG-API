@@ -473,6 +473,17 @@ NEMESIS in the app menu.
   isn't loaded, and the app shows why. This also keeps such a mod from winning a
   conflict it then can't use.
 
+### For mod authors
+
+- **EV readings for routing and charging** (#45):
+  - `hv.energy`, the usable energy left (Wh), and `hv.capacity_nominal`;
+  - `range` as the cluster shows it (km);
+  - the AC and DC charge limits (`charge.target_ac`, `charge.target_dc`) and the car's DC charge time estimate (`charge.minutes_dc`);
+  - live power drawn by climate control, the electronics and the battery's compressor (`aux.*`, W);
+  - `drive_mode`, pushed by body control and never asked for (asking can show the drive mode pop-up).
+
+  Nine new framework hook points, mapped on the US Ioniq 5 260507. On other cars they're listed missing until mapped, and their readings answer `-`. Range and `hv.battery_temp_min` now share one cluster battery info request every 2 s at most. (docs/mod-reference.md, "Vehicle readings")
+
 ## 1.1.0-rc.2 (2026-11-15)
 
 The second release candidate: fixes from a review of rc.1, nothing new in HMG-API itself.

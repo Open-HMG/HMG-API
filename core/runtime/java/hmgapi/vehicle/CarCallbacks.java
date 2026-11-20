@@ -8,7 +8,9 @@ import hmgapi.hook.Points;
 
 /**
  * Values the car only pushes to listeners (no getter): the steering wheel heat and
- * rear defogger state (body control's onRemoteTeleHeatingStatusChanged), and the outside
+ * rear defogger state (body control's onRemoteTeleHeatingStatusChanged), the drive mode
+ * (body control's onDriveModeChanged: getDriveMode would ask the car, which can show the
+ * drive mode pop-up), and the outside
  * temperature (climate control's onDatcStatus: DatcStatus, sent on registration and on
  * change; the system service's own ambient callbacks send 0 on the EV6), and the
  * ambient light (the system service's SML_STATUS_CHANGED broadcast, passed on by
@@ -29,8 +31,10 @@ final class CarCallbacks {
     volatile boolean saidNoAmbient;
     /** body control's heating status: steering wheel heat, rear defogger (raw); MIN_VALUE: not heard yet */
     volatile int wheelHeat = Integer.MIN_VALUE, defogger = Integer.MIN_VALUE;
+    /** body control's drive mode (onDriveModeChanged, raw); MIN_VALUE: not heard yet */
+    volatile int driveMode = Integer.MIN_VALUE;
 
-    /** the cluster's last battery info (8 ints: [1] minimum pack temperature °C, [5] conditioning indicator), and when; null until heard */
+    /** the cluster's last battery info (8 ints: [1] minimum pack temperature °C, [2] usable energy (2 Wh), [5] conditioning indicator, [6] range km, [7] VCU_DTE_ADD km), and when; null until heard */
     volatile int[] battery;
     volatile long batteryAt;
 
@@ -114,12 +118,25 @@ final class CarCallbacks {
                 Object svc = Hub.bcm();
                 if (svc != null) {
                     final int code = (Integer) Points.get(null, "framework.bcm_listener_stub.heating", null);
+                    final boolean mode = Points.has("framework.bcm_listener_stub.drive_mode");   // not in every car's map yet
+                    final int modeCode = mode ? (Integer) Points.get(null, "framework.bcm_listener_stub.drive_mode", null) : Integer.MIN_VALUE;
                     // the door status: on a map that has it (registration sends the current one)
                     final int doorCode = Points.has("framework.bcm_listener_stub.doors") ? (Integer) Points.get(null, "framework.bcm_listener_stub.doors", null) : Integer.MIN_VALUE;
-                    int[] codes = doorCode == Integer.MIN_VALUE ? new int[] { code } : new int[] { code, doorCode };
+                    java.util.List<Integer> want = new java.util.ArrayList<Integer>();
+                    want.add(code);
+                    if (mode) want.add(modeCode);
+                    if (doorCode != Integer.MIN_VALUE) want.add(doorCode);
+                    int[] codes = new int[want.size()];
+                    for (int i = 0; i < codes.length; i++) codes[i] = want.get(i);
                     Listener l = new Listener(Points.cls(null, "framework.bcm_listener").getName(), codes) {
                         @Override
                         void got(int c, Parcel d) {
+                            if (mode && c == modeCode) {
+                                int m = d.readInt();
+                                if (driveMode == Integer.MIN_VALUE) System.out.println("vehicle: drive mode, first value: " + m);
+                                driveMode = m;
+                                return;
+                            }
                             if (c == doorCode) {
                                 int[] v = new int[10];
                                 for (int i = 0; i < v.length; i++) v[i] = d.readInt();
@@ -136,7 +153,8 @@ final class CarCallbacks {
                     Points.call(svc.getClass().getClassLoader(), "framework.bcm_service.register_listener", svc, proxy, l);
                     bcm = l;
                     lastBcmFailure = null;
-                    System.out.println("vehicle: listening to the body control service (wheel heat, defogger" + (doorCode == Integer.MIN_VALUE ? "; no door status in this car's map" : ", doors") + ")");
+                    System.out.println("vehicle: listening to the body control service (wheel heat, defogger" + (mode ? ", drive mode" : "")
+                            + (doorCode == Integer.MIN_VALUE ? "; no door status in this car's map" : ", doors") + ")");
                 }
             } catch (Throwable t) {
                 String why = String.valueOf(t.getCause() != null ? t.getCause() : t);
@@ -303,14 +321,28 @@ final class CarCallbacks {
      * temperature of -40..60 °C (Launchpad's ClusterBatteryTemperatureReader).
      */
     int packTempMin(long waitMs) {
+        int[] b = batteryInfo(waitMs);
+        if (b == null || b[1] < -40 || b[1] > 60) return Integer.MIN_VALUE;
+        return b[1];
+    }
+
+    /**
+     * The cluster's battery info (8 ints), a packet under 2 s old or asked for now (waiting up
+     * to waitMs); null when there's none, it isn't 8 values, or it's a wake-up packet: usable
+     * energy 0xffff (its range 0), or all zeros (the first packet at a start, before the BMS
+     * has said anything: seen on a US Ioniq 5 260507, which would read range 0 and 0 C).
+     */
+    int[] batteryInfo(long waitMs) {
+        int[] last = battery;
+        if (last != null && android.os.SystemClock.elapsedRealtime() - batteryAt < 2000) return good(last);
         long asked = android.os.SystemClock.elapsedRealtime();
         try {
             Object svc = Hub.cluster();
-            if (svc == null || cluster == null) return Integer.MIN_VALUE;
+            if (svc == null || cluster == null) return null;
             Points.call(svc.getClass().getClassLoader(), "framework.cluster_service.battery_info", svc);
         } catch (Throwable t) {
             Hub.services.remove("framework.car_services.cluster");
-            return Integer.MIN_VALUE;
+            return null;
         }
         while (batteryAt < asked && android.os.SystemClock.elapsedRealtime() - asked < waitMs) {
             try {
@@ -319,9 +351,14 @@ final class CarCallbacks {
                 break;
             }
         }
-        int[] b = battery;
-        if (batteryAt < asked || b == null || b.length != 8 || b[1] < -40 || b[1] > 60) return Integer.MIN_VALUE;
-        return b[1];
+        return batteryAt < asked ? null : good(battery);
+    }
+
+    static int[] good(int[] b) {
+        if (b == null || b.length != 8 || b[2] == 0xffff) return null;
+        // all zeros: no state of charge, energy or range yet (a real empty pack still has a SOC
+        // reading and a temperature; the car doesn't run at 0)
+        return b[0] == 0 && b[2] == 0 && b[6] == 0 ? null : b;
     }
 
     /** the light's status from LightRelay: hex of r, g, b (2 bytes each), brightness, dimmed, drive mode */

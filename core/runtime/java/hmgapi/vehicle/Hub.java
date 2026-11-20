@@ -526,6 +526,25 @@ public final class Hub {
             if ("outside_temp_f".equals(name)) return dec(f10 / 10f);
             return dec(c10 != Integer.MIN_VALUE ? c10 / 10f : (f10 / 10f - 32f) * 5f / 9f);
         }
+        if ("hv.energy".equals(name)) return scaled(hev("framework.hev_flag.energy_map"), 0xfffe, 2);
+        if ("hv.capacity_nominal".equals(name)) return scaled(hev("framework.hev_flag.energy_capacity"), 0xfffe, 2);
+        if ("range".equals(name)) {
+            int[] b = callbacks.batteryInfo(500);
+            return b == null || b[6] < 0 || b[6] >= 0xffff ? null : String.valueOf(b[6]);
+        }
+        if ("charge.target_ac".equals(name) || "charge.target_dc".equals(name)) {
+            int half = hev("charge.target_ac".equals(name) ? "framework.hev_flag.target_soc_ac" : "framework.hev_flag.target_soc_dc");
+            return half < 0 || half > 200 ? null : dec(half / 2f);
+        }
+        if ("charge.minutes_dc".equals(name)) return scaled(hev("framework.hev_flag.dc_minutes"), 0xfffe, 1);
+        if ("aux.climate_power".equals(name)) return scaled(hev("framework.hev_flag.climate_power"), 0xfffe, 20);
+        if ("aux.other_ecu_power".equals(name)) return scaled(hev("framework.hev_flag.other_ecu_power"), 0xfe, 10);
+        if ("aux.battery_conditioning_power".equals(name)) return scaled(hev("framework.hev_flag.battery_comp_power"), 0xfe, 20);
+        if ("aux.power".equals(name)) {
+            String c = read("aux.climate_power"), e = read("aux.other_ecu_power"), b = read("aux.battery_conditioning_power");
+            return c == null || e == null || b == null ? null : String.valueOf(Integer.parseInt(c) + Integer.parseInt(e) + Integer.parseInt(b));
+        }
+        if ("drive_mode".equals(name)) return callbacks.driveMode == Integer.MIN_VALUE ? null : String.valueOf(callbacks.driveMode);
         if ("odometer".equals(name)) {
             int tenths = hev("framework.hev_flag.odometer");
             return tenths < 0 ? null : dec(tenths / 10f);
@@ -534,6 +553,7 @@ public final class Hub {
     }
 
     static int hev(String flag) throws Exception {
+        if (!Points.has(flag)) return -1;   // not in this car's map yet: "-", without a failed call
         int f = (Integer) Points.get(null, flag, null);
         int v = num(call(service("framework.car_services.hev", "framework.hev_service_stub.as_interface", null), "framework.hev_service.hev_status", f));
         return v == 0xffff ? -1 : v;   // the car's "invalid"
@@ -845,6 +865,11 @@ public final class Hub {
     static String raw(Object o) {
         if (o instanceof Byte) return String.valueOf(((Byte) o).intValue() & 0xff);
         return o instanceof Number ? String.valueOf(((Number) o).intValue()) : null;
+    }
+
+    /** raw (0..max) times scale; null for anything else (the car's "invalid") */
+    static String scaled(int raw, int max, int scale) {
+        return raw < 0 || raw > max ? null : String.valueOf(raw * scale);
     }
 
     static String bool(boolean b) {
