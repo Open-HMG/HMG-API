@@ -12,7 +12,7 @@ HMG-API (1.1.0-rc.5) is a mod manager for Hyundai/Kia/Genesis **Gen5W** head uni
 
 ## Hard rules (no overrides)
 
-- Never collect or publish per-car secrets: `/data` contents, the telesecurity partition, certificates/keys, account tokens, VIN, serials, SIM/IMEI/phone numbers. Model-level firmware keys only privately, with consent.
+- Never collect or publish per-car secrets: `/data` contents, the telesecurity partition, certificates/keys, account tokens, VIN, serials, SIM/IMEI/phone numbers. Model-level firmware keys only privately, with consent. One exception, the owner's own choice: the problem log's crash dumps, Android's crash reports and kernel log (`ProblemLog`, each off until the owner turns it on; dumps trimmed to backtraces with no memory or log lines, reports to header and stack trace, all scrubbed).
 - The repo holds **no full manufacturer apps or libraries**. Allowed: hash-only recipes, delta patch sets (`patches/`), checksums, our own code.
 
 ## Recommendations (warn, then follow the user)
@@ -33,7 +33,7 @@ Owners get to decide for their own units. Follow these by default. If the user a
 | Path | What |
 |---|---|
 | `core/hmgapid` | root daemon + client, static ARM (no libc). Ops per caller uid (root/shell: all incl. `sh`, `remount`; `hmgapi.app`: HMG-API ops; others: `ping`). Abstract socket `@hmgapid`. |
-| `core/zygote` | `app_process` wrapper (installed as `/system/bin/app_process`, stock kept as `app_process.hmgapi-stock`): `LD_PRELOAD` for the zygote when `/data/hmgapi/hook/enable`, boot guard (`hook/starts`, watcher resets after 120 s). |
+| `core/zygote` | `app_process` wrapper (installed as `/system/bin/app_process`, stock kept as `app_process.hmgapi-stock`): `LD_PRELOAD` for the zygote when `/data/hmgapi/hook/enable`, boot guard (`hook/starts`: starts in a row that didn't last 120 s, off at 6; `hook/boot`: the kernel's `boot_id` and its count, off at 3, so restarts within 120 s don't count as crashes; the watcher resets both after 120 s). |
 | `core/loader` | `libhmgapi_hook.so`: interposes `JNI_CreateJavaVM`, loads `/system/framework/hmgapi-hook.jar` before `ZygoteInit.main`, Dalvik method hooks (Xposed-style, offsets checked on the EV6 libdvm). |
 | `core/runtime` | `hmgapi-hook.jar`: `Bridge`, `Hooks`, `MethodHook`, `ModEntry`/`ModContext`/`LoadedApp` (mod API), `Mods` (loader), launcher/editor hooks (`HMG-API`), ★ choices (`StarKey`). |
 | `core/app` | `hmgapi.app`: status + mod list (from `HmgApiStatus.json`, set by the hooks). |
