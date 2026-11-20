@@ -31,6 +31,10 @@ public class MainActivity extends Activity {
     private final View[] marks = new View[TABS.length];
     private int current;
     private boolean pendingChanges;
+    private boolean planning;   // plan() is running: the status pill comes from its answer
+    /** the mod settings on screen (Mods tab), saved before Apply or a change of screen */
+    SettingsForm form;
+    private int statusRun;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -56,7 +60,12 @@ public class MainActivity extends Activity {
         Ui.button(actions, "Apply changes", true, new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                plan();
+                saveThen(new Runnable() {
+                    @Override
+                    public void run() {
+                        plan();
+                    }
+                }, false);
             }
         });
         Ui.button(actions, "Check USB updates", new View.OnClickListener() {
@@ -92,7 +101,12 @@ public class MainActivity extends Activity {
             t.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    show(n);
+                    saveThen(new Runnable() {
+                        @Override
+                        public void run() {
+                            show(n);
+                        }
+                    });
                 }
             });
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -116,8 +130,36 @@ public class MainActivity extends Activity {
         refreshStatus();
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (form != null) form.flush(null);   // leaving with a text field open: keep what was typed
+    }
+
+    /** Saves mod settings still being edited, then runs next; doesn't if they can't be saved (the form says why). */
+    void saveThen(Runnable next) {
+        saveThen(next, true);
+    }
+
+    /** status: refresh the top bar's pills after a save (Apply doesn't: its plan sets them) */
+    void saveThen(final Runnable next, final boolean status) {
+        if (form == null) {
+            next.run();
+            return;
+        }
+        final boolean[] saved = { false };
+        saved[0] = form.flush(new Runnable() {
+            @Override
+            public void run() {
+                next.run();
+                if (status && saved[0]) refreshStatus();
+            }
+        });
+    }
+
     void show(int n) {
         current = n;
+        form = null;
         for (int i = 0; i < TABS.length; i++) {
             tabs[i].setTextColor(i == n ? Ui.TEXT : Ui.GREY);
             tabs[i].setTypeface(i == n ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
@@ -143,9 +185,11 @@ public class MainActivity extends Activity {
     // ---- status: hooks, changes not applied, restart needed
 
     void refreshStatus() {
+        final int run = ++statusRun;   // an older check finishing later doesn't add its pill too
         pills.removeAllViews();
         hooksPill();
         if (restartNeeded()) Ui.pill(pills, "Restart needed", Ui.WARN);
+        if (planning) return;   // back from Updates: plan() asks already (two at once only wait on each other)
         new Ui.Job<Boolean>() {
             @Override
             Boolean work() throws Exception {
@@ -155,6 +199,7 @@ public class MainActivity extends Activity {
 
             @Override
             void done(Boolean changed, Exception e) {
+                if (run != statusRun) return;
                 pendingChanges = e == null && Boolean.TRUE.equals(changed);
                 if (pendingChanges) Ui.pill(pills, "Changes not applied", Ui.WARN);
             }
@@ -199,6 +244,7 @@ public class MainActivity extends Activity {
 
     void plan() {
         final AlertDialog wait = new AlertDialog.Builder(this).setMessage("Checking what would change…").show();
+        planning = true;
         new Ui.Job<Hmgapid.Result>() {
             @Override
             Hmgapid.Result work() throws Exception {
@@ -208,6 +254,11 @@ public class MainActivity extends Activity {
             @Override
             void done(Hmgapid.Result r, Exception e) {
                 wait.dismiss();
+                planning = false;
+                statusRun++;   // this answer is newer than any check still running
+                boolean changed = e == null && r.code == 0 && changes(r.output);
+                if (changed && !pendingChanges) Ui.pill(pills, "Changes not applied", Ui.WARN);
+                pendingChanges = changed;
                 if (e != null) {
                     message("Couldn't check", e.getMessage());
                     return;
