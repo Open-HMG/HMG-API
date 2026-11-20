@@ -140,9 +140,11 @@ sdk() {
     # the engine on its own (no Android classes): host tests, Signing, ScriptCheck
     javac --release 8 -Xlint:-options -nowarn -d "$OUT/sdk-build/engine" core/runtime/java/hmgapi/engine/*.java
     jarof "$OUT/sdk-build/engine" "$S/lib/hmgapi-engine.jar"
-    # MemRecipeTest: a mod's native recipes on real libraries (<stock> <patched> <recipe> triples)
+    # MemRecipeTest: a mod's native recipes on real libraries (<stock> <patched> <recipe> triples);
+    # RecipeCheck: without them, against the recipes of the mods it requires (test/lib.sh plan_test)
     mkdir -p "$OUT/sdk-build/engine-test"
-    javac --release 8 -Xlint:-options -nowarn -cp "$OUT/sdk-build/engine" -d "$OUT/sdk-build/engine-test" core/runtime/test/hmgapi/engine/MemRecipeTest.java
+    javac --release 8 -Xlint:-options -nowarn -cp "$OUT/sdk-build/engine" -d "$OUT/sdk-build/engine-test" \
+        core/runtime/test/hmgapi/engine/MemRecipeTest.java core/runtime/test/hmgapi/engine/RecipeCheck.java
     jarof "$OUT/sdk-build/engine-test" "$S/test/hmgapi-engine-test.jar"
     cp "$OUT/lpatch-host" "$S/bin/"
     cp tools/lpatch/lpatch.c tools/lpatch/build.sh "$S/src/lpatch/"
@@ -152,6 +154,10 @@ sdk() {
     cp -r install/nemesis/mod "$S/nemesis/mod"
     cp install/nemesis/bin/open.sh "$S/nemesis/bin/"
     cp tools/sdk/lib.sh "$S/test/lib.sh"
+    cp tools/sdk/plan.py "$S/test/plan.py"
+    # the hook maps (public: point names and md5s), for test/lib.sh's plan test
+    cp -r maps "$S/maps"
+    rm -f "$S/maps/coverage.json"   # tools/test-hooks.py's baseline, for the repo only
     cp tools/sdk/README.txt LICENSE "$S/"
     cp core/hookpoints/*.json "$S/catalogue/"
     python3 -c 'import glob,json; [print(p["id"]) for f in sorted(glob.glob("core/hookpoints/*.json")) for p in json.load(open(f))["points"]]' > "$S/points.txt"
