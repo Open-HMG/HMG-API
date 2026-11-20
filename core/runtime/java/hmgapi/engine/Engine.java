@@ -124,6 +124,8 @@ public final class Engine {
 
     final List<String> out = new ArrayList<String>();
     final List<String> problems = new ArrayList<String>();   // stop the apply
+    /** mods installed anyway (overrides.ignore_system) whose patches.json has no set for this unit */
+    final Set<String> noSet = new LinkedHashSet<String>();
     String product, onebin;
     Map<String, Object> hmgapi = new LinkedHashMap<String, Object>();
     SystemCheck.Facts facts;
@@ -136,13 +138,15 @@ public final class Engine {
      * up saying who holds it. The engine's own child processes (the installer's engine
      * firmware-reset, NEMESIS scripts) run inside the holder's run: HMGAPI_ENGINE_LOCKED=1
      * passes them through. status and map only read, for the app's screens: never wait.
+     * problem neither: it only reads, and writes its own file in public/reports and its stop
+     * flag; a recording lasts up to 30 minutes and its "problem stop" must get through.
      */
     static final String LOCKED_ENV = "HMGAPI_ENGINE_LOCKED";
     static volatile boolean locked;
     static java.io.RandomAccessFile lockFile;   // held open (the lock goes with the process)
 
     boolean lock(String cmd) throws IOException, InterruptedException {
-        if ("status".equals(cmd) || "map".equals(cmd) || "1".equals(env(LOCKED_ENV, null))) return true;
+        if ("status".equals(cmd) || "map".equals(cmd) || "problem".equals(cmd) || "1".equals(env(LOCKED_ENV, null))) return true;
         File f = new File(stateDir, "engine.lock");
         java.io.RandomAccessFile raf = new java.io.RandomAccessFile(f, "rw");
         long wait = Long.parseLong(env("HMGAPI_LOCK_WAIT", "900")) * 1000000000L, start = System.nanoTime();
@@ -369,6 +373,7 @@ public final class Engine {
         if ("verify-map".equals(cmd)) return MapCheck.run(this);
         if ("map-car".equals(cmd)) return MapProbe.run(this, args);
         if ("report".equals(cmd)) return Report.run(this, args.length > 1 && "--usb".equals(args[1]));
+        if ("problem".equals(cmd)) return ProblemLog.run(this, args);
         if ("usb-scan".equals(cmd)) return UsbUpdates.scan(this);
         if ("publish-state".equals(cmd)) return LiveState.publish(this);
         if ("apps".equals(cmd)) return ModApps.sync(this);
@@ -545,8 +550,16 @@ public final class Engine {
                 }
             }
             if (cars != null && best == null) {
-                problems.add(m.id + ": doesn't support this head unit (" + product + ")");
-                continue;
+                if (!SystemCheck.ignored(hmgapi, m.id)) {
+                    problems.add(m.id + ": doesn't support this head unit (" + product + ")");
+                    continue;
+                }
+                // "Install anyway" covers the patch set too: a plan with only changes that need no
+                // set (props, added files, merges onto any version) applies; a change made against
+                // a set's stock files refuses the plan, saying it's the missing set (stockCheck)
+                noSet.add(m.id);
+                out.add("WARNING: " + m.id + ": its patches.json has no set for this head unit (" + product
+                        + "); overrides.ignore_system is set, so only changes that need no set can apply");
             }
             m.set = best == null ? "" : String.valueOf(cars.get(best));
             all.add(m);
@@ -1347,6 +1360,16 @@ public final class Engine {
                     out.add("note     " + t.path + ": live file isn't stock (" + m + "); using the stock copy NEMESIS kept ("
                             + nem.getParentFile().getName() + "). Uninstall that NEMESIS package, or HMG-API takes this file over.");
                 } else {
+                    // a mod installed anyway with no set for this unit: say so, not "a NEMESIS package"
+                    Set<String> needSet = new LinkedHashSet<String>();
+                    for (Ch ch : t.changes) if (noSet.contains(ch.mod.id) && ch.c.get("stock") == null) needSet.add(ch.mod.id);
+                    if (!needSet.isEmpty()) {
+                        String who = needSet.size() == 1 ? needSet.iterator().next() : needSet.toString();
+                        problems.add(t.path + ": " + who + (needSet.size() == 1 ? " has" : " have") + " no patch set for this head unit ("
+                                + product + "), and this change is made for another build's stock file; turn " + who
+                                + " off, or install a version made for this car.");
+                        return;
+                    }
                     boolean allAdd = true;
                     for (Ch ch : t.changes) allAdd &= "add".equals(ch.type);
                     String pkg = nemesisPackageOf(t.path);

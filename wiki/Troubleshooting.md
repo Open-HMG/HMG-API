@@ -45,12 +45,15 @@ The first time a mod uses a car command, HMG-API asks you on screen. If you said
 
 ## The head unit restarted over and over
 
-After three failed starts in a row, HMG-API turns its hooks off by itself so the
-head unit starts normally, and the app says the hooks aren't running. Turn off or
-remove the mod you added last, then reset the counter and restart:
+When Android fails to start three times during one boot with HMG-API's hooks (a
+hook crashing the system), or the head unit restarts six times in a row less than
+two minutes after starting, HMG-API turns its hooks off by itself so the head unit
+starts normally, and the app says the hooks aren't running. Turn off or remove the
+mod you added last, then reset the counter and restart: reinstall HMG-API from the
+app (Check USB updates, Reinstall HMG-API), or over adb:
 
 ```
-adb shell "hmgapid sh 'echo 0 > /data/hmgapi/hook/starts'"
+adb shell "hmgapid sh 'echo 0 > /data/hmgapi/hook/starts; rm -f /data/hmgapi/hook/boot'"
 ```
 
 ## A mod isn't doing anything

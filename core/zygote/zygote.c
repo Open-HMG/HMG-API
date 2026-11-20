@@ -7,11 +7,19 @@
  *   /data/hmgapi/hook/enable exists      (step 2 creates it)
  *   /data/hmgapi/hook/disable is absent  (manual off switch)
  *   /system/lib/libhmgapi_hook.so exists
- *   /data/hmgapi/hook/starts < 3         (boot guard)
- * Boot guard reset: with hooks on, a watcher (double-forked, so init adopts it
- * and the zygote never sees it exit) waits GUARD_DELAY seconds and writes 0 to
- * starts if this zygote pid is still alive. On 4.4 a system_server crash kills
- * the zygote too, so a zygote alive that long means the boot worked.
+ *   boot guard: fewer than MAXSTARTS (3) earlier starts in this kernel boot, and
+ *   fewer than MAXBOOTS (6) in a row overall, that didn't last GUARD_DELAY
+ * Boot guard: /data/hmgapi/hook/starts counts the starts in a row that didn't last,
+ * across restarts; /data/hmgapi/hook/boot holds the kernel's boot_id and the count
+ * within that boot. A crash loop from a hook happens within one boot (on 4.4 a
+ * system_server crash kills the zygote and init starts it again), so 3 there turn
+ * the hooks off. A head unit restarted or switched off within GUARD_DELAY of
+ * starting (installs, applies, the car turned off) is a new boot: those count
+ * only toward MAXBOOTS, which still stops a loop of full restarts. With no
+ * boot_id, every start counts as the same boot (MAXSTARTS overall, as before).
+ * Reset: with hooks on, a watcher (double-forked, so init adopts it and the
+ * zygote never sees it exit) waits GUARD_DELAY seconds and, if this zygote pid is
+ * still alive, writes 0 to starts and removes boot: the start worked.
  * Stock ARM app_process re-execs /system/bin/app_process once with
  * NO_ADDR_COMPAT_LAYOUT_FIXUP=1 (ADDR_COMPAT_LAYOUT personality), so the zygote
  * passes through here twice per start. Only the first pass counts and sets the
@@ -44,7 +52,11 @@ typedef unsigned long ul;
 #ifndef HMGAPID
 #define HMGAPID "/system/bin/hmgapid"
 #endif
-#define MAXSTARTS 3
+#ifndef BOOTID
+#define BOOTID "/proc/sys/kernel/random/boot_id"
+#endif
+#define MAXSTARTS 3   /* in one kernel boot */
+#define MAXBOOTS 6    /* in a row, across restarts */
 #ifndef GUARD_DELAY
 #define GUARD_DELAY 120
 #endif
@@ -66,6 +78,7 @@ static long xfork(void) { return sys3(2, 0, 0, 0); }
 static long xgetpid(void) { return sys3(20, 0, 0, 0); }
 static void xexit(int c) { sys3(1, c, 0, 0); for (;;) ; }
 static void xsleep(long s) { long ts[2] = { s, 0 }; sys3(162, (long)ts, 0, 0); }
+static void xunlink(const char *p) { sys3(10, (long)p, 0, 0); }
 #define O_RDONLY 0
 #define O_WRONLY 1
 #define O_WR 0x241   /* O_WRONLY|O_CREAT|O_TRUNC */
@@ -93,27 +106,73 @@ static void flush(void)
     lpos = 0;
 }
 
-/* Reads and bumps the start counter; returns the value before this start, or -1. */
-static long bump_starts(void)
+/* the number at the start of a file, or 0 (absent, empty, not a number) */
+static long readnum(const char *path, char *buf, ul size, long *len)
 {
-    char b[16]; long fd, n, v = 0, i;
-    fd = xopen(HOOKDIR "/starts", O_RDONLY, 0);
+    long fd = xopen(path, O_RDONLY, 0), n = 0, v = 0, i;
     if (fd >= 0) {
-        n = xread(fd, b, sizeof b);
+        n = xread(fd, buf, size);
         xclose(fd);
-        for (i = 0; i < n && b[i] >= '0' && b[i] <= '9'; i++) v = v * 10 + (b[i] - '0');
+        if (n < 0) n = 0;
     }
-    fd = xopen(HOOKDIR "/starts", O_WR, 0600);
-    if (fd < 0) return -1;
-    {
-        char t[12]; int k = 0; long w = v + 1;
-        do t[k++] = '0' + w % 10; while ((w /= 10) && k < 11);
-        while (k) { char c = t[--k]; xwrite(fd, &c, 1); }
-    }
-    xclose(fd);
+    if (len) *len = n;
+    for (i = 0; i < n && buf[i] >= '0' && buf[i] <= '9'; i++) v = v * 10 + (buf[i] - '0');
     return v;
 }
+static void putnum(char *t, int *k, long v)
+{
+    char d[12]; int i = 0;
+    do d[i++] = '0' + v % 10; while ((v /= 10) && i < 11);
+    while (i) t[(*k)++] = d[--i];
+}
 
+/* Bumps both counters (in a row: starts; this boot: boot). Returns the in-a-row count
+   before this start, or -1 when it can't be written; *inboot gets this boot's count
+   before this start (the in-a-row one when there's no boot_id). */
+static long bump_starts(long *inboot)
+{
+    static char b[16], id[48], saved[96];
+    long fd, v, idn = 0, sn = 0, i, k;
+    int same, w;
+    v = readnum(HOOKDIR "/starts", b, sizeof b, 0);
+    fd = xopen(BOOTID, O_RDONLY, 0);
+    if (fd >= 0) {
+        idn = xread(fd, id, sizeof id - 1);
+        xclose(fd);
+        if (idn < 0) idn = 0;
+        while (idn > 0 && (id[idn - 1] == '\n' || id[idn - 1] == ' ')) idn--;
+    }
+    fd = xopen(HOOKDIR "/boot", O_RDONLY, 0);
+    if (fd >= 0) {
+        sn = xread(fd, saved, sizeof saved - 1);
+        xclose(fd);
+        if (sn < 0) sn = 0;
+    }
+    saved[sn] = 0;
+    /* hook/boot: "<boot_id> <count>" */
+    same = idn > 0 && sn > idn && saved[idn] == ' ';
+    for (i = 0; same && i < idn; i++) if (saved[i] != id[i]) same = 0;
+    if (idn == 0) *inboot = v;
+    else if (same) { *inboot = 0; for (k = idn + 1; k < sn && saved[k] >= '0' && saved[k] <= '9'; k++) *inboot = *inboot * 10 + (saved[k] - '0'); }
+    else *inboot = 0;
+    fd = xopen(HOOKDIR "/starts", O_WR, 0600);
+    if (fd < 0) return -1;
+    { char t[12]; int n = 0; putnum(t, &n, v + 1); xwrite(fd, t, n); }
+    xclose(fd);
+    if (idn > 0) {
+        fd = xopen(HOOKDIR "/boot", O_WR, 0600);
+        if (fd >= 0) {
+            w = 0;
+            for (i = 0; i < idn && w < (int)sizeof saved - 14; i++) saved[w++] = id[i];
+            saved[w++] = ' ';
+            putnum(saved, &w, *inboot + 1);
+            saved[w++] = '\n';
+            xwrite(fd, saved, w);
+            xclose(fd);
+        }
+    }
+    return v;
+}
 static int alive(long pid)
 {
     char p[24] = "/proc/", c;
@@ -142,6 +201,7 @@ static void start_watcher(void)
             if (!alive(zpid)) xexit(0);
             fd = xopen(HOOKDIR "/starts", O_WR, 0600);
             if (fd >= 0) { xwrite(fd, "0", 1); xclose(fd); }
+            xunlink(HOOKDIR "/boot");
             put("<6>hmgapi-hook: zygote "); putn(zpid); put(" up "); putn(GUARD_DELAY);
             put(" s, boot guard reset"); flush();
         }
@@ -171,7 +231,7 @@ static char preload[] = "LD_PRELOAD=" HOOKLIB;
 int main(int argc, char **argv, char **envp)
 {
     int i, n = 0, zygote = 0, use = 0, reexec = 0;
-    long starts = -1, rc;
+    long starts = -1, inboot = 0, rc;
 
     for (i = 1; i < argc; i++)
         if (seq(argv[i], "--zygote")) zygote = 1;
@@ -185,10 +245,12 @@ int main(int argc, char **argv, char **envp)
         if (exists(HOOKDIR "/disable")) put(", hooks off (disable file)");
         else if (!exists(HOOKLIB)) put(", hooks off (no " HOOKLIB ")");
         else {
-            starts = bump_starts();
+            starts = bump_starts(&inboot);
             if (starts < 0) put(", hooks off (can't write starts)");
-            else if (starts >= MAXSTARTS) { put(", hooks off (boot guard, starts="); putn(starts); put(")"); }
-            else { use = 1; put(", hooks on, start "); putn(starts + 1); }
+            else if (inboot >= MAXSTARTS || starts >= MAXBOOTS) {
+                put(", hooks off (boot guard, starts="); putn(starts); put(", this boot "); putn(inboot); put(")");
+            }
+            else { use = 1; put(", hooks on, start "); putn(starts + 1); put(" (this boot "); putn(inboot + 1); put(")"); }
         }
     }
 
