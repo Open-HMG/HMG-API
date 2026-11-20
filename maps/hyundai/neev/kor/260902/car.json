@@ -135,6 +135,8 @@
   },
   "missing": {
     "framework.bcm_listener_stub.drive_mode": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
+    "framework.datc_service.is_unit_celsius": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
+    "framework.datc_service.vr_climate_status": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
     "framework.hev_flag.battery_comp_power": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
     "framework.hev_flag.climate_power": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
     "framework.hev_flag.dc_minutes": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
@@ -142,6 +144,8 @@
     "framework.hev_flag.energy_map": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
     "framework.hev_flag.other_ecu_power": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
     "framework.hev_flag.target_soc_ac": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
-    "framework.hev_flag.target_soc_dc": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it"
+    "framework.hev_flag.target_soc_dc": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
+    "gpm.sensor_source.report_diagnostics": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
+    "gpm.sensor_source.shutdown": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it"
   }
 }

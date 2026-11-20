@@ -133,6 +133,8 @@
     "dipo.carplay.disconnect": "found by an rc.5 Car Report on a car whose DiPO, GPM and iAP2 are EPP builds, not stock (#231): stock files or a Car Report from a stock car map it",
     "dipo.carplay.restart_bonjour": "found by an rc.5 Car Report on a car whose DiPO, GPM and iAP2 are EPP builds, not stock (#231): stock files or a Car Report from a stock car map it",
     "framework.bcm_listener_stub.drive_mode": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.datc_service.is_unit_celsius": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.datc_service.vr_climate_status": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "framework.hev_flag.battery_comp_power": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "framework.hev_flag.climate_power": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "framework.hev_flag.dc_minutes": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
@@ -147,6 +149,8 @@
     "gpm.receiver_service.connection_manager": "found by an rc.5 Car Report on a car whose DiPO, GPM and iAP2 are EPP builds, not stock (#231): stock files or a Car Report from a stock car map it",
     "gpm.receiver_service.on_create": "found by an rc.5 Car Report on a car whose DiPO, GPM and iAP2 are EPP builds, not stock (#231): stock files or a Car Report from a stock car map it",
     "gpm.receiver_service.wireless_explorer": "found by an rc.5 Car Report on a car whose DiPO, GPM and iAP2 are EPP builds, not stock (#231): stock files or a Car Report from a stock car map it",
+    "gpm.sensor_source.report_diagnostics": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "gpm.sensor_source.shutdown": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "gpm.wireless_explorer": "found by an rc.5 Car Report on a car whose DiPO, GPM and iAP2 are EPP builds, not stock (#231): stock files or a Car Report from a stock car map it",
     "gpm.wireless_explorer.connected_device": "found by an rc.5 Car Report on a car whose DiPO, GPM and iAP2 are EPP builds, not stock (#231): stock files or a Car Report from a stock car map it"
   },

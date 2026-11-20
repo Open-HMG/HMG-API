@@ -307,6 +307,14 @@
   "framework.datc_service": {
     "class": "com.hkmc.datc.IDATCService"
   },
+  "framework.datc_service.is_unit_celsius": {
+    "method": "isUnitCelsius",
+    "params": [
+      "int"
+    ],
+    "ret": "boolean",
+    "static": false
+  },
   "framework.datc_service.register_listener": {
     "method": "registerDATCListener",
     "params": [
@@ -314,6 +322,14 @@
       "android.os.IBinder"
     ],
     "ret": "void",
+    "static": false
+  },
+  "framework.datc_service.vr_climate_status": {
+    "method": "getVRClimateStatus",
+    "params": [
+      "int"
+    ],
+    "ret": "float",
     "static": false
   },
   "framework.datc_service_stub": {

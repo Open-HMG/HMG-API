@@ -119,6 +119,8 @@
   },
   "missing": {
     "framework.bcm_listener_stub.drive_mode": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.datc_service.is_unit_celsius": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.datc_service.vr_climate_status": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "framework.hev_flag.battery_comp_power": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "framework.hev_flag.climate_power": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "framework.hev_flag.dc_minutes": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
@@ -126,7 +128,9 @@
     "framework.hev_flag.energy_map": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "framework.hev_flag.other_ecu_power": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "framework.hev_flag.target_soc_ac": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
-    "framework.hev_flag.target_soc_dc": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)"
+    "framework.hev_flag.target_soc_dc": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "gpm.sensor_source.report_diagnostics": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "gpm.sensor_source.shutdown": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)"
   },
   "by_reference": [
     "btsettings.projection_helper",

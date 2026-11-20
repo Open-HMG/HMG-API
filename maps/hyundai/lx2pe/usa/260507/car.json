@@ -144,6 +144,8 @@
     "framework.bcm_listener_stub.doors": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "framework.bcm_listener_stub.drive_mode": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
     "framework.car_services.power": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "framework.datc_service.is_unit_celsius": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
+    "framework.datc_service.vr_climate_status": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
     "framework.hev_flag.battery_comp_power": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
     "framework.hev_flag.climate_power": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
     "framework.hev_flag.dc_minutes": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
@@ -186,6 +188,8 @@
     "gpm.receiver_service.connection_manager": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "gpm.receiver_service.on_create": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "gpm.receiver_service.wireless_explorer": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
+    "gpm.sensor_source.report_diagnostics": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
+    "gpm.sensor_source.shutdown": "newer than this map: map-car.py on the car's stock tree, or a Car Report from a newer HMG-API, maps it",
     "gpm.wireless_explorer": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)",
     "gpm.wireless_explorer.connected_device": "not in the Car Report: newer than the HMG-API that made it (a Car Report from a newer HMG-API maps it)"
   },

@@ -117,6 +117,20 @@
     "ret": "boolean",
     "static": false
   },
+  "gpm.sensor_source.report_diagnostics": {
+    "method": "nativeReportDiagnosticsData",
+    "params": [
+      "byte[]"
+    ],
+    "ret": "int",
+    "static": false
+  },
+  "gpm.sensor_source.shutdown": {
+    "method": "shutdown",
+    "params": [],
+    "ret": "void",
+    "static": false
+  },
   "gpm.sensor_source.speed": {
     "field": "SENSOR_TYPE_SPEED",
     "type": "int",
