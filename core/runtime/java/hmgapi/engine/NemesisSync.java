@@ -241,7 +241,7 @@ final class NemesisSync {
         List<String> cmd = new ArrayList<String>();
         cmd.add(nemesis.getPath());
         for (String a : args) cmd.add(a);
-        ProcessBuilder pb = new ProcessBuilder(cmd);
+        ProcessBuilder pb = Engine.child(new ProcessBuilder(cmd));
         pb.environment().put("HMGAPI_NEMESIS_SYNC", "1");   // HMG-API's NEMESIS scripts: list or unlist only
         pb.redirectErrorStream(true);
         Process p = pb.start();

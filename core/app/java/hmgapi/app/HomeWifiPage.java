@@ -1,9 +1,13 @@
 package hmgapi.app;
 
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.DialogInterface;
+import android.content.SharedPreferences;
 import android.text.InputType;
 import android.view.View;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 
@@ -46,12 +50,53 @@ final class HomeWifiPage {
             }
         });
         Ui.text(page, "Now: " + now(), 16, false, Ui.TEXT);
+        final SharedPreferences prefs = a.getSharedPreferences("hmgapi", Context.MODE_PRIVATE);
+        LinearLayout timer = Ui.row(a);
+        page.addView(timer);
+        final CheckBox limit = new CheckBox(a);
+        limit.setText("Turn off after");
+        limit.setTextColor(Ui.TEXT);
+        Ui.size(limit, 18);
+        limit.setChecked(prefs.getBoolean("wifi_now_timer", true));
+        timer.addView(limit);
+        final EditText minutes = new EditText(a);
+        minutes.setInputType(InputType.TYPE_CLASS_NUMBER);
+        minutes.setSingleLine(true);
+        minutes.setEms(3);
+        minutes.setTextColor(Ui.TEXT);
+        Ui.size(minutes, 18);
+        minutes.setText(String.valueOf(prefs.getInt("wifi_now_minutes", 30)));
+        minutes.setEnabled(limit.isChecked());
+        timer.addView(minutes);
+        Ui.text(timer, "minutes", 18, false, Ui.TEXT);
+        limit.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton b, boolean on) {
+                minutes.setEnabled(on);
+                prefs.edit().putBoolean("wifi_now_timer", on).apply();
+            }
+        });
         LinearLayout manual = Ui.row(a);
         page.addView(manual);
-        Ui.button(manual, "Connect now (30 min)", new View.OnClickListener() {
+        Ui.button(manual, "Connect now", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                request("now", "30");
+                if (!limit.isChecked()) {
+                    request("now", "0");
+                    return;
+                }
+                int m = -1;
+                try {
+                    m = Integer.parseInt(minutes.getText().toString().trim());
+                } catch (NumberFormatException e) {
+                    // left at -1: refused below
+                }
+                if (m < 1 || m > 240) {
+                    a.message("Home Wi-Fi", "Minutes: 1 to 240. Untick the box for no time limit.");
+                    return;
+                }
+                prefs.edit().putInt("wifi_now_minutes", m).apply();
+                request("now", String.valueOf(m));
             }
         });
         Ui.button(manual, "Back to the car's Wi-Fi", new View.OnClickListener() {
@@ -60,7 +105,8 @@ final class HomeWifiPage {
                 request("back", null);
             }
         });
-        Ui.text(page, "Connect now works in P: wireless CarPlay and Android Auto are off until it ends (back, out of P, or 30 minutes).",
+        Ui.text(page, "Connect now works in P. Wireless CarPlay and Android Auto stay off until it ends: when you shift out of P, "
+                + "tap Back, the head unit restarts, or the minutes are up (with the box ticked). You can leave this app meanwhile.",
                 14, false, Ui.GREY);
         Ui.line(page);
         Ui.text(page, "Saved networks", 21, true, Ui.TEXT);
@@ -102,7 +148,7 @@ final class HomeWifiPage {
         try {
             JSONObject w = new JSONObject(UsbFolders.read(new File("/data/hmgapi/public/wifi.json")));
             String s = w.optString("state");
-            if ("up".equals(s)) return "connected (the car is off), " + w.optInt("rssi") + " dBm, " + w.optInt("freq") + " MHz";
+            if ("up".equals(s)) return "connected, " + w.optInt("rssi") + " dBm, " + w.optInt("freq") + " MHz";
             if ("waiting".equals(s)) return "the car is on: home Wi-Fi waits until it's off";
             if ("searching".equals(s)) return "the car is off: looking for a saved network";
             if ("nonetworks".equals(s)) return "no saved networks yet";
@@ -116,7 +162,7 @@ final class HomeWifiPage {
         }
     }
 
-    /** hmgapid wifi now [minutes] | back: home Wi-Fi on request (in P), and back */
+    /** hmgapid wifi now [minutes] | back: home Wi-Fi on request (in P; 0 minutes: until out of P), and back */
     void request(final String verb, final String minutes) {
         new Ui.Job<Hmgapid.Result>() {
             @Override

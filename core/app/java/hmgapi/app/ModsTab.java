@@ -17,7 +17,8 @@ import java.util.List;
 /**
  * Mods: every installed mod on the left with its state (green on, yellow a
  * conflict, red not loaded on this car or an error, grey off), and the chosen one on
- * the right: its switch, why it isn't running if it isn't, its settings, its log
+ * the right: its switch, why it isn't running if it isn't, its settings (saved as
+ * they change), its log
  * (HMG-API's log lines for it and its services' output), Remove.
  */
 final class ModsTab {
@@ -148,9 +149,14 @@ final class ModsTab {
             row.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    chosen = m.id;
-                    drawList();
-                    show(m);
+                    a.saveThen(new Runnable() {
+                        @Override
+                        public void run() {
+                            chosen = m.id;
+                            drawList();
+                            show(m);
+                        }
+                    });
                 }
             });
             list.addView(row);
@@ -158,6 +164,7 @@ final class ModsTab {
     }
 
     void show(final Mod m) {
+        a.form = null;
         detail.removeAllViews();
         LinearLayout head = Ui.row(a);
         LinearLayout names = Ui.column(a);
@@ -213,12 +220,13 @@ final class ModsTab {
         Ui.text(detail, "Settings", 21, true, Ui.GREEN);
         LinearLayout settings = Ui.column(a);   // filled when they're read: keeps its place above the log
         detail.addView(settings);
-        new SettingsForm(a, settings, m.id, new Runnable() {
+        a.form = new SettingsForm(a, settings, m.id, new Runnable() {
             @Override
             public void run() {
                 a.refreshStatus();
             }
-        }).load();
+        });
+        a.form.load();
 
         Ui.line(detail);
         Ui.text(detail, "Log", 21, true, Ui.GREEN);
