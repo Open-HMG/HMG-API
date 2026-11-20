@@ -1681,7 +1681,7 @@ static int forget_answers(int fd)
 }
 
 /* home Wi-Fi for HMG-API's app: wifi saved | seen | join <ssid> [key] | forget <ssid> | now [minutes] | back
- * (on request, in P: the updater's way in later). The keeper's
+ * (on request, in P; now 0: until out of P. The updater's way in later). The keeper's
  * script does it (state/wifi.sh); the key goes in its environment (HMGAPI_WIFI_PSK), never on a command
  * line, which any process on the unit can read. */
 static int op_wifi(int fd, int argc, char **argv)

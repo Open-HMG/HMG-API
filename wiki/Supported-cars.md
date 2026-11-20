@@ -17,6 +17,7 @@ the parts that change the car's own apps stay off, and the app says which.
 | Kia Telluride | USA | 260507 | made on an owner's car by HMG-API's own mapper (351 of 351 hook points); waiting for a check on a car |
 | Kia Niro EV | USA | 260507 | made on 3 owners' cars by HMG-API's own mapper (343 of 351 hook points: the 8 newest need a Car Report from 1.1.0 or newer); waiting for a check on a car |
 | Kia Carnival | USA | 260507 | made on an owner's car by HMG-API's own mapper (343 of 351 hook points: the 8 newest need a Car Report from 1.1.0 or newer); waiting for a check on a car |
+| Hyundai Palisade | USA | 260507 | 351 of 391 hook points: original 343 checked on the owner's car; eight more resolved off-car; 40 newer points need mapping; status remains mapped, pending a current vehicle check |
 | Hyundai Palisade | USA | 260903 | made on an owner's car by HMG-API's own mapper (343 of 351 hook points: the 8 newest need a Car Report from 1.1.0 or newer); waiting for a check on a car |
 | Hyundai Ioniq 6 | Canada and USA | 260206 | ✅ checked on a Canadian car (351 of 351 hook points), from a Car Report and stock Bluetooth settings files; a US car on 260206 has the same 18 stock files (#319) |
 | Hyundai Ioniq 6 | USA | 260507 | all 351 hook points, from stock files and an rc.3 Car Report (#253); waiting for a check on a car |
