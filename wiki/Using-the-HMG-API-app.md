@@ -31,7 +31,8 @@ Every installed mod, with its state:
 | ⚪ grey | off |
 
 Pick a mod for its switch, its settings, its log (HMG-API's lines for it and its
-services' output) and **Remove**.
+services' output) and **Remove**. A mod that does more alongside another one lists it
+there ("Works with …"), with what it adds and whether that one is on.
 
 ## Settings
 

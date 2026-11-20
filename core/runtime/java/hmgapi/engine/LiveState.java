@@ -23,7 +23,8 @@ import java.util.Set;
  * "projection" (top level): Android Auto density, sensors, fuel and connector types,
  * and which apps hear projection events (Projection.settle).
  *
- * A mod is "enabled" only if it's turned on and every mod it requires is too. Mods'
+ * A mod is "enabled" only if it's turned on and every mod it requires is too (not
+ * counting optional ones). Mods'
  * mod.json and declared hook JARs are made readable (their folders traversable), so an app can
  * load a "live" mod that wasn't loaded when it started; settings files are not.
  */
@@ -55,7 +56,7 @@ final class LiveState {
         while (more) {
             more = false;
             for (String id : new LinkedHashSet<String>(on)) {
-                for (Version.Dep d : Version.deps(json.get(id).get("requires"))) {
+                for (Version.Dep d : Version.needs(json.get(id).get("requires"))) {   // an optional one: it runs without
                     if (!on.contains(d.id)) {
                         on.remove(id);
                         more = true;

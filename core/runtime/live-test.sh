@@ -42,6 +42,10 @@ eng publish-state
 check "off" False "$(q "d['mods']['base']['enabled']")"
 check "a mod whose requirement is off is off too" False "$(q "d['mods']['user']['enabled']")"
 check "others unaffected" True "$(q "d['mods']['other']['enabled']")"
+mod extra ', "requires": [{"id": "base", "optional": true, "adds": "colours"}]'
+eng publish-state
+check "a mod whose optional requirement is off stays on" True "$(q "d['mods']['extra']['enabled']")"
+rm -r $R/data/hmgapi/mods/extra
 s1=$(q "d['serial']"); sleep 0.01; eng publish-state
 check "every publish has a new serial" yes "$([ "$(q "d['serial']")" != "$s1" ] && echo yes)"
 eng apply; has "apply publishes too" "state published" "$out"

@@ -437,6 +437,19 @@ NEMESIS in the app menu.
   build, the stock-file md5s give `mismatch`, never another build's names.
   `SystemCheck` knows the new model codes. None of the four builds has the Wi-Fi hotspot
   feature file, so the wireless mods can't use the hotspot there yet.
+
+### For mod authors
+
+- **Optional requirements.** A `"requires"` entry in object form can say
+  `"optional": true` (and `"adds"`: what it brings): the mod loads after that one when
+  it's there, may use its API, and runs without it otherwise, never turned off for it.
+  `engine plan` says what a mod runs without, and the HMG-API app lists the mods it
+  works with on its page, with what each adds and whether it's on. HMG-API 1.1.0-rc.2
+  and older read such an entry as a plain requirement.
+- **`ModContext.modOn(id)`**: whether another mod is installed, turned on and loaded in
+  this process, following the owner's switches, so hook code no longer reads
+  `/data/hmgapi/public/state.json` itself.
+
 ### Fixes
 
 - **The USB install puts the HMG-API app in right away** (#187). With Android up, the
