@@ -53,7 +53,7 @@ final class NativePatch {
     static final Map<String, List<Owned>> owned = new HashMap<String, List<Owned>>();
     static boolean hooked;
 
-    static final MemRecipe.Memory MEMORY = new MemRecipe.Memory() {
+    static final MemRecipe.Memory MEMORY = new MemRecipe.CodeMemory() {
         @Override
         public byte[] peek(long addr, int len) {
             return Bridge.peekNative(addr, len);
@@ -67,6 +67,31 @@ final class NativePatch {
         @Override
         public long mapCode(long hint, int len) {
             return Bridge.mapCodeNative(hint, len);
+        }
+
+        @Override
+        public void unmapCode(long address, int len) {
+            Bridge.unmapCodeNative(address, len);
+        }
+
+        @Override
+        public List<long[]> mappings() {
+            List<long[]> ranges = new ArrayList<long[]>();
+            try {
+                BufferedReader in = new BufferedReader(new FileReader("/proc/self/maps"));
+                try {
+                    String line;
+                    while ((line = in.readLine()) != null) {
+                        String address = line.split("\\s+", 2)[0];
+                        int dash = address.indexOf('-');
+                        ranges.add(new long[] { Long.parseLong(address.substring(0, dash), 16),
+                                Long.parseLong(address.substring(dash + 1), 16) });
+                    }
+                } finally { in.close(); }
+            } catch (Exception e) {
+                throw new IllegalStateException("can't read occupied process mappings", e);
+            }
+            return ranges;
         }
     };
 

@@ -56,6 +56,75 @@ public final class MemRecipeTest {
         }
     }
 
+    /** mmap ignores every coarse hint; only one non-MB-aligned page is free nearby. */
+    static final class Fragmented implements MemRecipe.CodeMemory {
+        final Fake backing;
+        final long hole;
+        int frees, writes, allocations;
+        boolean race;
+        Fragmented(long base, byte[] lib, long hole) {
+            backing = new Fake(base, lib); this.hole = hole;
+        }
+        public byte[] peek(long a, int n) { return backing.peek(a, n); }
+        public boolean poke(long a, byte[] b) { writes++; return backing.poke(a, b); }
+        public long mapCode(long hint, int len) {
+            allocations++;
+            long at = hint == hole && !race ? hole : 0x70000000L;
+            return backing.mapCode(at, len);
+        }
+        public void unmapCode(long at, int len) {
+            int i = backing.find(at, len);
+            if (i == 0) throw new AssertionError("attempted to unmap the library");
+            backing.at.remove(i); backing.mem.remove(i); frees++;
+        }
+        public List<long[]> mappings() {
+            List<long[]> r = new ArrayList<long[]>();
+            r.add(new long[] {hole + 0x1000, 0x100000000L}); // deliberately unsorted
+            r.add(new long[] {0x1000, hole});
+            return r;
+        }
+    }
+
+    static void fragmented() throws Exception {
+        for (long base : new long[] {0x10000000L, 0xb0000000L}) {
+            byte[] lib = new byte[4096];
+            String hash = MemRecipe.md5(java.util.Arrays.copyOfRange(lib, 0x204, 0x208));
+            // Identity recipe's 5 MB preference, plus an AA-style nonzero page offset.
+            for (int page : new int[] {0, 0x120}) {
+                MemRecipe recipe = MemRecipe.parse("id fragmented\nverify 0x204 4 " + hash
+                        + " -\nsegment " + (0x500000 + page) + " 0000000011223344\n"
+                        + "rel32 0 0 0x205\nbranch 0x204 4\n");
+                for (long hole : new long[] {base + 0x223000, base - 0x123000}) {
+                    Fragmented m = new Fragmented(base, lib, hole);
+                    MemRecipe.Result r = recipe.apply(m, base, lib.length, "x");
+                    check("fragmented address space: small gap reached", r.ok() && r.segment == hole + page);
+                    check("relocation and branch at fallback address",
+                            r.segment + i32(m.peek(r.segment, 4), 0) == base + 0x205
+                            && bwTarget(base + 0x204, m.peek(base + 0x204, 4)) == r.segment + 4);
+                    check("rejected mappings freed; successful code retained",
+                            m.frees == m.allocations - 1 && m.backing.mem.size() == 2);
+                    Fragmented raced = new Fragmented(base, lib, hole); raced.race = true;
+                    check("gap occupied during allocation: fails without library writes",
+                            recipe.apply(raced, base, lib.length, "x").status == MemRecipe.Result.FAILED
+                            && raced.writes == 0 && raced.frees == raced.allocations && raced.backing.mem.size() == 1);
+                }
+                Fragmented outside = new Fragmented(base, lib, base + 0x2103000);
+                check("gap beyond branch range: refused without writes",
+                        recipe.apply(outside, base, lib.length, "x").status == MemRecipe.Result.FAILED
+                        && outside.writes == 0 && outside.backing.mem.size() == 1);
+            }
+        }
+        List<long[]> ranges = new ArrayList<long[]>();
+        ranges.add(new long[] {0x3000, 0x6000});
+        ranges.add(new long[] {0x1000, 0x2000});
+        check("gap fits rounded allocation, not only requested bytes",
+                MemRecipe.gapHints(ranges, 0x1000, 0x5000, 4097).isEmpty());
+        check("unaligned lower bound cannot use preceding page",
+                MemRecipe.gapHints(ranges, 0x2001, 0x5000, 1).isEmpty());
+        check("empty branch-window intersection has no candidates",
+                MemRecipe.gapHints(ranges, 0x8000, 0x7000, 1).isEmpty());
+    }
+
     static String hex(byte[] b) {
         StringBuilder s = new StringBuilder();
         for (byte x : b) s.append(String.format("%02x", x & 0xff));
@@ -78,7 +147,7 @@ public final class MemRecipeTest {
 
     /** no arguments: the synthetic libraries; else <stock lib> <patched lib> <recipe> triples (a mod's real recipes) */
     public static void main(String[] a) throws Exception {
-        if (a.length == 0) synthetic();
+        if (a.length == 0) { synthetic(); fragmented(); }
         for (int k = 0; k + 2 < a.length; k += 3) real(a[k], a[k + 1], a[k + 2]);
         System.exit(fail);
     }

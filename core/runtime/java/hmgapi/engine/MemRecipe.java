@@ -36,6 +36,12 @@ public final class MemRecipe {
         long mapCode(long hint, int len);
     }
 
+    /** Real process memory can expose free gaps and release rejected allocations. */
+    public interface CodeMemory extends Memory {
+        List<long[]> mappings(); // occupied [start, end) ranges, including anonymous mappings
+        void unmapCode(long address, int len);
+    }
+
     public static final class Verify {
         public final long off;
         public final int len;
@@ -204,7 +210,7 @@ public final class MemRecipe {
         return new Result(Result.APPLIED, id + ": applied" + (seg != 0 ? " (code at 0x" + Long.toHexString(seg) + ")" : ""), seg);
     }
 
-    /** a code page run for the segment, every branch into it within range; tries the preferred offset, then 1 MB steps around the library */
+    /** a code page run for the segment, every branch into it within range; tries the preferred offset, then 1 MB steps, then actual free gaps around the library */
     long placeSegment(Memory m, long base, long textEnd) {
         long page = segPreferred >= 0 ? segPreferred & 0xfff : 0;
         int len = (int) (page + segment.length);
@@ -225,9 +231,52 @@ public final class MemRecipe {
                 if (d > BRANCH_RANGE || d < -BRANCH_RANGE) inRange = false;
             }
             if (inRange) return seg;
-            // the kernel put it elsewhere: left mapped (a few KB), the next hint is tried
+            // A non-fixed mmap hint may be ignored. Do not leak rejected executable pages.
+            if (m instanceof CodeMemory) ((CodeMemory)m).unmapCode(got, len);
+        }
+        if (m instanceof CodeMemory && !branches.isEmpty()) {
+            long low = 0x1000L, high = 0xfffff000L;
+            for (long[] b : branches) {
+                long pc = base + b[0] + 4;
+                low = Math.max(low, pc - BRANCH_RANGE - 4 - b[1] - page);
+                high = Math.min(high, pc + BRANCH_RANGE - b[1] - page);
+            }
+            CodeMemory cm = (CodeMemory)m;
+            for (long h : gapHints(cm.mappings(), low, high, len)) {
+                long got = m.mapCode(h, len);
+                if (got == 0) continue;
+                long seg = got + page;
+                boolean fits = true;
+                for (long[] b : branches)
+                    if (branchW(base + b[0], seg + b[1]) == null) fits = false;
+                if (fits) return seg;
+                cm.unmapCode(got, len);
+            }
         }
         return 0;
+    }
+
+    /** Page-aligned starts of actual free gaps in the intersection of branch windows. */
+    static List<Long> gapHints(List<long[]> mappings, long low, long high, int len) {
+        List<Long> hints = new ArrayList<Long>();
+        if (len <= 0 || low > high) return hints;
+        long size = ((long)len + 0xfff) & ~0xfffL;
+        long cursor = (Math.max(0x1000L, low) + 0xfff) & ~0xfffL;
+        high = Math.min(high, 0x100000000L - size);
+        List<long[]> sorted = new ArrayList<long[]>(mappings);
+        for (long[] range : sorted)
+            if (range == null || range.length != 2 || range[0] < 0 || range[1] < range[0] || range[1] > 0x100000000L)
+                throw new IllegalArgumentException("invalid process mapping");
+        java.util.Collections.sort(sorted, new java.util.Comparator<long[]>() {
+            public int compare(long[] a, long[] b) { return a[0] < b[0] ? -1 : a[0] == b[0] ? 0 : 1; }
+        });
+        for (long[] range : sorted) {
+            if (cursor > high) break;
+            if (range[0] >= cursor + size) hints.add(cursor);
+            cursor = Math.max(cursor, (range[1] + 0xfff) & ~0xfffL);
+        }
+        if (cursor <= high) hints.add(cursor);
+        return hints;
     }
 
     /** Thumb-2 B.W (T4) at from to target (Thumb code addresses; the low bit is ignored); null if out of range */
