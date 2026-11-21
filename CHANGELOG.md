@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **Turning a mod with an app-menu tile on or off updates the home screen in the
+  background.** When a mod declaring `"provides": {"launcher": [...]}` is toggled,
+  `com.android.launcher3` notifies `all_menu` observers and recreates its `Launcher`
+  home activity once it is in the background (deferring until `onStop` if the owner is
+  looking at the home screen, so it never flashes under them). Hooks in the launcher
+  process can ask for the same refresh with `ModContext.reloadLauncher()`, and
+  `launcher.menu_list.new` lets a live-loaded mod inspect the built-in menu list before
+  the next load (#304).
+
 ## 1.1.0-rc.7 (2026-11-19)
 
 - **Comes with wireless CarPlay + Android Auto 2.2.0-rc.8** (it needs this RC's hook points): more

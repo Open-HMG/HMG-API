@@ -66,4 +66,10 @@ rm -r $R/data/hmgapi/mods/*
 # the mod loader's own decisions (hook.Mods: boot and live loads), on a mods folder
 javac --release 8 -Xlint:-options -nowarn -cp "$CP" -d "$CP" core/runtime/test/hmgapi/engine/HookPlanTest.java
 mkdir -p $T/loader; java -cp "$CP" hmgapi.engine.HookPlanTest $T/loader || fail=1
+
+# background Launcher recreation state diff, foreground deferral, and coalescing
+javac --release 8 -Xlint:-options -nowarn -cp "$CP" -d "$CP" \
+    core/runtime/java/hmgapi/hook/LauncherReloadState.java \
+    core/runtime/test/hmgapi/hook/LauncherReloadTest.java
+java -cp "$CP" hmgapi.hook.LauncherReloadTest || fail=1
 exit $fail
