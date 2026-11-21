@@ -25,6 +25,12 @@
         "https://github.com/lemoyneiv/hmgapi-comfort",
         "https://github.com/lemoyneiv/hmgapi-tile-manager"
       ]
+    },
+    "654180e6-0ac7-8376-8912-fc9faa99378b": {
+      "name": "AMDHome",
+      "repos": [
+        "https://github.com/AMDHome/hmgapi-per-source-volume"
+      ]
     }
   }
 }
