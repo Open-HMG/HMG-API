@@ -487,7 +487,7 @@ NEMESIS in the app menu.
 - **Raw Android Auto sensor data from hook code** (#44). An EV mod no longer calls
   `SensorSource` by name. Its library recipes stay its own: HMG-API ships no native patch.
   - `"projection": {"aa_raw": true}` declares that the mod's hook code sends raw sensor
-    batches. It needs the mod's own `hooks.native` recipe for
+    batches. It needs the mod's own `hooks.native` (or `hooks.native_sites`) recipe for
     `libautoreceiver_infobank.so` (egmp-aa-ev's `ev-sensor-<build>.recipe` are the
     example), and the plan and the HMG-API app show it;
   - `ProjectionHooks.sendRaw(mod, message)` sends one sensor batch (`80 03`, then the

@@ -228,8 +228,8 @@ has "events: the asking mod's apps" '"events":["dev.example.tube"]' "$st"
 has "only speed can be left out" "tube: projection aa_sensors remove: gps (only [speed])" "$out"
 has "sensor types: 1-64" "dpi: projection aa_sensors add: 70 isn't 1-64" "$out"
 has "aa_raw: true or false" "dpi: projection aa_raw: true or false" "$out"
-has "a type above 21 needs the mod's own library recipe" "tube: projection aa_sensors add 23: needs the mod's own recipe for libautoreceiver_infobank.so in hooks.native (HMG-API ships none) (the stock library reads up to 21)" "$out"
-has "so does aa_raw" "tube: projection aa_raw: needs the mod's own recipe for libautoreceiver_infobank.so in hooks.native (HMG-API ships none)" "$out"
+has "a type above 21 needs the mod's own library recipe" "tube: projection aa_sensors add 23: needs the mod's own recipe for libautoreceiver_infobank.so in hooks.native or hooks.native_sites (HMG-API ships none) (the stock library reads up to 21)" "$out"
+has "so does aa_raw" "tube: projection aa_raw: needs the mod's own recipe for libautoreceiver_infobank.so in hooks.native or hooks.native_sites (HMG-API ships none)" "$out"
 hasnt "... and neither is in the state" '"aa_raw"' "$st"
 hasnt "... (types above 21)" 'aa_sensors_add_patched' "$st"
 mkdir -p "$D/settings"; printf '{"overrides": {"projection": {"aa_density": "tube"}}}\n' > "$D/settings/hmgapi.json"
@@ -251,6 +251,13 @@ has "... and its raw sends" '"aa_raw":["dpi"]' "$st"
 eng plan
 has "plan: raw sensor batches" "projection Android Auto raw sensor batches from its hook code (only where its own libautoreceiver_infobank.so recipe is in place) [dpi]" "$out"
 has "plan: types above 21 need its recipe" "projection Android Auto sensors added [13, 26] ([26] only where its own libautoreceiver_infobank.so recipe is in place) [dpi]" "$out"
+# ... or one that finds its own sites (hooks.native_sites, as egmp-aa-ev's ev-sensor.sites)
+printf '{"id": "dpi", "version": "1.0.0", "projection": {"aa_raw": true, "aa_sensors": {"add": [26]}},
+ "hooks": {"jar": "hooks.jar", "entry": "x.X", "native_sites": {"libautoreceiver_infobank.so": ["recipes/ev-sensor-test.recipe"]}}}\n' > "$D/mods/dpi/mod.json"
+eng publish-state
+st=$(tr -d ' \n' < $D/public/state.json)
+has "a site recipe counts as its own recipe: raw sends" '"aa_raw":["dpi"]' "$st"
+has "... and types above 21" '"aa_sensors_add_patched":{"dpi":[26]}' "$st"
 rm -r "$D/mods/dpi" "$D/settings/hmgapi.json"
 
 # side panel pages: the mod's own apps' widgets

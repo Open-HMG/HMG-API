@@ -295,8 +295,9 @@ Settings apply through hooks when GPM starts, and every mod's asks are combined.
 
 **Your own recipe for Android Auto's library.** HMG-API ships no native patch: they stay
 in the mods. A type above 21 and raw sends need changes to
-`libautoreceiver_infobank.so` that only your mod's `hooks.native` recipes make, one per
-build of the library:
+`libautoreceiver_infobank.so` that only your mod's recipes make: `hooks.native`, one per
+build of the library, or `hooks.native_sites`, which find their own sites (#230); either
+counts:
 
 ```json
 "hooks": {"native": {"libautoreceiver_infobank.so": ["recipes/ev-sensor-48ee793a.recipe", "recipes/ev-sensor-dbfe7bd2.recipe"]}}
@@ -309,7 +310,7 @@ turn `SensorSource.nativeReportDiagnosticsData` into a send of the whole message
 HMG-API checks only that one of your recipes for the library is in place, not what it
 changes: without the `reportDiagnosticsData` change, `sendRaw` hands your bytes to the
 library as a diagnostics report. Without
-`hooks.native` recipes for that library, `aa_raw` and types above 21 are left out, and
+`hooks.native` or `hooks.native_sites` recipes for that library, `aa_raw` and types above 21 are left out, and
 the plan says why. On a build none of your recipes fits, nothing is patched:
 your types above 21 aren't offered, `rawReady(mod)` stays false, and the log says
 `native patch libautoreceiver_infobank.so not applied`.

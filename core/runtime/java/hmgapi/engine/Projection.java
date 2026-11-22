@@ -20,7 +20,8 @@ import java.util.Map;
  * wins, the owner picks with hmgapi.json overrides.projection {"aa_density": "<mod>"}).
  * Sensors, fuel types and connectors: what all mods ask, together.
  * "aa_raw" and sensor types above 21 need the mod's own recipe for Android Auto's
- * library (mod.json hooks.native "libautoreceiver_infobank.so"): HMG-API ships none,
+ * library (mod.json hooks.native or hooks.native_sites "libautoreceiver_infobank.so",
+ * fixed per build or finding its own sites): HMG-API ships none,
  * native patches stay in the mods. state.json "aa_raw" lists the mods that send raw,
  * "aa_sensors_add_patched" each mod's types above 21; GPM's process offers those, and
  * lets a mod send, only where that mod's recipe is in place.
@@ -42,12 +43,19 @@ public final class Projection {
         boolean events, raw;
     }
 
-    /** whether a mod's mod.json "hooks" has recipes for Android Auto's library in "native" */
+    /**
+     * whether a mod's mod.json "hooks" has recipes for Android Auto's library, fixed
+     * ("native") or finding their own sites ("native_sites"); ModContext.nativePatch
+     * puts either kind on, and the runtime checks whichever is in place
+     */
     @SuppressWarnings("unchecked")
     static boolean hasAaRecipe(Object hooks) {
-        Object nat = hooks instanceof Map ? ((Map<String, Object>) hooks).get("native") : null;
-        Object files = nat instanceof Map ? ((Map<String, Object>) nat).get(AA_LIB) : null;
-        return files instanceof List && !((List<Object>) files).isEmpty();
+        for (String key : new String[] {"native", "native_sites"}) {
+            Object nat = hooks instanceof Map ? ((Map<String, Object>) hooks).get(key) : null;
+            Object files = nat instanceof Map ? ((Map<String, Object>) nat).get(AA_LIB) : null;
+            if (files instanceof List && !((List<Object>) files).isEmpty()) return true;
+        }
+        return false;
     }
 
     /** hooks: the mod's mod.json "hooks" (its own native recipes) */
@@ -85,7 +93,7 @@ public final class Projection {
         a.raw = Boolean.TRUE.equals(raw);
         // what only a mod's own recipe for the library makes work
         if (!hasAaRecipe(hooks)) {
-            String need = ": needs the mod's own recipe for " + AA_LIB + " in hooks.native (HMG-API ships none)";
+            String need = ": needs the mod's own recipe for " + AA_LIB + " in hooks.native or hooks.native_sites (HMG-API ships none)";
             if (a.raw) errors.add(id + ": projection aa_raw" + need);
             a.raw = false;
             for (java.util.Iterator<Integer> it = a.add.iterator(); it.hasNext();) {
