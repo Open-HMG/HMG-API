@@ -214,24 +214,50 @@ check "no events: events.txt empty" "" "$(cat $D/state/events.txt)"
 # phone projection: Android Auto density, sensors, events
 cat > "$D/mods/tube/mod.json" <<'J'
 {"id": "tube", "version": "1.0.0", "apps": [{"apk": "app/T.apk", "package": "dev.example.tube"}],
- "projection": {"aa_density": 200, "aa_sensors": {"remove": ["speed", "gps"], "add": [23]}, "aa_fuel_types": [10],
-                "aa_ev_connectors": [4, 1], "events": true}}
+ "projection": {"aa_density": 200, "aa_sensors": {"remove": ["speed", "gps"], "add": [6, 23]}, "aa_fuel_types": [10],
+                "aa_ev_connectors": [4, 1], "events": true, "aa_raw": true}}
 J
 mkdir -p "$D/mods/dpi"
-printf '{"id": "dpi", "version": "1.0.0", "projection": {"aa_density": 160, "aa_sensors": {"remove": ["speed"]}, "aa_ev_connectors": [1, 5]}}\n' > "$D/mods/dpi/mod.json"
+printf '{"id": "dpi", "version": "1.0.0", "projection": {"aa_density": 160, "aa_sensors": {"remove": ["speed"], "add": [70]}, "aa_ev_connectors": [1, 5], "aa_raw": "yes"}}\n' > "$D/mods/dpi/mod.json"
 eng publish-state
 st=$(tr -d ' \n' < $D/public/state.json)
 has "density: the first by id wins" '"projection":{"aa_density":160,"aa_density_by":"dpi"' "$st"
 has "... and the owner is told how to pick" 'conflict: tube asks Android Auto density 200, dpi 160; dpi has it' "$out"
-has "sensors, fuel and connectors: together" '"aa_sensors_remove":["speed"],"aa_sensors_add":[23],"aa_fuel_types":[10],"aa_ev_connectors":[1,5,4]' "$st"
+has "sensors, fuel and connectors: together" '"aa_sensors_remove":["speed"],"aa_sensors_add":[6],"aa_fuel_types":[10],"aa_ev_connectors":[1,5,4]' "$st"
 has "events: the asking mod's apps" '"events":["dev.example.tube"]' "$st"
 has "only speed can be left out" "tube: projection aa_sensors remove: gps (only [speed])" "$out"
+has "sensor types: 1-64" "dpi: projection aa_sensors add: 70 isn't 1-64" "$out"
+has "aa_raw: true or false" "dpi: projection aa_raw: true or false" "$out"
+has "a type above 21 needs the mod's own library recipe" "tube: projection aa_sensors add 23: needs the mod's own recipe for libautoreceiver_infobank.so in hooks.native or hooks.native_sites (HMG-API ships none) (the stock library reads up to 21)" "$out"
+has "so does aa_raw" "tube: projection aa_raw: needs the mod's own recipe for libautoreceiver_infobank.so in hooks.native or hooks.native_sites (HMG-API ships none)" "$out"
+hasnt "... and neither is in the state" '"aa_raw"' "$st"
+hasnt "... (types above 21)" 'aa_sensors_add_patched' "$st"
 mkdir -p "$D/settings"; printf '{"overrides": {"projection": {"aa_density": "tube"}}}\n' > "$D/settings/hmgapi.json"
 eng publish-state
 has "the owner's pick wins" '"aa_density":200,"aa_density_by":"tube"' "$(tr -d ' \n' < $D/public/state.json)"
 eng plan
 has "plan: density" "projection Android Auto density 200 [tube]" "$out"
 has "plan: sensor removal says it's for every mod" "projection Android Auto: the phone isn't offered [speed] (for every mod) [dpi]" "$out"
+has "plan: only the type the stock library reads" "projection Android Auto sensors added [6] [tube]" "$out"
+# a mod with its own recipe for the library (as egmp-aa-ev's ev-sensor-<build>.recipe)
+mkdir -p "$D/mods/dpi/recipes"; echo jar > "$D/mods/dpi/hooks.jar"; echo 'id ev-sensor-test' > "$D/mods/dpi/recipes/ev-sensor-test.recipe"
+printf '{"id": "dpi", "version": "1.0.0", "projection": {"aa_raw": true, "aa_sensors": {"add": [13, 26]}},
+ "hooks": {"jar": "hooks.jar", "entry": "x.X", "native": {"libautoreceiver_infobank.so": ["recipes/ev-sensor-test.recipe"]}}}\n' > "$D/mods/dpi/mod.json"
+eng publish-state
+st=$(tr -d ' \n' < $D/public/state.json)
+has "its own recipe: types up to 21 with everyone's" '"aa_sensors_add":[13,6]' "$st"
+has "... above 21 by the mod, offered only where its recipe is in place" '"aa_sensors_add_patched":{"dpi":[26]}' "$st"
+has "... and its raw sends" '"aa_raw":["dpi"]' "$st"
+eng plan
+has "plan: raw sensor batches" "projection Android Auto raw sensor batches from its hook code (only where its own libautoreceiver_infobank.so recipe is in place) [dpi]" "$out"
+has "plan: types above 21 need its recipe" "projection Android Auto sensors added [13, 26] ([26] only where its own libautoreceiver_infobank.so recipe is in place) [dpi]" "$out"
+# ... or one that finds its own sites (hooks.native_sites, as egmp-aa-ev's ev-sensor.sites)
+printf '{"id": "dpi", "version": "1.0.0", "projection": {"aa_raw": true, "aa_sensors": {"add": [26]}},
+ "hooks": {"jar": "hooks.jar", "entry": "x.X", "native_sites": {"libautoreceiver_infobank.so": ["recipes/ev-sensor-test.recipe"]}}}\n' > "$D/mods/dpi/mod.json"
+eng publish-state
+st=$(tr -d ' \n' < $D/public/state.json)
+has "a site recipe counts as its own recipe: raw sends" '"aa_raw":["dpi"]' "$st"
+has "... and types above 21" '"aa_sensors_add_patched":{"dpi":[26]}' "$st"
 rm -r "$D/mods/dpi" "$D/settings/hmgapi.json"
 
 # side panel pages: the mod's own apps' widgets

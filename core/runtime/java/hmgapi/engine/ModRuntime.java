@@ -317,7 +317,7 @@ final class ModRuntime {
                 }
             }
         }
-        d.projection = Projection.of(id, mod.get("projection"), d.errors);
+        d.projection = Projection.of(id, mod.get("projection"), mod.get("hooks"), d.errors);
         if (d.projection != null && d.projection.events && d.apps.isEmpty()) d.errors.add(id + ": projection events: the mod has no app to tell (\"apps\")");
         d.network = Network.of(id, mod.get("network"), d.errors);
         Object in = mod.get("input");

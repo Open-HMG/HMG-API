@@ -219,6 +219,12 @@ final class SettingsTab {
             if (p.has("aa_density")) fact("Android Auto density", p.optInt("aa_density") + " DPI (stock 240), set by " + p.optString("aa_density_by"));
             JSONArray rm = p.optJSONArray("aa_sensors_remove");
             if (rm != null) fact("Sensors not offered to the phone", rm.join(", ").replace("\"", ""));
+            JSONArray add = p.optJSONArray("aa_sensors_add");
+            if (add != null) fact("Sensors offered as well", add.join(", "));
+            JSONObject own = p.optJSONObject("aa_sensors_add_patched");
+            if (own != null) fact("Sensors offered with a mod's own library patch", own.toString().replaceAll("[{}\"]", "").replace(":", ": ").replace("],", "], "));
+            JSONArray raw = p.optJSONArray("aa_raw");
+            if (raw != null) fact("Raw sensor data sent by", raw.join(", ").replace("\"", "") + " (with its own library patch)");
             JSONArray ev = p.optJSONArray("events");
             if (ev != null) fact("Apps told about connections", ev.join(", ").replace("\"", ""));
         } catch (Exception e) {
