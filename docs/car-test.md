@@ -143,7 +143,7 @@ press SOS.
      what the cluster shows.
 3. EV readings, car in READY:
    ```
-   adb shell hmgapid vehicle hv.energy hv.capacity_nominal range charge.target_ac charge.target_dc charge.minutes_dc aux.climate_power aux.other_ecu_power aux.battery_conditioning_power aux.power drive_mode
+   adb shell hmgapid vehicle hv.energy hv.capacity_nominal range charge.target_ac charge.target_dc charge.minutes_dc aux.climate_power aux.other_ecu_power aux.battery_conditioning_power drive_mode
    ```
    - **Expect:** `range` matches the cluster (km; a US car shows miles: × 1.609),
      `charge.target_ac`/`charge.target_dc` the charge limits in the EV settings,

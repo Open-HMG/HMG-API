@@ -153,7 +153,6 @@ Each entry is `"<id>"`, `"<id> <range>"` or `{"id": …, "version": <range>}`; r
 | `charge.target_ac`, `charge.target_dc` | %, 0.5 steps | the AC and DC charge limits in the EV settings (HEV `TARGET_SOC_SLOW`, `TARGET_SOC_QUICK`) |
 | `charge.minutes_dc` | min | the car's estimate of a DC fast charge to the DC limit, as on the EV screen (HEV `NOT_CHAR_QUICK_REM_TIME_EV`) |
 | `aux.climate_power`, `aux.other_ecu_power`, `aux.battery_conditioning_power` | W | power drawn now by climate control (20 W steps), the electronics and accessories (10 W steps), and the compressor for the battery (20 W steps): HEV `DATC_CLMTPWRCNSMPTN_W`, `PWR_OTHER_ECU`, `DATC_BATTERYCOMPPWRCON_W` |
-| `aux.power` | W | those three added up; `-` if one can't be read. The battery heater has no named HEV flag on these cars, so it isn't in it |
 | `drive_mode` | raw | body control's drive mode, pushed by the car (0 default, 1 normal, 2 sport, 3 eco, 4 snow); `-` until it has said. HMG-API never asks for it: asking can show the drive mode pop-up |
 | `seat_heat.<seat>` (driver, passenger, rear_left, rear_right), `seat_vent.<seat>` (driver, passenger: the rear seats have none) | level 0-3 | body control's seat climate step (one value per seat: off, ventilation 1-3 or heat 1-3) |
 | `wheel_heat`, `defogger` | raw | body control's heating status: steering wheel heat (0 off), rear defogger (1 on, 0 off); pushed by the car, `-` until it has said |
@@ -163,6 +162,9 @@ Each entry is `"<id>"`, `"<id> <range>"` or `{"id": …, "version": <range>}`; r
 | `power` | text | the power service's status: `on`, `logic_on` (the car is off, the head unit still up), `adm`, `system_ready`, `delay_mode`, `preparing_off`, `off` |
 | `doors.closed` | 0/1 | all four doors closed (body control, pushed; the trunk and hood don't count); `-` until the car has said |
 | `parked` | 0/1 | HMG-API's parked state, by the owner's rule (the `parked` / `unparked` car events) |
+
+Mods that need an auxiliary power total can sum the individual power readings
+their consumption model uses.
 
 Each value is read through the car's own interface, by method name from the car's
 hook map, and kept for a short time (100 ms for steering and pedals, up to 60 s

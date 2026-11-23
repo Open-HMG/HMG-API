@@ -70,7 +70,6 @@ public final class Vehicle {
         add(m, "aux.climate_power", "W", 2000, "climate control's power draw now (HEV DATC_CLMTPWRCNSMPTN_W, 20 W steps)");
         add(m, "aux.other_ecu_power", "W", 2000, "electronics' and accessories' power draw now (HEV PWR_OTHER_ECU, 10 W steps)");
         add(m, "aux.battery_conditioning_power", "W", 2000, "the compressor's power draw for the battery now (HEV DATC_BATTERYCOMPPWRCON_W, 20 W steps)");
-        add(m, "aux.power", "W", 2000, "the three aux.* draws added up (the battery heater has no named HEV flag, so it isn't in it)");
         add(m, "drive_mode", "raw", 1000, "drive mode, pushed by body control: 0 default, 1 normal, 2 sport, 3 eco, 4 snow; - until it has said");
         add(m, "odometer", "km", 60000, "odometer");
         for (String seat : new String[] { "driver", "passenger", "rear_left", "rear_right" }) {

@@ -529,8 +529,8 @@ public final class Hub {
         if ("hv.energy".equals(name)) return scaled(hev("framework.hev_flag.energy_map"), 0xfffe, 2);
         if ("hv.capacity_nominal".equals(name)) return scaled(hev("framework.hev_flag.energy_capacity"), 0xfffe, 2);
         if ("range".equals(name)) {
-            int[] b = callbacks.batteryInfo(500);
-            return b == null || b[6] < 0 || b[6] >= 0xffff ? null : String.valueOf(b[6]);
+            int km = callbacks.rangeKm(500);
+            return km < 0 ? null : String.valueOf(km);
         }
         if ("charge.target_ac".equals(name) || "charge.target_dc".equals(name)) {
             int half = hev("charge.target_ac".equals(name) ? "framework.hev_flag.target_soc_ac" : "framework.hev_flag.target_soc_dc");
@@ -540,10 +540,6 @@ public final class Hub {
         if ("aux.climate_power".equals(name)) return scaled(hev("framework.hev_flag.climate_power"), 0xfffe, 20);
         if ("aux.other_ecu_power".equals(name)) return scaled(hev("framework.hev_flag.other_ecu_power"), 0xfe, 10);
         if ("aux.battery_conditioning_power".equals(name)) return scaled(hev("framework.hev_flag.battery_comp_power"), 0xfe, 20);
-        if ("aux.power".equals(name)) {
-            String c = read("aux.climate_power"), e = read("aux.other_ecu_power"), b = read("aux.battery_conditioning_power");
-            return c == null || e == null || b == null ? null : String.valueOf(Integer.parseInt(c) + Integer.parseInt(e) + Integer.parseInt(b));
-        }
         if ("drive_mode".equals(name)) return callbacks.driveMode == Integer.MIN_VALUE ? null : String.valueOf(callbacks.driveMode);
         if ("odometer".equals(name)) {
             int tenths = hev("framework.hev_flag.odometer");

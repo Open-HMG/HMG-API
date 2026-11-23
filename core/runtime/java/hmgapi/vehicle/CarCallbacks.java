@@ -3,6 +3,7 @@ package hmgapi.vehicle;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.Parcel;
+import android.os.SystemClock;
 
 import hmgapi.hook.Points;
 
@@ -34,25 +35,25 @@ final class CarCallbacks {
     /** body control's drive mode (onDriveModeChanged, raw); MIN_VALUE: not heard yet */
     volatile int driveMode = Integer.MIN_VALUE;
 
-    /** the cluster's last battery info (8 ints: [1] minimum pack temperature °C, [2] usable energy (2 Wh), [5] conditioning indicator, [6] range km, [7] VCU_DTE_ADD km), and when; null until heard */
-    volatile int[] battery;
-    volatile long batteryAt;
+    private final BatteryInfo battery = new BatteryInfo();
 
     /** the ambient light's last status: r, g, b (2 bytes each), brightness, dimmed while driving, drive mode; null until heard */
     volatile byte[] sml;
 
-    private Listener system, bcm, cluster;
+    private Listener system, bcm;
+    private volatile Listener cluster;
     private String lastFailure, lastBcmFailure, lastClusterFailure;   // logged once, not every tick
     private boolean lightAsked;
 
     /**
-     * After QuickBoot STR suspend, body control's cached push values may be from an earlier
-     * drive until CAN wakes up; clear them so stale readings aren't served.
+     * After QuickBoot STR suspend, clear the cached heating and battery readings
+     * so they cannot carry over to the next drive.
      */
     synchronized void onWake() {
         wheelHeat = Integer.MIN_VALUE;
         defogger = Integer.MIN_VALUE;
         lightAsked = false;
+        battery.clear();
     }
 
     /** a binder answering some transactions of one interface */
@@ -175,10 +176,7 @@ final class CarCallbacks {
                     Listener l = new Listener(Points.cls(null, "framework.cluster_listener").getName(), code) {
                         @Override
                         void got(int c, Parcel d) {
-                            int[] v = d.createIntArray();
-                            if (battery == null) System.out.println("vehicle: battery info, first values: " + java.util.Arrays.toString(v));
-                            battery = v;
-                            batteryAt = android.os.SystemClock.elapsedRealtime();
+                            battery.received(d.createIntArray(), SystemClock.elapsedRealtime());
                         }
                     };
                     Object proxy = Points.call(null, "framework.cluster_listener_stub.as_interface", null, l);
@@ -321,44 +319,42 @@ final class CarCallbacks {
      * temperature of -40..60 °C (Launchpad's ClusterBatteryTemperatureReader).
      */
     int packTempMin(long waitMs) {
-        int[] b = batteryInfo(waitMs);
-        if (b == null || b[1] < -40 || b[1] > 60) return Integer.MIN_VALUE;
-        return b[1];
+        return BatteryInfo.packTempMin(batteryInfo(waitMs));
+    }
+
+    int rangeKm(long waitMs) {
+        return BatteryInfo.rangeKm(batteryInfo(waitMs));
     }
 
     /**
-     * The cluster's battery info (8 ints), a packet under 2 s old or asked for now (waiting up
-     * to waitMs); null when there's none, it isn't 8 values, or it's a wake-up packet: usable
-     * energy 0xffff (its range 0), or all zeros (the first packet at a start, before the BMS
-     * has said anything: seen on a US Ioniq 5 260507, which would read range 0 and 0 C).
+     * Use a recent cluster reply or wait up to waitMs for one. Readers share the reply
+     * and send at most one request every two seconds, even when the cluster doesn't answer.
      */
-    int[] batteryInfo(long waitMs) {
-        int[] last = battery;
-        if (last != null && android.os.SystemClock.elapsedRealtime() - batteryAt < 2000) return good(last);
-        long asked = android.os.SystemClock.elapsedRealtime();
-        try {
-            Object svc = Hub.cluster();
-            if (svc == null || cluster == null) return null;
-            Points.call(svc.getClass().getClassLoader(), "framework.cluster_service.battery_info", svc);
-        } catch (Throwable t) {
-            Hub.services.remove("framework.car_services.cluster");
-            return null;
-        }
-        while (batteryAt < asked && android.os.SystemClock.elapsedRealtime() - asked < waitMs) {
+    private int[] batteryInfo(long waitMs) {
+        long started = SystemClock.elapsedRealtime();
+        int[] reply = battery.fresh(started);
+        if (reply != null || cluster == null) return reply;
+        if (battery.beginRequest(SystemClock.elapsedRealtime())) {
             try {
-                Thread.sleep(20);
-            } catch (InterruptedException e) {
-                break;
+                Object svc = Hub.cluster();
+                if (svc == null) return null;
+                Points.call(svc.getClass().getClassLoader(), "framework.cluster_service.battery_info", svc);
+            } catch (Throwable t) {
+                Hub.services.remove("framework.car_services.cluster");
+                return null;
             }
         }
-        return batteryAt < asked ? null : good(battery);
-    }
-
-    static int[] good(int[] b) {
-        if (b == null || b.length != 8 || b[2] == 0xffff) return null;
-        // all zeros: no state of charge, energy or range yet (a real empty pack still has a SOC
-        // reading and a temperature; the car doesn't run at 0)
-        return b[0] == 0 && b[2] == 0 && b[6] == 0 ? null : b;
+        long now = SystemClock.elapsedRealtime();
+        while ((reply = battery.fresh(now)) == null && now - started < waitMs) {
+            try {
+                Thread.sleep(Math.min(20, waitMs - (now - started)));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return null;
+            }
+            now = SystemClock.elapsedRealtime();
+        }
+        return reply;
     }
 
     /** the light's status from LightRelay: hex of r, g, b (2 bytes each), brightness, dimmed, drive mode */
