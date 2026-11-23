@@ -478,6 +478,13 @@ NEMESIS in the app menu.
 
   Nine new framework hook points, mapped on the US Ioniq 5 260507. On other cars they're listed missing until mapped, and their readings answer `-`. Range and `hv.battery_temp_min` now share one cluster battery info request every 2 s at most. (docs/mod-reference.md, "Vehicle readings")
 
+- **Hook points for EV mods** (#46):
+  - `gpm.sensor_source.shutdown`, Android Auto's sensor service ending (before its native object is freed);
+  - `gpm.sensor_source.report_diagnostics`, the native send a library recipe can repoint for raw sensor data;
+  - `framework.datc_service.vr_climate_status` and `framework.datc_service.is_unit_celsius`, climate control's state.
+
+  Mapped on the US Ioniq 5 260507 and listed missing elsewhere. (docs/hook-points.md)
+
 ## 1.1.0-rc.2 (2026-11-15)
 
 The second release candidate: fixes from a review of rc.1, nothing new in HMG-API itself.

@@ -2230,6 +2230,32 @@
       }
     },
     {
+      "id": "framework.datc_service.vr_climate_status",
+      "kind": "method",
+      "of": "framework.datc_service",
+      "find": {
+        "name": "getVRClimateStatus",
+        "params": [
+          "int"
+        ],
+        "ret": "float"
+      },
+      "about": "(DATCFlag) one climate value from the service's cache: 2 driver set temperature, 5 blower, 6 mode, 8 auto, 9 A/C, 12 on/off, 13 unit; -1 an unsupported flag"
+    },
+    {
+      "id": "framework.datc_service.is_unit_celsius",
+      "kind": "method",
+      "of": "framework.datc_service",
+      "find": {
+        "name": "isUnitCelsius",
+        "params": [
+          "int"
+        ],
+        "ret": "boolean"
+      },
+      "about": "(unit) whether climate control's temperature unit is Celsius"
+    },
+    {
       "id": "framework.datc_status",
       "kind": "class",
       "find": {
