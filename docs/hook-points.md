@@ -17,48 +17,48 @@ Every point and map lives here, in HMG-API, including the ones only a mod in its
 uses (the wireless mod's, for one): a mod gets new points through an HMG-API release and its
 mod SDK ([mod-repos.md](mod-repos.md), section 4).
 
-393 hook points. **Cars** (`maps/`):
+395 hook points. **Cars** (`maps/`):
 
 | Car | Map | Points |
 |---|---|---|
-| Genesis G70 CAN 260903 | mapped on cars by HMG-API's own mapper | 383 of 393 |
-| Genesis G70 KOR 260902 | mapped on cars by HMG-API's own mapper | 343 of 393 |
-| Genesis G70 USA 260507 | mapped on cars by HMG-API's own mapper | 353 of 393 |
-| Hyundai Ioniq 6 CAN 260206 | checked on a car | 393 of 393 |
-| Hyundai Ioniq 6 KOR 260902 | mapped on cars by HMG-API's own mapper | 335 of 393 |
-| Hyundai Ioniq 6 SGP 260907 | mapped on cars by HMG-API's own mapper | 314 of 393 |
-| Hyundai Ioniq 6 USA 260507 | mapped from stock files | 353 of 393 |
-| Hyundai Ioniq 6 USA 260903 | checked on a car | 393 of 393 |
-| Hyundai Elantra N USA 260903 | mapped on cars by HMG-API's own mapper | 353 of 393 |
-| Hyundai Avante KOR 260902 | mapped on cars by HMG-API's own mapper | 353 of 393 |
-| Hyundai Elantra USA 260507 | mapped on cars by HMG-API's own mapper | 393 of 393 |
-| Hyundai Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N, Palisade 2020-22 CAN 260206 | mapped from stock files | 393 of 393 |
-| Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902 | mapped on cars by HMG-API's own mapper | 353 of 393 |
-| Hyundai Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N, Palisade 2020-22 USA 260507 | mapped from stock files | 393 of 393 |
-| Hyundai Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N, Palisade 2020-22 USA 260903 | mapped from stock files | 393 of 393 |
-| Hyundai Palisade USA 260507 | mapped from stock files | 353 of 393 |
-| Hyundai Palisade USA 260903 | mapped on cars by HMG-API's own mapper | 353 of 393 |
-| Hyundai Ioniq 5 CAN 260206 | mapped from stock files | 393 of 393 |
-| Hyundai Ioniq 5 KOR 260902 | mapped from stock files | 393 of 393 |
-| Hyundai Ioniq 5 USA 260507 | mapped from stock files | 393 of 393 |
-| Hyundai Ioniq 5 USA 260903 | mapped from stock files | 393 of 393 |
-| Hyundai Kona USA 260903 | mapped on cars by HMG-API's own mapper | 353 of 393 |
-| Hyundai Creta Electric IND 260430 | mapped on cars by HMG-API's own mapper | 354 of 393 |
-| Hyundai Creta IND 260430 | mapped on cars by HMG-API's own mapper | 340 of 393 |
-| Kia K3 KOR 260902 | mapped on cars by HMG-API's own mapper | 325 of 393 |
-| Kia EV6 CAN 260206 | mapped from stock files | 393 of 393 |
-| Kia EV6 IND 260430 | mapped on cars by HMG-API's own mapper | 353 of 393 |
-| Kia EV6 KOR 260902 | mapped on cars by HMG-API's own mapper | 320 of 393 |
-| Kia EV6 USA 260507 | checked on a car | 393 of 393 |
-| Kia Carnival USA 260507 | mapped from stock files | 393 of 393 |
-| Kia K5, Sorento, Stinger, Soul, Seltos 2021, Niro 2020-21, Telluride 2020-21 CAN 260206 | mapped from stock files | 393 of 393 |
-| Kia K5, Sorento, Stinger, Seltos, Soul, Niro, Mohave, K7, Morning, Ray KOR 260902 | mapped from stock files | 393 of 393 |
-| Kia K5, Sorento, Stinger, Soul, Seltos 2021, Niro 2020-22, Cadenza, Telluride 2020-21 USA 260507 | mapped from stock files | 393 of 393 |
-| Kia Sportage (and Hybrid, Plug-in Hybrid), Forte, Carnival 2022, Niro Hybrid and Plug-in Hybrid, Soul, Seltos 2024 USA 260507 | mapped from stock files | 393 of 393 |
-| Kia Telluride USA 260507 | mapped from stock files | 393 of 393 |
-| Kia Niro EV CAN 260206 | mapped on cars by HMG-API's own mapper | 353 of 393 |
-| Kia Niro, Sportage, Carnival, Telluride, Forte, Soul, Seltos 2024 CAN 260206 | mapped from stock files | 393 of 393 |
-| Kia Niro EV USA 260507 | mapped from stock files | 393 of 393 |
+| Genesis G70 CAN 260903 | mapped on cars by HMG-API's own mapper | 385 of 395 |
+| Genesis G70 KOR 260902 | mapped on cars by HMG-API's own mapper | 345 of 395 |
+| Genesis G70 USA 260507 | mapped on cars by HMG-API's own mapper | 355 of 395 |
+| Hyundai Ioniq 6 CAN 260206 | checked on a car | 395 of 395 |
+| Hyundai Ioniq 6 KOR 260902 | mapped on cars by HMG-API's own mapper | 337 of 395 |
+| Hyundai Ioniq 6 SGP 260907 | mapped on cars by HMG-API's own mapper | 316 of 395 |
+| Hyundai Ioniq 6 USA 260507 | mapped from stock files | 355 of 395 |
+| Hyundai Ioniq 6 USA 260903 | checked on a car | 395 of 395 |
+| Hyundai Elantra N USA 260903 | mapped on cars by HMG-API's own mapper | 355 of 395 |
+| Hyundai Avante KOR 260902 | mapped on cars by HMG-API's own mapper | 355 of 395 |
+| Hyundai Elantra USA 260507 | mapped on cars by HMG-API's own mapper | 395 of 395 |
+| Hyundai Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N, Palisade 2020-22 CAN 260206 | mapped from stock files | 395 of 395 |
+| Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902 | mapped on cars by HMG-API's own mapper | 355 of 395 |
+| Hyundai Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N, Palisade 2020-22 USA 260507 | mapped from stock files | 395 of 395 |
+| Hyundai Elantra, Sonata, Santa Fe, Kona, Ioniq, Venue, Veloster N, Palisade 2020-22 USA 260903 | mapped from stock files | 395 of 395 |
+| Hyundai Palisade USA 260507 | mapped from stock files | 355 of 395 |
+| Hyundai Palisade USA 260903 | mapped on cars by HMG-API's own mapper | 355 of 395 |
+| Hyundai Ioniq 5 CAN 260206 | mapped from stock files | 395 of 395 |
+| Hyundai Ioniq 5 KOR 260902 | mapped from stock files | 395 of 395 |
+| Hyundai Ioniq 5 USA 260507 | mapped from stock files | 395 of 395 |
+| Hyundai Ioniq 5 USA 260903 | mapped from stock files | 395 of 395 |
+| Hyundai Kona USA 260903 | mapped on cars by HMG-API's own mapper | 355 of 395 |
+| Hyundai Creta Electric IND 260430 | mapped on cars by HMG-API's own mapper | 356 of 395 |
+| Hyundai Creta IND 260430 | mapped on cars by HMG-API's own mapper | 342 of 395 |
+| Kia K3 KOR 260902 | mapped on cars by HMG-API's own mapper | 327 of 395 |
+| Kia EV6 CAN 260206 | mapped from stock files | 395 of 395 |
+| Kia EV6 IND 260430 | mapped on cars by HMG-API's own mapper | 355 of 395 |
+| Kia EV6 KOR 260902 | mapped on cars by HMG-API's own mapper | 322 of 395 |
+| Kia EV6 USA 260507 | checked on a car | 395 of 395 |
+| Kia Carnival USA 260507 | mapped from stock files | 395 of 395 |
+| Kia K5, Sorento, Stinger, Soul, Seltos 2021, Niro 2020-21, Telluride 2020-21 CAN 260206 | mapped from stock files | 395 of 395 |
+| Kia K5, Sorento, Stinger, Seltos, Soul, Niro, Mohave, K7, Morning, Ray KOR 260902 | mapped from stock files | 395 of 395 |
+| Kia K5, Sorento, Stinger, Soul, Seltos 2021, Niro 2020-22, Cadenza, Telluride 2020-21 USA 260507 | mapped from stock files | 395 of 395 |
+| Kia Sportage (and Hybrid, Plug-in Hybrid), Forte, Carnival 2022, Niro Hybrid and Plug-in Hybrid, Soul, Seltos 2024 USA 260507 | mapped from stock files | 395 of 395 |
+| Kia Telluride USA 260507 | mapped from stock files | 395 of 395 |
+| Kia Niro EV CAN 260206 | mapped on cars by HMG-API's own mapper | 355 of 395 |
+| Kia Niro, Sportage, Carnival, Telluride, Forte, Soul, Seltos 2024 CAN 260206 | mapped from stock files | 395 of 395 |
+| Kia Niro EV USA 260507 | mapped from stock files | 395 of 395 |
 
 In the tables, **Cars** is "all" when every car above has the point, otherwise the cars without it.
 
@@ -398,6 +398,8 @@ App `com.daudio.app.dipo`.
 | `dipo.iap2_proxy.stop_route_guidance` | method | `Iap2SvcStopRouteGuidanceUpdate(String[])` → boolean | stop the phone's route guidance updates (DiPO: the car's navigation took turn-by-turn back) | all |
 | `dipo.carplay.disconnect` | method | `disconnectCarPlay()` → com.daudio.app.dipo.telechips.CarPlayReturn | ends the CarPlay session; DiPO then doesn't advertise CarPlay again (restartBonjour off) until something does | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260507, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
 | `dipo.carplay.restart_bonjour` | method | `restartBonjour()` → com.daudio.app.dipo.telechips.CarPlayReturn | advertises CarPlay again (Bonjour), as DiPO does after a session it didn't end itself: the phone can come back | not on Genesis G70 CAN 260903, Genesis G70 KOR 260902, Genesis G70 USA 260507, Hyundai Ioniq 6 KOR 260902, Hyundai Ioniq 6 SGP 260907, Hyundai Ioniq 6 USA 260507, Hyundai Elantra N USA 260903, Hyundai Avante KOR 260902, Hyundai Sonata, Sonata Hybrid, Santa Fe, Palisade KOR 260902, Hyundai Palisade USA 260507, Hyundai Palisade USA 260903, Hyundai Kona USA 260903, Hyundai Creta Electric IND 260430, Hyundai Creta IND 260430, Kia K3 KOR 260902, Kia EV6 IND 260430, Kia EV6 KOR 260902, Kia Niro EV CAN 260206 |
+| `dipo.service` | class | `com.daudio.app.dipo.service.DipoService` | DiPO's main service (DipoService) | all |
+| `dipo.service.reset_usb` | method | `?()` → void | resetUSB(): power-cycles the USB port through the micom (requestVBusOffOn), about 6 s into a CarPlay session start; part of the wired handshake, and it drops a USB Wi-Fi adapter on that port | all |
 
 ## gpm
 

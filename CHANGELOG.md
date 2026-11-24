@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **New hook point `dipo.service.reset_usb`** (with its class, `dipo.service`): DipoService's
+  `resetUSB()`, which power-cycles the USB port through the micom (`requestVBusOffOn`) about
+  6 s after a CarPlay session starts. It is part of the wired handshake. A mod that runs a
+  wireless session over a USB Wi-Fi adapter on that port can skip it while its own session is
+  attached (#372).
+
 ## 1.1.0-rc.8 (2026-11-20)
 
 - **Comes with wireless CarPlay + Android Auto 2.2.0-rc.9** (it needs this RC): #91's fix (an iPhone

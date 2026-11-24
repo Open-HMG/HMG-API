@@ -201,5 +201,14 @@
     "params": [],
     "ret": "com.daudio.app.dipo.telechips.CarPlayReturn",
     "static": false
+  },
+  "dipo.service": {
+    "class": "com.daudio.app.dipo.service.DipoService"
+  },
+  "dipo.service.reset_usb": {
+    "method": "cv",
+    "params": [],
+    "ret": "void",
+    "static": false
   }
 }
