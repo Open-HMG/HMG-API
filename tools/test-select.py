@@ -18,7 +18,7 @@ RUNTIME = ['core/runtime/*-test.sh']
 ENGINE = ['core/runtime/engine-test.sh', 'core/runtime/signing-test.sh', 'core/runtime/system-test.sh', 'core/runtime/safety-test.sh',
           'core/runtime/packages-test.sh', 'core/runtime/map-test.sh', 'core/runtime/local-map-test.sh', 'core/runtime/usb-test.sh', 'core/runtime/hooks-test.sh',
           'core/runtime/live-test.sh', 'core/runtime/native-test.sh', 'core/runtime/runtime-test.sh', 'core/runtime/net-test.sh', 'core/runtime/homewifi-test.sh',
-          'core/runtime/overlap-test.sh', 'core/runtime/scriptcheck-test.sh', 'install/nemesis/mod-test.sh', 'install/nemesis/sync-test.sh',
+          'core/runtime/overlap-test.sh', 'core/runtime/scriptcheck-test.sh', 'core/runtime/sitefind-test.sh', 'core/runtime/selftest-test.sh', 'install/nemesis/mod-test.sh', 'install/nemesis/sync-test.sh',
           'tools/catalog-test.sh', 'tools/version-test.sh', 'tools/check-scripts.sh']
 INSTALL = ['install/common/test.sh', 'install/common/install-test.sh', 'install/usb/test.sh', 'install/nemesis/mod-test.sh', 'install/nemesis/sync-test.sh']
 MODS = ['tools/check-scripts.sh']   # the example mods' scripts (their tests run in sdk-test)
@@ -53,6 +53,7 @@ RULES = [
     (['mods/examples/*'], ['core/runtime/signing-test.sh', 'install/nemesis/mod-test.sh', 'tools/check-scripts.sh'] + SDK),   # hello: its test.sh runs in sdk-test
     (['install/*'], INSTALL + ['core/runtime/packages-test.sh']),
     (['install/nemesis/mod/*', 'install/nemesis/bin/open.sh'], SDK),
+    (['tools/sitefind.py', 'core/runtime/test/selftest/*'], ['core/runtime/sitefind-test.sh', 'core/runtime/selftest-test.sh']),   # research prototypes
     (['tools/mkdelta.py', 'tools/mkrecipe.py', 'tools/mkmemrecipe.py'], ['core/runtime/engine-test.sh', 'core/runtime/safety-test.sh', 'tools/lpatch/test.sh']),
     (['tools/mkinstallers.sh', 'tools/mkrelease.sh', 'tools/mkmodpkg.sh', 'tools/mknemesismod.sh', 'tools/nemesis-version.py', 'tools/nemesis-meta.py', 'tools/release-mods.txt'], INSTALL + ['core/runtime/signing-test.sh', 'core/runtime/usb-test.sh'] + SDK + MODS),
     # the mod SDK and the reusable mod workflow

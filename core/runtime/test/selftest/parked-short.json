@@ -1,0 +1,42 @@
+{
+ "about": "two samples a second apart, parked: not enough to judge most checks",
+ "synthetic": true,
+ "expect": {
+  "result": "pass",
+  "range.tracks_soc": "skip",
+  "callback.drive_mode": "pass",
+  "soc.range": "pass"
+ },
+ "samples": [
+  {
+   "t": 0,
+   "hv.soc": "81.5",
+   "hv.energy": "61188",
+   "hv.capacity_nominal": "77400",
+   "range": "289",
+   "charge.target_ac": "80",
+   "charge.target_dc": "90",
+   "aux.climate_power": "1200",
+   "aux.other_ecu_power": "350",
+   "aux.battery_conditioning_power": "0",
+   "aux.power": "1550",
+   "drive_mode": "-",
+   "outside_temp": "12.5"
+  },
+  {
+   "t": 1000,
+   "hv.soc": "81.5",
+   "hv.energy": "61188",
+   "hv.capacity_nominal": "77400",
+   "range": "289",
+   "charge.target_ac": "80",
+   "charge.target_dc": "90",
+   "aux.climate_power": "1200",
+   "aux.other_ecu_power": "350",
+   "aux.battery_conditioning_power": "0",
+   "aux.power": "1550",
+   "drive_mode": "1",
+   "outside_temp": "12.5"
+  }
+ ]
+}
