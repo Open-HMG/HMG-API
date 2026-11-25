@@ -181,7 +181,7 @@ eng apply   # nothing to do
 n=$(queued)
 printf 'action=install\nid=hmgapi\nstate=failed\nrc=1\n' > $R/data/nemesis/queue/00000009.job
 echo "libtest.so: Some package already replaces it" > $R/data/nemesis/queue/00000009.out
-sed -i 's/^package-version=.*/package-version=1.0/' $R/data/nemesis/apps/hmgapi/NEMESIS.data
+f=$R/data/nemesis/apps/hmgapi/NEMESIS.data; sed 's/^package-version=.*/package-version=1.0/' $f > $f.new && mv $f.new $f   # no sed -i: BSD sed's differs
 eng status
 check "failed job: status exit 4" 4 $rc
 has "failed job: status says why" "NEMESIS couldn't apply HMG-API's last file changes: libtest.so: Some package already replaces it" "$out"
