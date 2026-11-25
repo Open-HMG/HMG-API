@@ -440,8 +440,11 @@ public final class Engine {
             out.add("usage: engine plan | apply [--trial] | keep | restore | status | recover | firmware-reset | install <zip|dir> | remove <id> | nemesis-sync | map | map-car [--local [--if-needed] | --write | --forget] | verify-map | report [--usb] | usb-scan | update-hmgapi <zip> | publish-state | apps");
             return 2;
         }
+        writes = !"plan".equals(cmd);   // NemesisFiles.start: only an apply or restore moves files
         Plan p = plan(restoreAll, force);
         p.report(this);
+        String lpFailed = livepatch() == null || restoreAll ? null : livepatch().failed();
+        if (lpFailed != null) out.add("NEMESIS couldn't apply HMG-API's last file changes: " + lpFailed + " (Apply changes tries again)");
         if (!restoreAll) {
             out.addAll(hookPlan().report());
             Set<String> on = new LinkedHashSet<String>();
@@ -458,6 +461,7 @@ public final class Engine {
         if ("plan".equals(cmd)) return 0;
         if (p.isEmpty()) {
             out.add("nothing to do");
+            if ("apply".equals(cmd) && lpFailed != null) livepatch().commit();   // NEMESIS again, once the cause is gone
             if ("apply".equals(cmd)) LiveState.publish(this);   // a switch with no file change still reaches running apps
             return 0;
         }
@@ -929,6 +933,7 @@ public final class Engine {
         Map<String, String> rebased = new TreeMap<String, String>();   // path -> live md5: changed outside HMG-API, built on again
         Map<String, String> rebasedFrom = new TreeMap<String, String>();   // path -> what HMG-API had written (merges: checked after build)
         boolean force;           // --force: owned files that aren't what HMG-API wrote are written again
+        boolean restoreAll;      // engine restore (uninstall.sh): with NEMESIS LivePatch, its unlisting takes the files
 
         boolean isEmpty() throws IOException {
             if (!rebased.isEmpty()) return false;
@@ -987,6 +992,9 @@ public final class Engine {
     Plan plan(boolean restoreAll, boolean force) throws Exception {
         Plan p = new Plan();
         p.force = force;
+        p.restoreAll = restoreAll;
+        if (livepatch() != null) livepatch().start(restoreAll);
+        else NemesisFiles.off(this);
         p.state = loadState();
         Map<String, Object> files = (Map<String, Object>) p.state.get("files");
         Map<String, Object> st = (Map<String, Object>) p.state.get("settings");
@@ -1959,6 +1967,9 @@ public final class Engine {
         for (Target t : changed) needs.add(restart(t.path));
         if (!p.settings.isEmpty() || !p.settingsRestore.isEmpty()) needs.add("settings applied now");
         out.add("done: " + changed.size() + " file(s); " + needs);
+        // NEMESIS LivePatch: the files go to NEMESIS (its queue; it asks for the restart). Not for uninstall.sh's
+        // restore: it unlists HMG-API's package next, which takes them, and a queued package would list it again.
+        if (livepatch() != null && !changed.isEmpty() && !p.restoreAll) livepatch().commit();
     }
 
     List<String> withOdex(Target t) {
@@ -1995,13 +2006,23 @@ public final class Engine {
             odex.delete();
             dalvik(t.path, odex, true);
         }
-        out.add("wrote    " + t.path);
+        out.add((livepatch() != null ? "LivePatch " : "wrote    ") + t.path);   // LivePatch: HMG-API's view, for NEMESIS
     }
 
     /** dexopt a rebuilt app and fill its Dalvik cache entry, as the 1.x package did. */
     void dalvik(String apkPath, File odex, boolean dexopt) throws Exception {
         if (host) return;
         String apk = new File(apkPath).getName();
+        // NEMESIS LivePatch: the odex is made next to HMG-API's apk and NEMESIS mounts both at the restart;
+        // the app that runs until then keeps its own Dalvik cache
+        if (livepatch() != null) {
+            if (dexopt) {
+                Run r = exec("/system/bin/dexopt", "--preopt", sys(apkPath).getPath(), odex.getPath(), "m=y,u=n");
+                if (r.code != 0 || !odex.isFile()) throw new IOException("dexopt " + apkPath + ": " + r.text);
+                exec("/system/bin/chmod", "644", odex.getPath());
+            }
+            return;
+        }
         exec("/system/bin/sh", "-c", "rm -f /data/dalvik-cache/*" + apk + "* /cache/dalvik-cache/*" + apk + "*");
         if (dexopt) {
             Run r = exec("/system/bin/dexopt", "--preopt", sys(apkPath).getPath(), odex.getPath(), "m=y,u=n");
@@ -2040,7 +2061,8 @@ public final class Engine {
 
     Set<String> hold(List<Target> changed) throws Exception {
         Set<String> held = new LinkedHashSet<String>();
-        if (host || !"1".equals(getprop("sys.boot_completed"))) return held;
+        // NEMESIS LivePatch: a running app's files don't change now (NEMESIS mounts them at the restart)
+        if (host || livepatch() != null || !"1".equals(getprop("sys.boot_completed"))) return held;
         Map<String, String> pkgs = new LinkedHashMap<String, String>();
         for (String l : exec("/system/bin/pm", "list", "packages", "-f").text.split("\n")) {
             l = l.trim();
@@ -2060,7 +2082,7 @@ public final class Engine {
     }
 
     void remount(String mode) throws Exception {
-        if (host) return;
+        if (host || livepatch() != null) return;   // NEMESIS LivePatch: nothing here writes /system
         Run r = exec(env("HMGAPI_HMGAPID", "/system/bin/hmgapid"), "remount", mode);
         if (r.code != 0 && "rw".equals(mode)) throw new IOException("remount rw: " + r.text);
     }
@@ -2084,6 +2106,15 @@ public final class Engine {
         for (Map.Entry<String, Object> e : ((Map<String, Object>) state.get("settings")).entrySet()) {
             Map<String, Object> s = (Map<String, Object>) e.getValue();
             out.add("setting  " + e.getKey() + " = " + s.get("value") + " [" + s.get("mod") + "], stock " + s.get("stock"));
+        }
+        NemesisFiles lp = livepatch();
+        if (lp != null && !files.isEmpty()) {
+            out.add("files: NEMESIS LivePatch outputs (HMG-API's NEMESIS package, hmgapi), /system itself unchanged");
+            String why = lp.failed();
+            if (why != null) {
+                out.add("NEMESIS couldn't apply HMG-API's last file changes: " + why + " (Apply changes tries again)");
+                bad++;
+            }
         }
         Set<String> on = new LinkedHashSet<String>();
         adbTcpWarning(LiveState.mods(this, on), on);
@@ -2141,6 +2172,8 @@ public final class Engine {
             return 0;
         }
         Map<String, Object> j = Json.object(read(journalFile));
+        // a journal from before HMG-API moved to NEMESIS LivePatch (no marker): its files are on /system
+        if (livepatch() != null && !livepatch().marker.exists()) livepatch = null;
         remount("rw");
         try {
             for (Object o : (List<Object>) j.get("entries")) {
@@ -2163,6 +2196,7 @@ public final class Engine {
         journalFile.delete();
         rm(prevDir);
         out.add(Boolean.TRUE.equals(j.get("trial")) ? "trial undone" : "unfinished apply rolled back");
+        if (livepatch() != null) livepatch().commit();
         return 0;
     }
 
@@ -2216,7 +2250,25 @@ public final class Engine {
         return s;
     }
 
-    File sys(String path) { return new File(root + path); }
+    /** The file at path as HMG-API sees it: /system, or with NEMESIS LivePatch HMG-API's view (NemesisFiles). */
+    File sys(String path) {
+        NemesisFiles lp = livepatch();
+        return lp != null && lp.routes(path) ? lp.view(path) : new File(root + path);
+    }
+
+    NemesisFiles livepatch;
+    boolean writes;
+    boolean livepatchChecked;
+    Run nemesisVersion;   // asked once per command (NemesisSync.version)
+
+    /** NEMESIS 1.17.1 or newer, which takes the mods' file changes as LivePatch outputs, or null. */
+    NemesisFiles livepatch() {
+        if (!livepatchChecked) {
+            livepatchChecked = true;
+            livepatch = NemesisFiles.detect(this);
+        }
+        return livepatch;
+    }
 
     File backup(String path) { return new File(stockDir, path); }
 

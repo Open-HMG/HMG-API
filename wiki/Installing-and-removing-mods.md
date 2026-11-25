@@ -77,6 +77,16 @@ the mod on. **If you already installed the mod first:** uninstall the package an
 restart, and tap **Apply changes**. HMG-API sees that the package put the stock files
 back, builds the mod's changes on them, and the mod's hooks turn on at the next restart.
 
+### With NEMESIS 1.17.1 or newer
+
+HMG-API doesn't write the mods' file changes to the system any more: it hands them to
+NEMESIS LivePatch in its own NEMESIS package, `hmgapi`. NEMESIS puts them in place at the
+next restart, under any NEMESIS package that patches the same files, so both keep
+working. After **Apply changes**, NEMESIS Manager counts down to that restart. NEMESIS's
+safe mode shows the stock files. The first apply after updating NEMESIS moves the files
+HMG-API had already changed over, by itself. If NEMESIS couldn't take a change,
+`hmgapid engine status` and the next plan say so, and **Apply changes** tries again.
+
 ## Updating
 
 The same way: put the new zip on the stick and install it over the old one. Your

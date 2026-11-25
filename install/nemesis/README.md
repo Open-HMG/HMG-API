@@ -58,6 +58,37 @@ it says why, and the next sync tries again.
 `sync-test.sh` runs it all off-car with the real engine and a stand-in NEMESIS;
 `install/common/install-test.sh` checks the unlisting in `uninstall.sh`.
 
+## Mods' file changes as NEMESIS LivePatch outputs (NEMESIS 1.17.1 or newer)
+
+With NEMESIS 1.17.1 or newer, the engine no longer writes the files mods change into
+`/system` (`NemesisFiles.java`). It builds, checks, backs up and records each file as
+before, but the result goes to `/data/hmgapi/livepatch/files/system/...`, and the
+`hmgapi` package carries those results as `[file.N]` sections with
+`livepatch-first=1` (NEMESIS's 09-LivePatch.md). NEMESIS mounts them over `/system` at
+its next restart, under any other NEMESIS package's patch of the same file. Its safe
+mode then shows stock, and uninstalling `hmgapi` takes the changes with it.
+
+- The package goes through NEMESIS's queue (`nemesis queue add --move`), never a
+  `nemesis install` that waits: a mod package's postinstall runs `engine apply` inside a
+  NEMESIS job, and a second job would wait for it forever. NEMESIS asks for the restart
+  when the job is done. A job that fails shows in `engine status` (exit 4) and in the
+  next plan, and Apply changes queues it again.
+- Stock bytes of a file HMG-API doesn't own come from `nemesis livepatch stock`, which
+  reads under every LivePatch output.
+- `build.prop`: init reads it before `/data` is mounted, so it is never a LivePatch file.
+  Keys mods set become `[prop.N]` (set before the framework starts; services that start
+  earlier see the stock value). A removed key, a value over 91 bytes, or a value starting
+  with `"` or holding a tab can't be a `[prop.N]`, so HMG-API writes `build.prop` itself
+  as before, and NEMESIS's safe mode doesn't undo that.
+- Moving over: the first apply or restore on NEMESIS 1.17.1 copies each file HMG-API had
+  written into the LivePatch folder and puts the stock backup back on `/system`. A plan
+  writes nothing. `engine restore` and `uninstall.sh` queue nothing; NEMESIS removes the
+  outputs with the package.
+- NEMESIS older than 1.17.1, or gone: `/system` is written as before, and the LivePatch
+  folder is dropped.
+
+`core/runtime/livepatch-test.sh` runs it all off-car with a stand-in NEMESIS.
+
 ## Mods as NEMESIS packages
 
 `tools/mknemesismod.sh <signed mod zip>` wraps a mod (tools/mkmodpkg.sh's zip, as it
