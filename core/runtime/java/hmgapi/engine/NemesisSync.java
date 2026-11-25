@@ -65,10 +65,16 @@ final class NemesisSync {
         }
     }
 
+    /** `nemesis version`, once per command: the sync and LivePatch both ask. */
+    static Engine.Run nemesisVersion(Engine e, File nemesis) throws Exception {
+        if (e.nemesisVersion == null) e.nemesisVersion = Engine.exec(nemesis.getPath(), "version");
+        return e.nemesisVersion;
+    }
+
     static int sync(Engine e) throws Exception {
         File nemesis = new File(e.root + "/system/xbin/nemesis");
         if (!nemesis.isFile()) return 0;   // no NEMESIS: nothing to list
-        Engine.Run v = Engine.exec(nemesis.getPath(), "version");
+        Engine.Run v = nemesisVersion(e, nemesis);
         String ver = v.text.trim();
         if (v.code != 0 || !ver.matches("[0-9]+(\\.[0-9]+)*") || cmp(ver, "1.16") < 0) {
             e.out.add("NEMESIS sync: NEMESIS " + (ver.isEmpty() ? "?" : ver) + " is older than 1.16, so HMG-API isn't listed in it (update NEMESIS)");
@@ -82,19 +88,13 @@ final class NemesisSync {
         Map<String, String> listed = listed(e);
         Map<String, String> conflicts = conflicts(new File(tpl, "conflicts.txt"));
         int bad = 0;
-        // HMG-API first: the mods' packages depend on it
-        String pv = packageVersion(Engine.HMGAPI_VERSION);
+        // HMG-API first: the mods' packages depend on it. With NEMESIS LivePatch it carries the mods'
+        // file changes too (NemesisFiles), and its version their generation.
+        NemesisFiles lp = e.livepatch();
+        NemesisFiles.Pack pack = lp == null ? null : lp.pack();
+        String pv = hmgapiVersion(pack);
         if (!pv.equals(listed.get("hmgapi"))) {
-            Map<String, String> d = new LinkedHashMap<String, String>();
-            d.put("id", "hmgapi");
-            d.put("name", "HMG-API");
-            d.put("package-version", pv);
-            d.put("short-desc", "Mod manager for Gen5W head units: hooks, mods, Car Report.");
-            d.put("detailed-desc", "HMG-API " + Engine.HMGAPI_VERSION + ", listed here by HMG-API. Uninstalling it here or in HMG-API uninstalls HMG-API.");
-            d.put("depends", depends("hmgapi", "", conflicts, null));
-            d.put("postinstall", "scripts/postinstall.sh");
-            d.put("preuninstall", "scripts/preuninstall.sh");
-            if (list(e, nemesis, "hmgapi", descriptor(d), new File(tpl, "scripts"), null, listed.containsKey("hmgapi"))) listed.put("hmgapi", pv);
+            if (listHmgapi(e, nemesis, tpl, conflicts, pv, pack, listed.containsKey("hmgapi"))) listed.put("hmgapi", pv);
             else bad++;
         }
         // the mods
@@ -169,6 +169,40 @@ final class NemesisSync {
         return bad == 0 ? 0 : 1;
     }
 
+    static String hmgapiVersion(NemesisFiles.Pack pack) {
+        return packageVersion(Engine.HMGAPI_VERSION) + (pack == null ? "" : "." + pack.generation);
+    }
+
+    static boolean listHmgapi(Engine e, File nemesis, File tpl, Map<String, String> conflicts, String pv, NemesisFiles.Pack pack,
+            boolean update) throws IOException, InterruptedException {
+        Map<String, String> d = new LinkedHashMap<String, String>();
+        d.put("id", "hmgapi");
+        d.put("name", "HMG-API");
+        d.put("package-version", pv);
+        d.put("short-desc", "Mod manager for Gen5W head units: hooks, mods, Car Report.");
+        d.put("detailed-desc", "HMG-API " + Engine.HMGAPI_VERSION + ", listed here by HMG-API. Uninstalling it here or in HMG-API uninstalls HMG-API.");
+        d.put("depends", depends("hmgapi", "", conflicts, null));
+        d.put("postinstall", "scripts/postinstall.sh");
+        d.put("preuninstall", "scripts/preuninstall.sh");
+        if (pack != null) d.put("livepatch-first", "1");
+        return list(e, nemesis, "hmgapi", descriptor(d) + (pack == null ? "" : pack.text), new File(tpl, "scripts"), null, update, pack);
+    }
+
+    /**
+     * After an apply (NemesisFiles.commit): HMG-API's package with the mods' file changes, to NEMESIS's
+     * queue. Only this one package: listing the mods waits for NEMESIS, which may be what's running this.
+     */
+    static void queueHmgapi(Engine e, NemesisFiles lp) throws Exception {
+        File tpl = new File(e.data, "nemesis");
+        if (!new File(tpl, "scripts/preuninstall.sh").isFile()) throw new IOException("no NEMESIS scripts in " + tpl + " (install HMG-API again)");
+        NemesisFiles.Pack pack = lp.pack();
+        String pv = hmgapiVersion(pack);
+        Map<String, String> listed = listed(e);
+        if (pv.equals(listed.get("hmgapi"))) return;
+        if (!listHmgapi(e, lp.nemesis, tpl, conflicts(new File(tpl, "conflicts.txt")), pv, pack, listed.containsKey("hmgapi")))
+            throw new IOException("NEMESIS's queue didn't take it (see the line above)");
+    }
+
     /** id to package-version of every package NEMESIS has installed (/data/nemesis/apps/<id>/NEMESIS.data) */
     static Map<String, String> listed(Engine e) throws IOException {
         Map<String, String> out = new TreeMap<String, String>();
@@ -205,6 +239,12 @@ final class NemesisSync {
     }
 
     static boolean list(Engine e, File nemesis, String pkg, String desc, File scripts, String modId, boolean update) throws IOException, InterruptedException {
+        return list(e, nemesis, pkg, desc, scripts, modId, update, null);
+    }
+
+    /** pack: HMG-API's package with the mods' file changes (NemesisFiles), which goes through NEMESIS's queue. */
+    static boolean list(Engine e, File nemesis, String pkg, String desc, File scripts, String modId, boolean update,
+            NemesisFiles.Pack pack) throws IOException, InterruptedException {
         File dir = new File(e.stateDir, "nemesis-sync");
         dir.mkdirs();
         File zip = new File(dir, pkg + ".zip");
@@ -220,10 +260,25 @@ final class NemesisSync {
             File start = new File(e.data, "nemesis/bin/start.sh");   // HMG-API's boot service (descriptor)
             if (modId == null && start.isFile()) put(z, "bin/start.sh", bytes(start));
             if (modId != null) put(z, "mod/id", (modId + "\n").getBytes("UTF-8"));
+            if (pack != null) for (Map.Entry<String, File> f : pack.files.entrySet()) NemesisFiles.putFile(z, f.getKey(), f.getValue());
         } finally {
             z.close();
         }
         if (update) refresh(e, pkg, scripts);
+        if (pack != null) {
+            // the queue, never a nemesis command that waits for NEMESIS (see NemesisFiles), and without
+            // HMGAPI_NEMESIS_SYNC: a queue runner it starts would pass it to every job after this one. The
+            // package's scripts list only without it too (an update; installed.txt for a first listing).
+            Engine.Run r = Engine.exec(nemesis.getPath(), "queue", "add", "--move", zip.getPath());
+            zip.delete();
+            if (r.code == 0) {
+                e.out.add("NEMESIS sync: " + pkg + " " + version(desc) + " is in NEMESIS's queue, with the mods' file changes ("
+                        + pack.files.size() + " file(s)); NEMESIS asks to restart the head unit when they're ready");
+                return true;
+            }
+            e.out.add("NEMESIS sync: couldn't queue " + pkg + " in NEMESIS: " + last(r.text));
+            return false;
+        }
         Engine.Run r = update ? nemesis(nemesis, "install", "--update", zip.getPath()) : nemesis(nemesis, "install", zip.getPath());
         zip.delete();
         if (r.code == 0) {
@@ -251,6 +306,11 @@ final class NemesisSync {
         return r;
     }
 
+    static String version(String desc) {
+        Matcher m = Pattern.compile("(?m)^package-version=(.*)$").matcher(desc);
+        return m.find() ? m.group(1) : "";
+    }
+
     static String descriptor(Map<String, String> d) {
         StringBuilder b = new StringBuilder("[nemesis]\nversion=1.1\n");
         b.append("id=").append(d.get("id")).append('\n');
@@ -264,6 +324,8 @@ final class NemesisSync {
         for (String h : new String[] {"preinstall", "postinstall", "preuninstall"}) {
             if (d.containsKey(h)) b.append(h).append('=').append(d.get(h)).append('\n');
         }
+        // NEMESIS 1.17.1: the package's [file.N] go under every other package's patch of the same file
+        if ("1".equals(d.get("livepatch-first"))) b.append("livepatch-first=1\n");
         b.append("\n[app.0]\nkind=sh\npath=bin/open.sh\nuid=root\n");
         // HMG-API itself: a boot service, so NEMESIS's svcmgr starts HMG-API too (hmgapid boot:
         // once per boot, whichever of it and the boot hook comes first)

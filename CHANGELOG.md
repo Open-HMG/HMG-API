@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- **With NEMESIS 1.17.1 or newer, mods' file changes are NEMESIS LivePatch outputs instead
+  of writes to `/system`.** The engine builds and checks every file as before, but the
+  results go to `/data/hmgapi/livepatch/files` and reach the car through HMG-API's
+  `hmgapi` NEMESIS package (`[file.N]`, `[prop.N]` for `build.prop` keys,
+  `livepatch-first=1`), queued with `nemesis queue add` and mounted at NEMESIS's next
+  restart. NEMESIS's farms stay up, its safe mode shows stock, and HMG-API's changes no
+  longer fight NEMESIS packages that patch the same files. The first apply moves files
+  HMG-API had written back to stock on `/system`. `build.prop` key removals, and values
+  `[prop.N]` can't hold, are still written by HMG-API. Older NEMESIS, or none: unchanged.
+  Tested off-car (`core/runtime/livepatch-test.sh`); not on a car.
+
 ## 1.1.0-rc.9 (2026-11-24)
 
 - **The missing-stock-copy rescue works for every HMG-API version, and can't be forced
