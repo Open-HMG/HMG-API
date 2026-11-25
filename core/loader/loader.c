@@ -295,11 +295,21 @@ static long long n_mapCode(JNIEnv *env, jobject cls, long long hint, int len)
     return p == (void *)-1 ? 0 : (long long)(size_t)p;
 }
 
+/* Only anonymous allocations rejected by MemRecipe are released, never library mappings. */
+extern int munmap(void *, size_t);
+static void n_unmapCode(JNIEnv *env, jobject cls, long long address, int len)
+{
+    (void)env; (void)cls;
+    if (address && len > 0)
+        munmap((void *)(size_t)address, ((size_t)len + PAGE - 1) & ~(PAGE - 1));
+}
+
 static const JNINativeMethod natives[] = {
     { "log", "(ILjava/lang/String;)V", (void *)n_log },
     { "peekNative", "(JI)[B", (void *)n_peek },
     { "pokeNative", "(J[B)I", (void *)n_poke },
     { "mapCodeNative", "(JI)J", (void *)n_mapCode },
+    { "unmapCodeNative", "(JI)V", (void *)n_unmapCode },
     { "hookMethodNative", "(Ljava/lang/reflect/Member;Ljava/lang/Class;ILjava/lang/Object;)V", (void *)n_hookMethod },
 };
 

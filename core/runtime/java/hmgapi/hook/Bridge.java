@@ -27,6 +27,7 @@ public final class Bridge {
     static native int pokeNative(long addr, byte[] data);
 
     static native long mapCodeNative(long hint, int len);
+    static native void unmapCodeNative(long address, int len);
 
     private static native void hookMethodNative(Member method, Class<?> declaringClass, int slot, Object hookList);
 
