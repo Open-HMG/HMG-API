@@ -16,6 +16,7 @@
       "name": "DeFlight, LLC",
       "repos": [
         "https://github.com/DeFlight/hmgapi-gen5w-button-mapper",
+        "https://github.com/DeFlight/hmgapi-gen5w-light-studio",
         "https://github.com/DeFlight/hmgapi-gen5w-split-screen-blocker"
       ]
     },
