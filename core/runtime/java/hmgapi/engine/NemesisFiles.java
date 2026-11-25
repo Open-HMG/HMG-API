@@ -169,7 +169,8 @@ final class NemesisFiles {
     /**
      * HMG-API 1.1.0-rc.9 and older wrote /system: each file it owns that is still its result there is
      * copied here, and /system gets its stock bytes back (from HMG-API's backup), between `nemesis
-     * remount rw` and `ro` so NEMESIS's farms step aside. One that changed since is left as it is: the
+     * remount rw --bypass-livepatch` and `ro`, so NEMESIS's read-only farms are out of the way while
+     * those writes land. One that changed since is left as it is: the
      * plan sees it changed outside HMG-API and settles it as it always has.
      */
     @SuppressWarnings("unchecked")
@@ -215,9 +216,15 @@ final class NemesisFiles {
         if (!restoreAll) commit();
     }
 
-    /** NEMESIS's remount (its farms step aside), also off the car: there it's the tests' NEMESIS. */
+    /**
+     * NEMESIS's remount, also off the car: there it's the tests' NEMESIS. A plain `rw` leaves NEMESIS's
+     * read-only farms up; `--bypass-livepatch` (NEMESIS 1.17.1, which this class requires) takes them
+     * down until `ro` puts them back.
+     */
     void realRemount(String mode) throws Exception {
-        Engine.Run r = Engine.exec(nemesis.getPath(), "remount", mode);
+        Engine.Run r = "rw".equals(mode)
+                ? Engine.exec(nemesis.getPath(), "remount", "rw", "--bypass-livepatch")
+                : Engine.exec(nemesis.getPath(), "remount", mode);
         if (r.code != 0 && "rw".equals(mode)) throw new IOException("nemesis remount rw: " + NemesisSync.last(r.text));
     }
 

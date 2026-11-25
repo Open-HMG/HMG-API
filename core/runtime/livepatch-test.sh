@@ -58,7 +58,7 @@ case \$1 in
     queue) [ "\$2" = add ] && [ "\$3" = --move ] || exit 1
         [ -z "\$HMGAPI_NEMESIS_SYNC" ] || { echo "HMGAPI_NEMESIS_SYNC passed to the queue"; exit 1; }
         n=\$(ls $T/q.*.zip 2>/dev/null | wc -l | tr -d ' '); mv "\$4" $T/q.\$n.zip; echo "queued \$n hmgapi" ;;
-    remount) echo "\$2" >> $T/remounts ;;
+    remount) shift; echo "\$*" >> $T/remounts ;;
     install|uninstall) exit 0 ;;
     *) exit 1 ;;
 esac
@@ -166,7 +166,7 @@ check "remove: apply exit" 0 $rc
 has "remove: says it writes build.prop" "HMG-API writes /system/build.prop itself (a mod removes persist.drop)" "$out"
 hasnt "remove: /system's build.prop has no removed key" "persist.drop" "$(cat $R/system/build.prop)"
 has "remove: and the set key" "persist.ium.support=carplay" "$(cat $R/system/build.prop)"
-check "remove: through nemesis remount rw then ro" "rw ro" "$(tr '\n' ' ' < $T/remounts | sed 's/ $//')"
+check "remove: through nemesis remount rw --bypass-livepatch then ro" "rw --bypass-livepatch ro" "$(tr '\n' ' ' < $T/remounts | sed 's/ $//')"
 hasnt "remove: no [prop.N] now" "[prop." "$(qdata)"
 has "remove: the other files still go to NEMESIS" "target=/system/lib/libtest.so" "$(qdata)"
 nemesis_ran
@@ -232,9 +232,12 @@ check "migration: plan exit" 0 $rc
 has "migration: plan sees its files as they are" "same     /system/lib/libtest.so" "$out"
 check "migration: plan writes nothing" "$(md5 $T/lib.a)" "$(md5 $R/system/lib/libtest.so)"
 check "migration: plan queues nothing" $n "$(queued)"
+rm -f $T/remounts
 eng apply
 check "migration: apply exit" 0 $rc
 has "migration: says what moved" "file(s) HMG-API had written to /system are stock there again" "$out"
+# /system/lib can be a NEMESIS farm (read-only): only --bypass-livepatch lets the stock bytes land
+check "migration: through nemesis remount rw --bypass-livepatch then ro" "rw --bypass-livepatch ro" "$(tr '\n' ' ' < $T/remounts | sed 's/ $//')"
 stock_system "migration"
 check "migration: queued" $((n + 1)) "$(queued)"
 check "migration: the library in the package is HMG-API's result" "$(md5 $T/lib.a)" "$(qfile /system/lib/libtest.so)"
