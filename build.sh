@@ -35,14 +35,11 @@ loader() {
 }
 
 fetchlib() {
-    # libhmgapi_fetch.so (core/fetch/fetch.c): the engine's HTTPS through the unit's own libssl; no libc,
-    # only dlopen/dlsym from the unit's libdl (the loader's stand-in), and a JDK's jni.h
+    # libhmgapi_fetch.so (core/fetch/fetch.c): the engine's HTTPS through the unit's own libssl; no libc
+    # or system headers, only dlopen/dlsym from the unit's libdl (the loader's stand-in)
     sh core/loader/syslib-stubs.sh "$OUT/syslib" >/dev/null
-    J=${JAVA_HOME:-$(cd "$(dirname "$(readlink -f "$(command -v javac)")")/.." && pwd)}
-    case "$(uname -s)" in Darwin) JOS=darwin ;; *) JOS=linux ;; esac
     clang --target=armv7a-linux-androideabi -mthumb -march=armv7-a -mfloat-abi=softfp -Os -fPIC \
       -ffreestanding -fno-builtin -nostdlib -shared -fno-stack-protector -fno-exceptions -fno-asynchronous-unwind-tables -fuse-ld=lld \
-      -I"$J/include" -I"$J/include/$JOS" \
       -Wl,-z,now -Wl,--no-rosegment -Wl,--hash-style=sysv -Wl,-z,defs -Wl,--build-id=none -Wl,-soname,libhmgapi_fetch.so \
       -o "$OUT/libhmgapi_fetch.so" core/fetch/fetch.c "$OUT/syslib/libdl.so"
     md5sum "$OUT/libhmgapi_fetch.so"

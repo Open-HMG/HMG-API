@@ -21,9 +21,8 @@
  * and an OpenSSL 1.1+/3 library, which is why each OpenSSL call has an old and a new name.
  * First written as a mod (an update-check proof of concept), run on an Ioniq 5 US 260507.
  */
-#include <jni.h>
-
 #ifdef HOST
+#include <jni.h>
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <netdb.h>
@@ -52,6 +51,31 @@ struct addrinfo {            /* bionic, 32-bit ARM */
 #define O_TRUNC 01000
 static void *libc_handle;
 #define LIBC_SYM(name) dlsym(libc_handle, #name)
+/* the few JNI pieces used here, at their places in the standard function table (as jni.h has
+ * them), so the unit's build needs no system headers (jni.h pulls in the build machine's libc) */
+typedef int jint;
+typedef jint jsize;
+typedef signed char jbyte;
+typedef unsigned char jboolean;
+typedef void *jobject;
+typedef jobject jclass, jstring, jbyteArray;
+struct JNINativeInterface_ {
+    void *before169[169];
+    const char *(*GetStringUTFChars)(void *, jstring, jboolean *);          /* 169 */
+    void (*ReleaseStringUTFChars)(void *, jstring, const char *);           /* 170 */
+    jsize (*GetArrayLength)(void *, jbyteArray);                            /* 171 */
+    void *before184[184 - 172];
+    jbyte *(*GetByteArrayElements)(void *, jbyteArray, jboolean *);         /* 184 */
+    void *before192[192 - 185];
+    void (*ReleaseByteArrayElements)(void *, jbyteArray, jbyte *, jint);    /* 192 */
+};
+_Static_assert(__builtin_offsetof(struct JNINativeInterface_, GetStringUTFChars) == 169 * sizeof(void *), "JNI table");
+_Static_assert(__builtin_offsetof(struct JNINativeInterface_, GetByteArrayElements) == 184 * sizeof(void *), "JNI table");
+_Static_assert(__builtin_offsetof(struct JNINativeInterface_, ReleaseByteArrayElements) == 192 * sizeof(void *), "JNI table");
+typedef const struct JNINativeInterface_ *JNIEnv;
+#define JNIEXPORT __attribute__((visibility("default")))
+#define JNICALL
+#define JNI_ABORT 2
 static void *memset(void *p, int c, unsigned long n) { unsigned char *b = p; while (n--) *b++ = (unsigned char) c; return p; }
 #endif
 
