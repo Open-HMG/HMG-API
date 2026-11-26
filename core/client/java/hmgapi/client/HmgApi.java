@@ -103,9 +103,20 @@ public final class HmgApi {
         return r.code == 0 && !"root".equals(r.text.trim()) ? r.text.trim() : null;
     }
 
+    /**
+     * A service hmgapid runs as root: the daemon sees "root", not a mod, so the mod-only ops
+     * (setting-get, setting-set with no id) are refused there ("unknown op or wrong arguments").
+     * hmgapid names the service's mod in HMGAPI_MOD; root may name it.
+     */
+    private String rootService() {
+        String id = System.getenv("HMGAPI_MOD");
+        return id != null && id.matches("[a-z0-9][a-z0-9-]{0,63}") && android.os.Process.myUid() == 0 ? id : null;
+    }
+
     /** the mod's settings (settings.json defaults, the owner's values over them) */
     public JSONObject settings() throws IOException {
-        String t = ok(call("setting-get")).trim();
+        String root = rootService();
+        String t = ok(root != null ? call("setting-get", root) : call("setting-get")).trim();
         try {
             return new JSONObject(t.isEmpty() ? "{}" : t);
         } catch (JSONException e) {
@@ -115,7 +126,8 @@ public final class HmgApi {
 
     /** saves the owner's values (all of them: this replaces the file); mods' hooks see them at once */
     public void saveSettings(JSONObject values) throws IOException {
-        ok(call("setting-set", values.toString()));
+        String root = rootService();
+        ok(root != null ? call("setting-set", root, values.toString()) : call("setting-set", values.toString()));
     }
 
     public List<Service> services() throws IOException {

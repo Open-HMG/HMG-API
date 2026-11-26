@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **A root service can read its own settings** (`HmgApi.settings()`, `saveSettings()`): the
+  daemon sees such a service as root, so the client names its mod (`HMGAPI_MOD`).
+
 ## 1.1.0-rc.10 (2026-11-25)
 
 - **No owner-facing way to force an unknown `app_process`, for now.** An empty `HMGAPI/FORCE`
