@@ -642,10 +642,14 @@ static int op_engine(int fd, int argc, char **argv)
     if (!(seq(sub, "plan") || seq(sub, "apply") || seq(sub, "keep") || seq(sub, "restore") || seq(sub, "status")
           || seq(sub, "recover") || seq(sub, "install") || seq(sub, "remove") || seq(sub, "map") || seq(sub, "verify-map")
           || seq(sub, "usb-scan") || seq(sub, "update-hmgapi") || seq(sub, "apps") || seq(sub, "probe")
-          || seq(sub, "map-car") || seq(sub, "report") || seq(sub, "problem") || seq(sub, "nemesis-sync"))) {
+          || seq(sub, "map-car") || seq(sub, "report") || seq(sub, "problem") || seq(sub, "nemesis-sync")
+          || seq(sub, "catalog") || seq(sub, "catalog-plan") || seq(sub, "catalog-install") || seq(sub, "updates")
+          || seq(sub, "update") || seq(sub, "update-check"))) {
         say(fd, "usage: engine plan | apply [--trial] [--force] | keep | restore | status | recover | install <zip> | remove <id>"
                 " | nemesis-sync | map | map-car [--local | --write | --forget] | verify-map | report [--usb]"
-                " | problem record [--no-log] [--crash-dumps] [--crash-reports] [--kernel] [--usb] [--seconds N] | problem stop\n");
+                " | problem record [--no-log] [--crash-dumps] [--crash-reports] [--kernel] [--usb] [--seconds N] | problem stop"
+                " | catalog [--refresh] | catalog-plan <id>... | catalog-install <id>... [--any-car] | updates [--refresh]"
+                " | update <id>... | --all | hmgapi | update-check\n");
         return 2;
     }
     a[n++] = APP_PROCESS;
@@ -1718,8 +1722,10 @@ static int op_allow(int fd, int argc, char **argv)
     unsigned long long st[16];
     if (seq(argv[1], "commands_reset") && argc == 3 && seq(argv[2], "on")) return forget_answers(fd);
     if (!seq(argv[1], "startup_notice") && !seq(argv[1], "block_ambient_light") && !seq(argv[1], "trust_commands")
-        && !seq(argv[1], "ota_updates") && !seq(argv[1], "home_wifi") && !seq(argv[1], "testing_maps") && !seq(argv[1], "no_local_points") && !answer_name(argv[1])) {
-        say(fd, "unknown switch (startup_notice, block_ambient_light, trust_commands, ota_updates, home_wifi, testing_maps, no_local_points, cmd.<mod>.<command>, "
+        && !seq(argv[1], "ota_updates") && !seq(argv[1], "home_wifi") && !seq(argv[1], "testing_maps") && !seq(argv[1], "no_local_points")
+        && !seq(argv[1], "no_update_check") && !seq(argv[1], "auto_stage_updates") && !answer_name(argv[1])) {
+        say(fd, "unknown switch (startup_notice, block_ambient_light, trust_commands, ota_updates, home_wifi, testing_maps, no_local_points, "
+                "no_update_check, auto_stage_updates, cmd.<mod>.<command>, "
                 "nocmd.<mod>.<command>, commands_reset)\n");
         return 2;
     }

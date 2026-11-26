@@ -147,6 +147,8 @@ public final class Engine {
 
     boolean lock(String cmd) throws IOException, InterruptedException {
         if ("status".equals(cmd) || "map".equals(cmd) || "problem".equals(cmd) || "1".equals(env(LOCKED_ENV, null))) return true;
+        // the catalogue's reads (and refreshes: written whole, each in its own temporary folder) don't wait for an apply
+        if ("catalog".equals(cmd) || "updates".equals(cmd) || "catalog-plan".equals(cmd)) return true;
         File f = new File(stateDir, "engine.lock");
         java.io.RandomAccessFile raf = new java.io.RandomAccessFile(f, "rw");
         long wait = Long.parseLong(env("HMGAPI_LOCK_WAIT", "900")) * 1000000000L, start = System.nanoTime();
@@ -375,6 +377,8 @@ public final class Engine {
         if ("report".equals(cmd)) return Report.run(this, args.length > 1 && "--usb".equals(args[1]));
         if ("problem".equals(cmd)) return ProblemLog.run(this, args);
         if ("usb-scan".equals(cmd)) return UsbUpdates.scan(this);
+        if ("catalog".equals(cmd) || "catalog-plan".equals(cmd) || "catalog-install".equals(cmd) || "updates".equals(cmd)
+                || "update".equals(cmd) || "update-check".equals(cmd)) return Catalog.run(this, args);
         if ("publish-state".equals(cmd)) return LiveState.publish(this);
         if ("apps".equals(cmd)) return ModApps.sync(this);
         if ("probe".equals(cmd)) {   // a mod's install-time probe again (its answer is kept until then)
@@ -408,6 +412,9 @@ public final class Engine {
             boolean fromNemesis = java.util.Arrays.asList(args).contains("--from-nemesis");
             int rc;
             if ("remove".equals(cmd)) {
+                for (String d : Catalog.dependents(this, args[1])) {
+                    out.add("note     " + d + " requires " + args[1] + ": it won't load until " + args[1] + " is installed again");
+                }
                 rc = Packages.remove(this, args[1]);
             } else {
                 String uuid = null;

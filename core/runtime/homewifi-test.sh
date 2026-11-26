@@ -302,6 +302,9 @@ printf 10.10.10.100 > "$F/fw/props/dhcp.wlan0.dns1"
 : > "$F/fw/ndc.log"
 log=$(wk)
 has "up" "home Wi-Fi up: the mods that asked go through it; the car stays on mobile data" "$log"
+check "... the update check started, once" "update check" "$(cat "$X/data/hmgapi/wifi/update-check.test")"
+mkdir -p "$X/proc/sys/net/ipv4/conf/wlan0"; wk >/dev/null
+check "... not again while still up" 1 "$(grep -c . "$X/data/hmgapi/wifi/update-check.test")"
 check "status: up, signal, channel, no network name" '{"state": "up", "rssi": -61, "freq": 2437}' "$(pub)"
 hasnt "the car's default route back off Wi-Fi" "default via 10.4.0.1 dev wlan0 table main" "$(cat "$F/fw/ip4.route")"
 has "table 95: Wi-Fi's default" "default via 10.4.0.1 dev wlan0 table 95" "$(cat "$F/fw/ip4.route")"

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Dependencies are installed with a mod.** A mod's `requires` (copied into its catalogue
+  entry by `catalog.py add`, and read again from the downloaded package's `mod.json`) are met
+  by what's installed, or by the catalogue's version, installed first; a required mod that's
+  turned off is turned on. Loops, conflicts, a requirement newer than the catalogue's or not
+  in it, and a mod for a newer HMG-API are refused before anything is downloaded or installed.
+  Everything is downloaded and checked before the first install. Removing a mod others
+  require says which won't load.
 - **Home Wi-Fi joins on cars whose Wi-Fi library checks a checksum** (Ioniq 5 US 260507). The
   stock library starts the car's Wi-Fi client only if `wpa_supplicant_crc32.conf` holds the
   CRC-32 of `wpa_supplicant.conf`; HMG-API's saved networks didn't update it, so the client

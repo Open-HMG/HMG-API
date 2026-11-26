@@ -362,8 +362,8 @@ is switched on again, the client goes off and the hotspot comes back as it was. 
 next to the hotspot, on a second interface, didn't hold up on these units' Wi-Fi driver.)
 While joined, the traffic of the mods that ask (their apps, and their services) goes through
 home Wi-Fi; the car's own stays on mobile data. A mod that asks while the switch is off has no
-internet (the plan says so). IPv4 only for now. This is also how HMG-API itself is meant to
-check for updates.
+internet (the plan says so). IPv4 only for now. HMG-API itself checks its catalogue and
+updates this way (`Catalog`), each time home Wi-Fi comes up.
 
 How it's routed, for a mod that wants to know: its packets are marked (`0x2951`) and go out by
 table 95 (home Wi-Fi's default; an unreachable default while home Wi-Fi is down), masqueraded

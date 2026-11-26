@@ -25,6 +25,8 @@ carries the list. The wiki's Community mods page is made from the entries.
         newer than the entry, signed with the entry's author key
   tools/catalog.py wiki <out.md>
         the Community mods page
+  tools/catalog.py index [<out>]
+        catalog/index.json: every entry in one file, for the head unit's catalogue (one request)
 """
 import argparse, hashlib, json, os, re, shutil, subprocess, sys, tempfile, urllib.request, zipfile
 
@@ -38,7 +40,8 @@ UUID = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9
 VERSION = re.compile(r'^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$')
 FINAL = re.compile(r'^\d+\.\d+\.\d+$')   # what an entry's "version" is: no pre-releases (docs/releasing.md)
 HTTPS = re.compile(r'^https://[A-Za-z0-9.-]+(:\d+)?/[^\s<>()\[\]"\']*$')
-FIELDS = {'id', 'name', 'description', 'authors', 'license', 'uuid', 'version', 'repo', 'download', 'sha256', 'system', 'hmgapi'}
+FIELDS = {'id', 'name', 'description', 'authors', 'license', 'uuid', 'version', 'repo', 'download', 'sha256', 'system', 'hmgapi',
+          'requires', 'conflicts'}   # requires/conflicts: as the package's mod.json (HMG-API's catalogue installs requires first)
 NEEDED = ['id', 'name', 'description', 'authors', 'uuid', 'version', 'repo', 'download', 'sha256']
 
 
@@ -148,7 +151,7 @@ def fetch(url, dest):
 def entries():
     if not os.path.isdir(CATALOG):
         return {}
-    return {f[:-5]: load(os.path.join(CATALOG, f)) for f in sorted(os.listdir(CATALOG)) if f.endswith('.json')}
+    return {f[:-5]: load(os.path.join(CATALOG, f)) for f in sorted(os.listdir(CATALOG)) if f.endswith('.json') and f != 'index.json'}
 
 
 # ---- add
@@ -181,6 +184,9 @@ def cmd_add(a):
         e['hmgapi'] = mod['hmgapi']
     if mod.get('system'):
         e['system'] = mod['system']
+    for k in ('requires', 'conflicts'):   # what the head unit's catalogue resolves before downloading
+        if mod.get(k):
+            e[k] = mod[k]
     if not e['license']:
         del e['license']
     os.makedirs(CATALOG, exist_ok=True)
@@ -236,6 +242,10 @@ def check_entry(name, e, authors):
     for k in ('name', 'description', 'license'):
         if k in e and (not isinstance(e[k], str) or '\n' in e[k]):
             say(f'"{k}" is one line of text')
+    for k in ('requires', 'conflicts'):
+        if k in e and not (isinstance(e[k], list) and all(
+                (isinstance(d, str) and ID.match(d.split(' ')[0])) or (isinstance(d, dict) and ID.match(str(d.get('id', '')))) for d in e[k])):
+            say(f'"{k}" is a list of "<id> [range]" or {{"id": ..., "version": ...}}, as in mod.json')
     return p
 
 
@@ -311,7 +321,7 @@ def cmd_check(a):
     print(f'ok    {len(es)} catalogue entries, {len(au.get("authors", {}))} authors')
 
 
-BUMP = {'version', 'download', 'sha256', 'description'}   # what a version bump may change
+BUMP = {'version', 'download', 'sha256', 'description', 'requires', 'conflicts'}   # what a version bump may change
 
 
 def cmd_bump(a):
@@ -352,10 +362,13 @@ def cmd_bump(a):
                     z, why = download(n, new, work)
                     if why:
                         no.append(why)
-                    elif 'description' in changed:
-                        desc = load(os.path.join(unpack(z, os.path.join(work, 'mod')), 'mod.json')).get('description', '')
-                        if desc != new['description']:
+                    elif changed & {'description', 'requires', 'conflicts'}:
+                        pm = load(os.path.join(unpack(z, os.path.join(work, 'mod')), 'mod.json'))
+                        if 'description' in changed and pm.get('description', '') != new['description']:
                             no.append(f'{files[0]}: the description isn\'t the package\'s mod.json description')
+                        for k in ('requires', 'conflicts'):
+                            if k in changed and (pm.get(k) or None) != (new.get(k) or None):
+                                no.append(f'{files[0]}: "{k}" isn\'t the package\'s mod.json "{k}"')
                 finally:
                     shutil.rmtree(work, ignore_errors=True)
     for x in no:
@@ -486,6 +499,18 @@ def cars(system):
     return '; '.join(out)
 
 
+def cmd_index(a):
+    """catalog/index.json: every entry in one file, so a head unit fetches the catalogue in one request
+    (without it, HMG-API asks GitHub's API for the folder's listing, then each entry)"""
+    es = entries()
+    p = check_all(es, load(AUTHORS))
+    if p:
+        die('\n'.join(p))
+    out = a.out or os.path.join(CATALOG, 'index.json')
+    save(out, {'mods': [es[n] for n in sorted(es)]})
+    print(f'{os.path.relpath(out, REPO) if out.startswith(REPO) else out}: {len(es)} mods')
+
+
 def cmd_wiki(a):
     es, au = entries(), load(AUTHORS).get('authors', {})
     L = ['# Community mods', '',
@@ -541,12 +566,14 @@ def main():
     s.add_argument('--list', help='the ids (and pre-release pins) from this file, e.g. tools/release-mods.txt')
     s = sub.add_parser('wiki')
     s.add_argument('out')
+    s = sub.add_parser('index')
+    s.add_argument('out', nargs='?')
     a = ap.parse_args()
     if a.cmd == 'add' and not HTTPS.match(a.download):
         die('--download is an https:// link')
     if a.cmd == 'add' and a.repo and not HTTPS.match(a.repo):
         die('--repo is an https:// link')
-    {'add': cmd_add, 'check': cmd_check, 'bump': cmd_bump, 'fetch': cmd_fetch, 'wiki': cmd_wiki}[a.cmd](a)
+    {'add': cmd_add, 'check': cmd_check, 'bump': cmd_bump, 'fetch': cmd_fetch, 'wiki': cmd_wiki, 'index': cmd_index}[a.cmd](a)
     if _engine and _engine != os.environ.get('HMGAPI_ENGINE_CLASSES'):   # ours, not the caller's
         shutil.rmtree(_engine, ignore_errors=True)
 
