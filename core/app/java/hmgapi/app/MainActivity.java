@@ -239,6 +239,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onActivityResult(int request, int result, Intent data) {
+        if (request == UPDATES && current == 0) show(0);   // the Mods tab again: new mods, versions, the updates count
         if (request == UPDATES && result == RESULT_OK) plan();   // mods were installed: apply them (plan first)
     }
 
