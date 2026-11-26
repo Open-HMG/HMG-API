@@ -21,6 +21,11 @@
   HMG-API's redirect to home Wi-Fi's DNS server kept that source address, so no query left the
   unit. While home Wi-Fi is up, `route_localnet` is on for `wlan0` (the queries are
   masqueraded) and only the answers may come back in for 127.x (`HMGAPI_HOMELO`).
+- **HMG-API's own HTTPS** (`/data/hmgapi/lib/libhmgapi_fetch.so`, `core/fetch`): Android 4.4's
+  Java TLS can't reach GitHub, so the engine uses the unit's own `libssl.so` (TLS 1.2), on a
+  socket marked for home Wi-Fi only, with its own DNS lookup on home Wi-Fi's server. Tested
+  first as a mod on an Ioniq 5 US 260507 (HMG-API rc.10): the catalogue and three packages
+  over home Wi-Fi, each with its SHA-256.
 
 ## 1.1.0-rc.10 (2026-11-25)
 

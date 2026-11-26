@@ -304,6 +304,11 @@ cp "$P/uninstall.sh" "$P/lib.sh" "$P/stock.txt" "$P/app-pending.sh" "$P/hook-che
 # open.sh (NEMESIS Manager's Launch, adb) installs the app from this copy if it's missing, then opens it
 cp "$P/app-open.sh" "$D/open.sh" && chmod 700 "$D/open.sh" || fail "keep open.sh"
 cp "$P/HmgApi.apk" "$D/HmgApi.apk" && chmod 644 "$D/HmgApi.apk" || fail "keep a copy of the app"
+# the engine's HTTPS (the catalogue and updates over home Wi-Fi, Catalog): in /data, nothing on /system for it
+if [ -f "$P/libhmgapi_fetch.so" ]; then
+    mkdir -p "$D/lib" && cp "$P/libhmgapi_fetch.so" "$D/lib/libhmgapi_fetch.so.new" && chmod 644 "$D/lib/libhmgapi_fetch.so.new" \
+        && mv "$D/lib/libhmgapi_fetch.so.new" "$D/lib/libhmgapi_fetch.so" || fail "keep the engine's HTTPS library"
+fi
 # HMG-API's NEMESIS scripts and incompatible packages: engine nemesis-sync lists HMG-API and its mods in NEMESIS with them
 if [ -d "$P/nemesis" ]; then
     rm -rf "$D/nemesis" && cp -r "$P/nemesis" "$D/nemesis" && chmod -R 700 "$D/nemesis" || fail "keep the NEMESIS scripts"
