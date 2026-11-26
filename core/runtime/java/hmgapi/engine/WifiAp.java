@@ -86,11 +86,46 @@ public final class WifiAp {
     }
 
     /**
+     * crc <wpa_supplicant.conf>: the checksum the car's own Wi-Fi library checks before it starts
+     * the client. The stock libhardware_legacy (Ioniq 5 US 260507, and other Gen5W builds) keeps
+     * wpa_supplicant_crc32.conf next to the networks file: the file's CRC-32, 8 upper-case hex
+     * digits, no newline. If it doesn't match (any edit not made through Android's Wi-Fi settings),
+     * the library logs "Wi-Fi will not be enabled" and the client never starts. Written only when
+     * it differs, owned as the library makes it (system:wifi 660). Prints the checksum.
+     */
+    static int crc(java.io.File conf) throws Exception {
+        if (!conf.isFile()) {
+            System.out.println("no " + conf);
+            return 1;
+        }
+        java.util.zip.CRC32 c = new java.util.zip.CRC32();
+        c.update(Engine.readAll(new java.io.FileInputStream(conf)));
+        String want = String.format("%08X", c.getValue());
+        java.io.File f = new java.io.File(conf.getParentFile(), "wpa_supplicant_crc32.conf");
+        String have = f.isFile() ? Engine.read(f).trim() : null;
+        if (!want.equals(have)) {
+            java.io.File t = new java.io.File(f.getPath() + ".hmgapi");
+            java.io.FileOutputStream o = new java.io.FileOutputStream(t);
+            try {
+                o.write(want.getBytes("US-ASCII"));
+            } finally {
+                o.close();
+            }
+            Engine.child(new ProcessBuilder("chown", "system:wifi", t.getPath())).start().waitFor();
+            Engine.child(new ProcessBuilder("chmod", "660", t.getPath())).start().waitFor();
+            if (!t.renameTo(f)) throw new java.io.IOException("can't write " + f);
+        }
+        System.out.println(want);
+        return 0;
+    }
+
+    /**
      * restart: off and on again, the same mode. stop: off, printing the mode it had ("2" the projection
      * AP, "1" the plain hotspot, "0" it wasn't on). start <mode>: on again in that mode.
      */
     public static void main(String[] args) throws Exception {
         String v = args.length > 0 ? args[0] : "";
+        if ("crc".equals(v) && args.length == 2) System.exit(crc(new java.io.File(args[1])));
         boolean client = "client".equals(v) && args.length == 2 && ("on".equals(args[1]) || "off".equals(args[1]));
         boolean ensure = "ensure-projection".equals(v) && args.length == 1;
         if (!(("restart".equals(v) || "stop".equals(v)) && args.length == 1) && !("start".equals(v) && args.length == 2) && !client && !ensure) {

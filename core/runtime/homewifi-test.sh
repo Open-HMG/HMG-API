@@ -209,6 +209,7 @@ case "$3 $4" in
         fi ;;
     "client on") : > "$FW/client"; echo running > "$FW/props/init.svc.wpa_supplicant"; echo "client on" ;;
     "client off") rm -f "$FW/client"; echo stopped > "$FW/props/init.svc.wpa_supplicant"; echo "client off" ;;
+    "crc "*) echo crc >> "$FW/crc.log"; echo 01234567 ;;
 esac
 S
 printf '#!/bin/sh\n:\n' > "$F/bin/chown"
@@ -255,7 +256,9 @@ out=$(HMGAPI_WIFI_PSK='has"quote' verb join "Cascadia" || true)
 has "join: a key that could break the config refused" "can't be used" "$out"
 out=$(HMGAPI_WIFI_PSK= verb join 'Bad"Name' || true)
 has "join: a name that could break the config refused" "can't be used" "$out"
+: > "$F/fw/crc.log"
 check "join: saved" "saved: Cascadia" "$(HMGAPI_WIFI_PSK=cascadia-key verb join Cascadia)"
+check "... the checksum the car's Wi-Fi library checks, updated" crc "$(cat "$F/fw/crc.log")"
 check "... both now" "Willows
 Cascadia" "$(verb saved)"
 has "... Android's own settings kept" "p2p_disabled=1" "$(cat "$NET")"
@@ -268,12 +271,18 @@ check "forget" "forgotten: Cafe" "$(verb forget Cafe)"
 check "... gone, the others kept" "Cascadia
 Willows" "$(verb saved | sort)"
 check "seen: nothing before home Wi-Fi was on" "" "$(verb seen)"
+mv "$NET" "$NET.keep"; mkdir -p "$X/system/etc/wifi"; printf 'update_config=1\nctrl_interface=wlan0\npmf=1\n' > "$X/system/etc/wifi/wpa_supplicant.conf"
+HMGAPI_WIFI_PSK=first-net-key verb join First >/dev/null
+has "join with no config yet: started from the car's template" "pmf=1" "$(cat "$NET")"
+has "... with the network" 'ssid="First"' "$(cat "$NET")"
+mv "$NET.keep" "$NET"
 
 # parked: the hotspot off, the car's client on
 echo "wpa_state=SCANNING" > "$F/fw/wpa.status"
 : > "$F/fw/apps.log"
 log=$(wk)
 has "parked: switched at once" "the car off: the hotspot off, the car's Wi-Fi client on" "$log"
+has "... the checksum checked before the client goes on" crc "$(cat "$F/fw/crc.log")"
 check "... the hotspot off" no "$([ -f "$F/fw/ap" ] && echo yes || echo no)"
 has "... through Android's Wi-Fi service" "hmgapi.engine.WifiAp client on" "$(cat "$F/fw/apps.log")"
 check "... looking" searching "$(state)"
