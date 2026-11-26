@@ -9,6 +9,18 @@
   forgetting a network now updates it, and it's checked before each switch to home Wi-Fi.
   A first network no longer needs `printf` (not on the unit): the config starts from the car's
   own template.
+- **Mods' connections over home Wi-Fi are no longer refused** (Ioniq 5 US 260507). The block
+  that keeps mods off mobile data was in `filter OUTPUT`, where `-o` is the route a packet had
+  before HMG-API's mark moved it to home Wi-Fi: every connection that started on the main
+  table (mobile data) was refused. With home Wi-Fi on, the block now runs after the move
+  (`mangle POSTROUTING`, `HMGAPI_HOMECELL`: nothing marked for home Wi-Fi leaves on `rmnet`),
+  and table 95 holds an unreachable default while home Wi-Fi is down, so marked traffic never
+  falls through to mobile data. IPv6, and everything with home Wi-Fi off, stays refused as before.
+- **Mods' services can look names up on home Wi-Fi** (Ioniq 5 US 260507). Their resolver
+  (`ANDROID_DNS_MODE=local`) has no servers in the service's process and asks 127.0.0.1;
+  HMG-API's redirect to home Wi-Fi's DNS server kept that source address, so no query left the
+  unit. While home Wi-Fi is up, `route_localnet` is on for `wlan0` (the queries are
+  masqueraded) and only the answers may come back in for 127.x (`HMGAPI_HOMELO`).
 
 ## 1.1.0-rc.10 (2026-11-25)
 

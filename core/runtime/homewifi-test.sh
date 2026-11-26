@@ -105,9 +105,12 @@ v=4; case $1 in -4) shift ;; -6) v=6; shift ;; esac
 o=$1 c=$2; shift 2
 f=$FW/ip$v.$o; touch "$f"
 case $o.$c in
-    route.show) if [ "$1" = dev ]; then grep -- " dev $2 .*table main\$" "$f" | sed 's/ table main$//' || true; else grep -- " table ${3:-main}\$" "$f" || true; fi ;;
+    route.show) if [ "$1" = dev ]; then grep -- " dev $2 .*table main\$" "$f" | sed 's/ table main$//' || true
+        elif [ "$1" = table ]; then grep -- " table $2\$" "$f" | sed "s/ table $2\$//" || true; else grep -- " table main\$" "$f" || true; fi ;;
     route.replace) n=$#; if [ "${@:$((n-1)):1}" = table ]; then tb=${!n}; set -- "${@:1:$((n-2))}"; else tb=main; fi
         grep -v -- "^$1 .*table $tb\$" "$f" > "$f.new"; mv "$f.new" "$f"; echo "$* table $tb" >> "$f" ;;
+    route.add) n=$#; if [ "${@:$((n-1)):1}" = table ]; then tb=${!n}; set -- "${@:1:$((n-2))}"; else tb=main; fi
+        echo "$* table $tb" >> "$f" ;;
     route.del) grep -q -e "^$1 .*dev $3 .*table main\$" -e "^$1 dev $3 .*table main\$" "$f" || exit 2
         awk -v r="$1" -v d="$3" '!x && $1 == r && index($0, " dev " d " ") { x = 1; next } { print }' "$f" > "$f.new"; mv "$f.new" "$f" ;;
     route.flush) grep -v -- " table $2\$" "$f" > "$f.new"; mv "$f.new" "$f" ;;
@@ -143,11 +146,11 @@ printf 'com.example.dl dl\ncom.example.quiet quiet\n' > "$D/state/apps.txt"
 log=$(keeper once)
 has "mods kept off cellular" "mods kept off cellular: 2 app(s) and every mod service, home Wi-Fi routing in" "$log"
 check "the cellular chain first in OUTPUT" "-A OUTPUT -j HMGAPI_CELL" "$(ipt -S OUTPUT | grep -m1 '^-A')"
-check "its rules: both services' groups and both apps' uids" "-o rmnet+ -m owner --gid-owner 2950 -j REJECT
--o rmnet+ -m owner --gid-owner 2951 -j REJECT
--o rmnet+ -m owner --uid-owner 10071 -j REJECT
+check "its IPv4 rules: the plain group and the app that didn't ask (home ones: after the reroute)" "-o rmnet+ -m owner --gid-owner 2950 -j REJECT
 -o rmnet+ -m owner --uid-owner 10072 -j REJECT" "$(cat "$F/fw/4/filter/HMGAPI_CELL")"
-check "IPv6 too" 4 "$(grep -c REJECT "$F/fw/6/filter/HMGAPI_CELL")"
+check "IPv6: all four (never routed to home Wi-Fi)" 4 "$(grep -c REJECT "$F/fw/6/filter/HMGAPI_CELL")"
+check "home Wi-Fi traffic never out on mobile data, checked after the reroute" "-o rmnet+ -m mark --mark 0x2951 -j DROP" "$(cat "$F/fw/4/mangle/HMGAPI_HOMECELL")"
+check "... first in POSTROUTING" "-j HMGAPI_HOMECELL" "$(head -1 "$F/fw/4/mangle/POSTROUTING")"
 check "only the mod that asked marked for home Wi-Fi (and the home group)" "-m owner --gid-owner 2951 -j MARK --set-mark 0x2951
 -m owner --uid-owner 10071 -j MARK --set-mark 0x2951" "$(cat "$F/fw/4/mangle/HMGAPI_HOME")"
 check "masqueraded on wlan0 (home Wi-Fi: the car's own client)" "-o wlan0 -m mark --mark 0x2951 -j MASQUERADE" "$(cat "$F/fw/4/nat/HMGAPI_HOMEOUT")"
@@ -160,14 +163,16 @@ has "moved: put back first" "mods' cellular block put back" "$(keeper once)"
 check "... first again" "-A OUTPUT -j HMGAPI_CELL" "$(ipt -S OUTPUT | grep -m1 '^-A')"
 printf 'com.example.dl 10091 0 /data/data/com.example.dl default 3003\ncom.example.quiet 10072 0 /data/data/com.example.quiet default 3003\n' > "$F/packages.list"
 keeper once >/dev/null
-has "a reinstalled app's new uid" "--uid-owner 10091 -j REJECT" "$(cat "$F/fw/4/filter/HMGAPI_CELL")"
-hasnt "... the old one gone" "10071" "$(cat "$F/fw/4/filter/HMGAPI_CELL")"
+has "a reinstalled app's new uid" "--uid-owner 10091 -j REJECT" "$(cat "$F/fw/6/filter/HMGAPI_CELL")"
+has "... marked with it" "--uid-owner 10091 -j MARK" "$(cat "$F/fw/4/mangle/HMGAPI_HOME")"
+hasnt "... the old one gone" "10071" "$(cat "$F/fw/6/filter/HMGAPI_CELL" "$F/fw/4/mangle/HMGAPI_HOME")"
 rm "$D/settings/allow/home_wifi"
 eng publish-state
 keeper once >/dev/null
 check "home Wi-Fi off: no marks" no "$([ -f "$F/fw/4/mangle/HMGAPI_HOME" ] && echo yes || echo no)"
 hasnt "... no routing rule" "900:" "$(cat "$F/fw/ip4.rule")"
-check "... still off cellular" 4 "$(grep -c REJECT "$F/fw/4/filter/HMGAPI_CELL")"
+check "... still off cellular: all four refused in OUTPUT again" 4 "$(grep -c REJECT "$F/fw/4/filter/HMGAPI_CELL")"
+check "... no post-reroute block (nothing is marked)" no "$([ -f "$F/fw/4/mangle/HMGAPI_HOMECELL" ] && echo yes || echo no)"
 keeper down >/dev/null
 hasnt "down: the cellular chain gone" "HMGAPI_CELL" "$(ipt -S OUTPUT)"
 : > "$D/settings/allow/home_wifi"
@@ -175,7 +180,7 @@ eng publish-state
 
 # ---- the home Wi-Fi keeper, against fake tools
 X=$T/unit
-mkdir -p "$X/data/misc/wifi/sockets" "$X/data/hmgapi/public" "$X/proc/sys/kernel/random"
+mkdir -p "$X/data/misc/wifi/sockets" "$X/data/hmgapi/public" "$X/proc/sys/kernel/random" "$X/proc/sys/net/ipv4/conf/wlan0"
 echo boot-1 > "$X/proc/sys/kernel/random/boot_id"
 echo "1000.00 2000.00" > "$X/proc/uptime"
 cat > "$F/bin/hmgapid" <<'S'
@@ -306,6 +311,9 @@ has "wlan0's DNS servers for the mods" "resolver setifdns wlan0  10.10.10.100" "
 has "a DNS server off the subnet: through the gateway" "10.10.10.100/32 via 10.4.0.1 dev wlan0 metric 1000" "$(cat "$F/fw/ip4.route")"
 check "mods' services' DNS to the home router's" "-m owner --gid-owner 2951 -p udp --dport 53 -j DNAT --to-destination 10.10.10.100
 -m owner --gid-owner 2951 -p tcp --dport 53 -j DNAT --to-destination 10.10.10.100" "$(cat "$F/fw/4/nat/HMGAPI_HOMEDNS")"
+has "services' lookups (their resolver asks 127.0.0.1) may come back in through wlan0, answers only" "-i wlan0 -d 127.0.0.0/8 -m state --state ESTABLISHED,RELATED -j RETURN
+-i wlan0 -d 127.0.0.0/8 -j DROP" "$(cat "$F/fw/4/filter/HMGAPI_HOMELO")"
+check "... first in INPUT" "-j HMGAPI_HOMELO" "$(head -1 "$F/fw/4/filter/INPUT")"
 has "what it saw, for the app" "2437	-61	[WPA2-PSK-CCMP][ESS]	Willows" "$(verb seen)"
 hasnt "the key never in the log" "secret" "$log"
 FW=$F/fw PATH=$F/bin:$PATH ip route replace default via 10.4.0.1 dev wlan0   # Android puts it back (a renewal)
@@ -320,7 +328,9 @@ has "the car on: back" "back to the car's Wi-Fi (the car is on): the car's Wi-Fi
 check "... the projection hotspot, in its mode" 2 "$(cat "$F/fw/ap")"
 check "... client off, then the hotspot" "client off
 start 2" "$(grep -o 'client off\|start [12]' "$F/fw/apps.log")"
-check "... table 95 empty" "" "$(grep 'table 95' "$F/fw/ip4.route" || true)"
+check "... table 95: unreachable, never the main table's mobile data" "unreachable default table 95" "$(grep 'table 95' "$F/fw/ip4.route" || true)"
+check "... route_localnet off again" 0 "$(cat "$X/proc/sys/net/ipv4/conf/wlan0/route_localnet")"
+check "... the 127.x guard gone" no "$([ -f "$F/fw/4/filter/HMGAPI_HOMELO" ] && echo yes || echo no)"
 check "... waiting again" waiting "$(state)"
 
 # the car off without parked (the screen goes dark with it): 30 s, then home Wi-Fi
