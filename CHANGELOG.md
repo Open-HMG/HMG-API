@@ -8,6 +8,124 @@
   wireless session over a USB Wi-Fi adapter on that port can skip it while its own session is
   attached (#372).
 
+## 1.1.0-rc.10 (2026-11-25)
+
+- **No owner-facing way to force an unknown `app_process`, for now.** An empty `HMGAPI/FORCE`
+  file on the USB stick no longer forces the USB install or the NEMESIS package, and the
+  refusals no longer say how to force: an `app_process` not in `stock.txt` is refused with
+  nothing changed (install and uninstall). The refusal says HMG-API hasn't checked that build
+  yet and asks the owner to open an issue with the line, the car and its head unit software;
+  the USB installer's toast says the same in short. The build then goes into `stock.txt`. Forcing past that check is how #397's unit lost its last stock file.
+  The override stays in the scripts for maintainers (over adb), and the stick file's lines are
+  commented out, not deleted, to put back later. Tested off-car only.
+- **The stock `app_process` list names what it covers** (`install/common/stock.txt`). It held one
+  line, labelled "Kia EV6 US 260507". That one md5 is the stock `app_process` of every Gen5W
+  system image checked so far: HMC, ECOHMC, KMC and ECOKMC for the US and Canada (260206, 260507,
+  260903) and KMC and ECOHMC for Korea (260902). So cars on those builds were already taken for
+  stock; the label said otherwise. The file now says which builds were checked and which
+  weren't (Genesis, India, some Korean images, the newer Hyundai and Kia images). Nothing the
+  installer does changes.
+- **Updating over an older release installed with `HMGAPI/FORCE` on NEMESIS 1.17 no longer
+  stops Android from starting** (#397, a Korean 2020 K5). Releases before #396 refused NEMESIS
+  1.17's LivePatch script at `app_process` as an unknown build (md5
+  `f0fa894f6898c28850bfcebfb8db69d0`); forcing them kept that script as HMG-API's stock copy and
+  backup, and the stock binary stayed only in `app_process.real`. rc.9 took that for an update
+  and wrote its wrapper over `.real`: the wrapper ran NEMESIS's script, the script ran the
+  wrapper, and no zygote started, with no stock `app_process` left on the unit. Now a stock copy
+  that is NEMESIS's script means installing again from `.real` (a known stock build, or forced),
+  as a new install that keeps the engine's backups; the backup is taken again when it's the
+  script; with no stock binary in `.real` the install is refused even when forced. The install
+  checks the stock copy once more before any wrapper is written, and the uninstall never puts the
+  script or a wrapper back as stock, even forced. Tested off-car (the K5's sequence reproduced
+  with rc.9's scripts, then fixed); not on a car.
+- **The same repair when NEMESIS was uninstalled after the forced install** (#406 review).
+  NEMESIS's uninstall moves `app_process.real` back to `app_process`, so the stock binary is
+  there and the stock copy and backup are still its script. The install looked only in `.real`
+  and refused, which left the older release's own uninstall as the one way out: that asks for
+  `HMGAPI_FORCE` and then writes the script over `app_process` with NEMESIS gone. Now it installs
+  again from `app_process`.
+- **A stock `app_process` must be a binary, and a backup must be the bytes it was copied from**
+  (#406 review). The install and the uninstall share one check (`lib.sh`, `not_stock`): an HMG-API
+  wrapper, NEMESIS's script, any other script, an empty file and a missing one are all refused,
+  forced or not, so an empty `app_process.real` or another tool's script is never kept as the
+  stock copy. The backup is copied beside its name, checked and renamed, so an install that fails
+  or is cut off there no longer leaves a short file that the next install keeps and a forced
+  uninstall puts into `app_process.real`; a short one from an earlier release is taken again,
+  and the uninstall puts back the stock copy the wrapper runs instead. That check now runs before
+  anything on `/system` is written. On a unit rc.9 already broke, the uninstall no longer says to
+  install again first (the install refuses the same unit): it says no stock `app_process` is
+  left and what that takes. Tested off-car only (sh and dash); not on a car.
+- **A test that tries every order of events** (`tools/zygote-orders.py`,
+  `install/common/orders-test.sh`). It runs the real install and uninstall scripts, this tree's
+  and 1.0.2's, rc.8's and rc.9's from their tags, on a made-up head unit through every order of
+  installs, forced installs, uninstalls, restarts, NEMESIS 1.17 installed and uninstalled, firmware
+  installs and factory resets, and installs with a copy cut off, and follows what the zygote start
+  would run after each. With rc.9's scripts it finds #397's K5 three events in, and the same
+  mistake by other roads; it fails when this tree's install or uninstall is the step that leaves
+  no zygote. `ORDERS_FULL=1` goes seven events deep, for before a release.
+
+## 1.1.0-rc.9 (2026-11-24)
+
+- **The missing-stock-copy rescue works for every HMG-API version, and can't be forced
+  past** (#398 review). #399 recognised the leftover wrapper by this release's md5, which
+  rc.6 to rc.8 share; rc.5 and older ship other bytes, so their units were refused, and the
+  refusal suggested `HMGAPI/FORCE`. Forcing then took the old wrapper for an unknown stock
+  build, deleted HMG-API's stock backup as an old firmware's and kept the wrapper as the
+  "stock" copy, leaving no stock `app_process` on the unit for #397's stick. Now any HMG-API
+  wrapper (each version names `app_process.hmgapi-stock`) without its stock copy is rescued
+  from the backup the same way, before `HMGAPI_FORCE` is looked at, and refused with a
+  pointer to #397 when there's no backup. Tested off-car; not on a car.
+- **A factory reset no longer leaves HMG-API with a wrapper for a stock backup, and a forced
+  install can't keep a wrapper as the stock copy** (#400 review). A head-unit factory reset
+  wipes `/data/hmgapi` (its stock backups) while HMG-API stays on `/system`. Reinstalling then
+  took the missing backup from `app_process`, HMG-API's own wrapper, so the uninstall refused
+  ever after. With an older wrapper on `/system` the install refused it as an unknown build and
+  suggested `HMGAPI/FORCE`, and forcing copied that wrapper over the stock copy: the wrapper then
+  ran itself and Android couldn't start. Now any HMG-API wrapper with its stock copy there is an
+  update, a missing backup comes from the stock copy, a backup that is a wrapper is taken again,
+  and a stock copy that is a wrapper is refused even when forced.
+
+- **Installing puts back a missing stock copy of `app_process` instead of taking it for an
+  update** (#398 review). HMG-API's zygote wrapper is the same bytes from release to release,
+  so after an older uninstall on NEMESIS 1.17 and one restart, `app_process.real` was still
+  that wrapper with `app_process.hmgapi-stock` gone, and installing again took it for an
+  update: it never made the stock copy, said "installed", and the next restart couldn't start
+  Android. Now the install counts as an update only when the stock copy is there. Our wrapper
+  without one gets it back from `/data/hmgapi/stock` (a plain uninstall keeps it) when that's
+  a known stock build, checked by md5; with no usable backup (uninstalled with `--purge`) the
+  install refuses, changes nothing, and points to #397. The same holds without NEMESIS.
+  Tested off-car (`install-test.sh`, with the wrapper byte-identical to the installed one);
+  not on a car.
+
+- **HMG-API works under NEMESIS 1.17's LivePatch, and uninstalling no longer stops Android
+  from starting there.** NEMESIS 1.17 puts its own script at `/system/bin/app_process`
+  (its watchdog writes it again on every boot, LivePatch package or not) and runs
+  `app_process.real`, which holds the binary it found there first: stock, or HMG-API's
+  wrapper. The installer and uninstaller only knew `app_process`, so on such a unit:
+  - uninstalling put the stock binary over NEMESIS's script and deleted
+    `app_process.hmgapi-stock`. The next boot worked; then NEMESIS's script came back,
+    `.real` was still HMG-API's wrapper, its stock copy was gone, and the zygote could not
+    start on any later boot (no safe mode helps: the chain is the same). Getting out needs
+    adb and a stock `app_process`.
+  - an update wrote the new wrapper where NEMESIS overwrote it at the next boot (`.real`
+    kept the old one);
+  - with NEMESIS 1.17 there first, the install refused (`app_process` isn't a known stock
+    build).
+
+  Now both recognise NEMESIS's script (`# NEMESIS LivePatch` on its second line,
+  `lib.sh` `zygote_files`) and work on `app_process.real` instead: the wrapper goes there,
+  the stock bytes it held are the backup and `app_process.hmgapi-stock`, and the uninstall
+  puts them back there. NEMESIS's script is left alone. When an older HMG-API's update or
+  uninstall wrote over NEMESIS's script before the next boot (so `.real` still holds an
+  older wrapper), both files get the wrapper, or both the stock bytes: whatever the next
+  boot runs ends at stock. That also rescues a unit an older uninstall left this way, if
+  this release is installed before it restarts. Without NEMESIS's script nothing
+  changes. Mods can't change `app_process.real` (`Engine.HMGAPI_OWNED`). The uninstall
+  that runs is the one saved at install, so **on NEMESIS 1.17, update HMG-API to this
+  release before uninstalling it.** Tested off-car (`install/common/install-test.sh`:
+  HMG-API then NEMESIS, NEMESIS then HMG-API, an update between, NEMESIS's boot after
+  each step); not yet on a car.
+
 ## 1.1.0-rc.8 (2026-11-20)
 
 - **Comes with wireless CarPlay + Android Auto 2.2.0-rc.9** (it needs this RC): #91's fix (an iPhone

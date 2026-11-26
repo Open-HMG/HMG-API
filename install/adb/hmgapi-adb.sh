@@ -5,7 +5,7 @@
 #   ./hmgapi-adb.sh status             what's installed
 # Root comes from hmgapid once HMG-API is installed; the first install needs
 # NEMESIS (its daemon, through a non-SUID copy: the SUID nemesis is a weak root
-# from adb). HMGAPI_FORCE=1 is passed on (see install.sh). Restart the head unit afterwards.
+# from adb). HMGAPI_FORCE=1 is passed on (see install.sh; maintainers only). Restart the head unit afterwards.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 P=${HMGAPI_PAYLOAD:-$HERE/payload}

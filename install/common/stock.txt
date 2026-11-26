@@ -1,1 +1,10 @@
-33f798115689d1859e8d2159dc88e7dc Kia EV6 US 260507
+# Stock app_process builds the installer takes for stock: "<md5> <label>", one per line.
+# Every Gen5W system image checked so far ships the same app_process (9492 bytes):
+#   HMC, ECOHMC, KMC, ECOKMC USA 260206, 260507 (US and Canadian cars)
+#   HMC, ECOHMC USA 260903
+#   KMC, ECOHMC KOR 260902
+# Not checked yet: GENESIS (USA, KOR), HMC KOR 260902, ECOKMC KOR 260902, HMC IND 260430, and
+# the newer HMC (260903) and KMC (260206, 260507) images. A car on one of those whose
+# app_process isn't listed here is refused, with nothing changed; its line goes here once
+# that build's stock file is checked.
+33f798115689d1859e8d2159dc88e7dc Gen5W stock (US/CA 260206, 260507, 260903; KOR 260902)
