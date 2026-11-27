@@ -11,14 +11,26 @@
   entry by `catalog.py add`, and read again from the downloaded package's `mod.json`) are met
   by what's installed, or by the catalogue's version, installed first; a required mod that's
   turned off is turned on. Loops, conflicts, a requirement newer than the catalogue's or not
-  in it, and a mod for a newer HMG-API are refused before anything is downloaded or installed.
-  Everything is downloaded and checked before the first install. Removing a mod others
-  require says which won't load.
+  in it, an unreadable range, and a mod for a newer HMG-API are refused before anything is
+  downloaded or installed. The result is checked as a whole: every mod that will be on keeps
+  what it requires (an update that breaks another mod's range is refused), and conflicts count
+  whichever side lists them. Every package is downloaded and checked (SHA-256, signature,
+  author key, HMG-API, car) before the first install. When a package requires more than the
+  plan said, nothing is installed and the new plan is shown for a second OK. Removing a mod
+  others require says which won't load.
+- **A first install from the catalogue needs a known author.** The catalogue isn't signed, so
+  a new mod's author key from it must already be on the head unit's trusted author list (which
+  only HMG-API's releases bring), or the owner says yes for that mod.
+- **Staged updates wait for apply.** The automatic check stages only plain updates (nothing new
+  installed or turned on, signed with the installed key) into `/data/hmgapi/pending/`, which
+  nothing loads; `engine apply` puts them in place first and keeps the previous version in
+  `/data/hmgapi/previous/`.
 - **Updates.** Mods tab → Updates (with how many) lists installed mods with a newer catalogue
   version, and a newer HMG-API release (pre-releases only on a pre-release), with Update and
   Update all; a mod's row in the list says "update x.y.z". HMG-API checks by itself each time
-  home Wi-Fi comes up (owner switch `no_update_check` turns that off), and can also download and
-  stage the mods' updates then (`auto_stage_updates`, off by default); the owner still applies.
+  home Wi-Fi comes up, at most every 6 hours (owner switch `no_update_check` turns that off), and
+  can also download and stage the mods' plain updates then (`auto_stage_updates`, off by
+  default): they wait aside until the owner applies.
   HMG-API itself only updates on the owner's tap: its update zip is checked against its
   release's `SHA256SUMS`, then against the release key as from a USB stick. Engine: `updates`,
   `update <id>... | --all | hmgapi`, `update-check`; `logs/hmgapi/updates.log`.

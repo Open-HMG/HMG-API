@@ -87,6 +87,16 @@ public final class Version implements Comparable<Version> {
         return true;
     }
 
+    /** why a range can't be read ("^x.y"), or null when it can */
+    public static String rangeError(String range) {
+        try {
+            satisfies("0.0.0", range);
+            return null;
+        } catch (IllegalArgumentException x) {
+            return "\"" + range + "\" isn't a version range (" + x.getMessage() + ")";
+        }
+    }
+
     /**
      * Does HMG-API version core meet a mod's "hmgapi" range? A range of final versions
      * is checked against the release a pre-release leads to (1.1.0-rc.1 meets ">=1.1.0",

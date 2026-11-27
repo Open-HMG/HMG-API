@@ -447,7 +447,16 @@ public final class Engine {
             out.add("usage: engine plan | apply [--trial] | keep | restore | status | recover | firmware-reset | install <zip|dir> | remove <id> | nemesis-sync | map | map-car [--local [--if-needed] | --write | --forget] | verify-map | report [--usb] | usb-scan | update-hmgapi <zip> | publish-state | apps");
             return 2;
         }
-        Plan p = plan(restoreAll, force);
+        // updates the automatic check staged (pending/): in place right before an apply plans, never earlier
+        List<String> staged = "apply".equals(cmd) ? Catalog.stagedIn(this) : new ArrayList<String>();
+        if ("plan".equals(cmd)) Catalog.stagedReport(this);
+        Plan p;
+        try {
+            p = plan(restoreAll, force);
+        } catch (Exception x) {
+            Catalog.stagedBack(this, staged);
+            throw x;
+        }
         p.report(this);
         if (!restoreAll) {
             out.addAll(hookPlan().report());
@@ -460,6 +469,7 @@ public final class Engine {
         if (!problems.isEmpty()) {
             out.add("nothing changed: " + problems.size() + " problem(s)");
             for (String s : problems) out.add("  " + s);
+            Catalog.stagedBack(this, staged);
             return 3;
         }
         if ("plan".equals(cmd)) return 0;
