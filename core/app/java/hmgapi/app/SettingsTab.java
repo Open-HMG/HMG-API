@@ -17,11 +17,11 @@ import java.io.FileInputStream;
 /**
  * HMG-API's own settings, by category: Vehicle (the owner's switches for mods'
  * commands), Updates, Phone projection (what mods set), Hook map (this car's map,
- * checks, mapping it from its own files), About. The switches are kept by hmgapid
- * (allow <name>).
+ * checks, mapping it from its own files), Safe mode (every mod off: engine safe), About.
+ * The switches are kept by hmgapid (allow <name>).
  */
 final class SettingsTab {
-    static final String[] CATS = { "Vehicle", "Updates", "Home Wi-Fi", "Phone projection", "Hook map", "About" };
+    static final String[] CATS = { "Vehicle", "Updates", "Home Wi-Fi", "Phone projection", "Hook map", "Safe mode", "About" };
     final MainActivity a;
     LinearLayout cats, page;
     static int current;   // the category shown last, kept while the app runs
@@ -67,6 +67,7 @@ final class SettingsTab {
         else if (n == 2) homeWifi();
         else if (n == 3) projection();
         else if (n == 4) hookMap();
+        else if (n == 5) safeMode();
         else about();
     }
 
@@ -317,6 +318,46 @@ final class SettingsTab {
                         a.needRestart();
                     }
                 });
+    }
+
+    /** safe mode: every mod off, HMG-API and this app on (hmgapid engine safe on|off) */
+    void safeMode() {
+        JSONObject st = MainActivity.publicState();
+        boolean on = st.optBoolean("safe");
+        if (on && st.optString("safe_why").startsWith("boot guard")) {
+            Ui.text(page, "HMG-API turned safe mode on by itself: Android failed to start several times in a row. Turn off or "
+                    + "remove the mod you added or changed last (Mods), then turn safe mode off and restart.", 17, true, Ui.WARN);
+        }
+        Ui.text(page, "Turns every mod off at once without removing anything: no mod's hooks (from the next restart), services, "
+                + "apps or network rules (adb stays reachable). HMG-API and this app stay on, so you can turn it off here. Use it when something goes "
+                + "wrong after adding or changing a mod, to see whether a mod is the cause. The mods' changes to system files stay "
+                + "as they are: turning a mod off and applying, or uninstalling, puts those back.", 16, false, Ui.GREY);
+        Ui.text(page, "HMG-API also turns it on by itself if Android keeps failing to start with mods. Without the screen, over adb: "
+                + "adb shell \"hmgapid engine safe on\" (or off).", 16, false, Ui.GREY);
+        final Switch sw = Ui.switchRow(page, "Safe mode (all mods off)");
+        sw.setChecked(on);
+        sw.setOnCheckedChangeListener(new android.widget.CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(android.widget.CompoundButton b, final boolean checked) {
+                sw.setEnabled(false);
+                new Ui.Job<Hmgapid.Result>() {
+                    @Override
+                    Hmgapid.Result work() throws Exception {
+                        return Hmgapid.call(120000, "engine", "safe", checked ? "on" : "off");
+                    }
+
+                    @Override
+                    void done(Hmgapid.Result r, Exception e) {
+                        boolean ok = e == null && r.code == 0;
+                        a.message(ok ? (checked ? "Safe mode on" : "Safe mode off") : "Didn't work", e != null ? Hmgapid.unreachable(e) : r.output.trim());
+                        if (ok && r.output.contains("restart the head unit")) a.needRestart();
+                        else a.refreshStatus();
+                        show(current);
+                    }
+                }.start(a);
+            }
+        });
+        Ui.line(page);
     }
 
     void run(String waiting, final String... cmd) {

@@ -33,7 +33,7 @@ final class ModsTab {
         List<String> services = new ArrayList<String>();
 
         int color() {
-            if (!enabled) return Ui.OFF;
+            if (!enabled || "safe".equals(state)) return Ui.OFF;
             if ("conflict".equals(state)) return Ui.WARN;
             if ("error".equals(state) || "unsupported".equals(state)) return Ui.ERROR;
             return Ui.ACCENT;
@@ -41,6 +41,7 @@ final class ModsTab {
 
         String label() {
             if (!enabled) return "Off";
+            if ("safe".equals(state) || MainActivity.safeMode()) return "On, held by safe mode";
             if ("conflict".equals(state)) return "Conflict";
             if ("error".equals(state)) return "Error";
             if ("unsupported".equals(state)) return "Not for this car";

@@ -32,8 +32,8 @@ Owners get to decide for their own units. Follow these by default. If the user a
 
 | Path | What |
 |---|---|
-| `core/hmgapid` | root daemon + client, static ARM (no libc). Ops per caller uid (root/shell: all incl. `sh`, `remount`; `hmgapi.app`: HMG-API ops; others: `ping`). Abstract socket `@hmgapid`. |
-| `core/zygote` | `app_process` wrapper (installed as `/system/bin/app_process`, stock kept as `app_process.hmgapi-stock`): `LD_PRELOAD` for the zygote when `/data/hmgapi/hook/enable`, boot guard (`hook/starts`: starts in a row that didn't last 120 s, off at 6; `hook/boot`: the kernel's `boot_id` and its count, off at 3, so restarts within 120 s don't count as crashes; the watcher resets both after 120 s). |
+| `core/hmgapid` | root daemon + client, static ARM (no libc). Ops per caller uid (root/shell: all incl. `sh`, `remount`; `hmgapi.app`: HMG-API ops; others: `ping`). Abstract socket `@hmgapid`. Runs mods' services (logs capped through a pipe while they run, nice 10 unless `"priority": "normal"`). |
+| `core/zygote` | `app_process` wrapper (installed as `/system/bin/app_process`, stock kept as `app_process.hmgapi-stock`): `LD_PRELOAD` for the zygote when `/data/hmgapi/hook/enable`, boot guard (`hook/starts`: starts in a row that didn't last 120 s, trips at 6; `hook/boot`: the kernel's `boot_id` and its count, trips at 3, so restarts within 120 s don't count as crashes; the watcher resets both after 120 s). The first trip turns safe mode on and counts again (HMG-API's own hooks, no mod); a trip in safe mode: hooks off. |
 | `core/loader` | `libhmgapi_hook.so`: interposes `JNI_CreateJavaVM`, loads `/system/framework/hmgapi-hook.jar` before `ZygoteInit.main`, Dalvik method hooks (Xposed-style, offsets checked on the EV6 libdvm). |
 | `core/runtime` | `hmgapi-hook.jar`: `Bridge`, `Hooks`, `MethodHook`, `ModEntry`/`ModContext`/`LoadedApp` (mod API), `Mods` (loader), launcher/editor hooks (`HMG-API`), ★ choices (`StarKey`). |
 | `core/app` | `hmgapi.app`: status + mod list (from `HmgApiStatus.json`, set by the hooks). |
@@ -43,6 +43,8 @@ Owners get to decide for their own units. Follow these by default. If the user a
 | `catalog/` | the mod catalogue (`tools/catalog.py`): per mod its download, SHA-256 and author key; the wiki's Community mods page. The release bundles `tools/release-mods.txt`'s ids from it. |
 | `tools/sdk`, `./build.sh sdk` | the mod SDK (`hmgapi-mod-sdk-<version>.zip`, a release asset from 1.1.0-beta.1): what a mod repo builds, tests and packages with; `.github/workflows/mod.yml` is their reusable CI. |
 | `tools/` | `lpatch`, `mkrecipe.py`, `mkdelta.py`, `mkicon.sh` (stock-style tile pictures; `mkicon-hmgapi.sh` makes HMG-API's own from the logo), `env.sh`, `test-all.sh`; `map-car.py` (partial maps), `maplib.py` (the repo keeps `maps/base/` + each build's differences in `car.json`; `build.sh` expands them into the per-app files the unit reads), `test-hooks.py` (points × cars, `maps/coverage.json`), `probe-test.py` (on-car mapper vs map-car.py); `cars.py` (stock trees in `$HMGAPI_CARS`, default `~/hmg-cars`: `list`, `test --report`; `docs/car-trees.md`). |
+
+Safe mode: `/data/hmgapi/SAFE` (`hmgapid engine safe on|off`, Settings → Safe mode, the boot guard): no mod's hooks, services, apps or network rules (except a rule to adbd's port), nothing removed; `hmgapi.engine.Safe`. A USB stick can't help a unit stuck before Android: on 4.4, vold mounts a stick only when Android's MountService asks (AOSP behaviour, not timed on a car yet), so with no screen it's adb or the boot guard.
 
 ## Gotchas learned the hard way
 

@@ -20,6 +20,12 @@
  * Reset: with hooks on, a watcher (double-forked, so init adopts it and the
  * zygote never sees it exit) waits GUARD_DELAY seconds and, if this zygote pid is
  * still alive, writes 0 to starts and removes boot: the start worked.
+ * Safe mode (SAFEFILE, /data/hmgapi/SAFE): the runtime loads no mod, hmgapid runs no
+ * mod's service, the engine publishes every mod as off. The preload stays, so HMG-API's
+ * own hooks (its tile, its ★ choice, the update block) still run. The boot guard
+ * tripping with no SAFEFILE writes it ("boot guard") and gives the counters a fresh
+ * start: HMG-API alone gets another try. Tripping again in safe mode: hooks off, as
+ * before (until the owner turns safe mode off, which resets the counters).
  * Stock ARM app_process re-execs /system/bin/app_process once with
  * NO_ADDR_COMPAT_LAYOUT_FIXUP=1 (ADDR_COMPAT_LAYOUT personality), so the zygote
  * passes through here twice per start. Only the first pass counts and sets the
@@ -54,6 +60,9 @@ typedef unsigned long ul;
 #endif
 #ifndef BOOTID
 #define BOOTID "/proc/sys/kernel/random/boot_id"
+#endif
+#ifndef SAFEFILE
+#define SAFEFILE "/data/hmgapi/SAFE"
 #endif
 #define MAXSTARTS 3   /* in one kernel boot */
 #define MAXBOOTS 6    /* in a row, across restarts */
@@ -173,6 +182,15 @@ static long bump_starts(long *inboot)
     }
     return v;
 }
+/* safe mode on: SAFEFILE, saying why */
+static int safe_on(void)
+{
+    long fd = xopen(SAFEFILE, O_WR, 0600);
+    if (fd < 0) return 0;
+    xwrite(fd, "boot guard\n", 11);
+    xclose(fd);
+    return 1;
+}
 static int alive(long pid)
 {
     char p[24] = "/proc/", c;
@@ -245,12 +263,29 @@ int main(int argc, char **argv, char **envp)
         if (exists(HOOKDIR "/disable")) put(", hooks off (disable file)");
         else if (!exists(HOOKLIB)) put(", hooks off (no " HOOKLIB ")");
         else {
+            int safe = exists(SAFEFILE);
             starts = bump_starts(&inboot);
             if (starts < 0) put(", hooks off (can't write starts)");
-            else if (inboot >= MAXSTARTS || starts >= MAXBOOTS) {
-                put(", hooks off (boot guard, starts="); putn(starts); put(", this boot "); putn(inboot); put(")");
+            else if ((inboot >= MAXSTARTS || starts >= MAXBOOTS) && safe) {
+                put(", hooks off (boot guard, starts="); putn(starts); put(", this boot "); putn(inboot); put("; in safe mode)");
             }
-            else { use = 1; put(", hooks on, start "); putn(starts + 1); put(" (this boot "); putn(inboot + 1); put(")"); }
+            else if (inboot >= MAXSTARTS || starts >= MAXBOOTS) {
+                put(", boot guard (starts="); putn(starts); put(", this boot "); putn(inboot); put(")");
+                if (safe_on()) {   /* counters from 0 again, this start the first: HMG-API alone gets its try */
+                    long fd = xopen(HOOKDIR "/starts", O_WR, 0600);
+                    if (fd >= 0) { xwrite(fd, "0", 1); xclose(fd); }
+                    xunlink(HOOKDIR "/boot");
+                    starts = bump_starts(&inboot);
+                }
+                if (starts >= 0 && exists(SAFEFILE) && inboot < MAXSTARTS && starts < MAXBOOTS) {
+                    use = 1; put(": safe mode on, hooks on without mods");
+                }
+                else put(": hooks off (can't write " SAFEFILE ")");
+            }
+            else {
+                use = 1; put(", hooks on, start "); putn(starts + 1); put(" (this boot "); putn(inboot + 1); put(")");
+                if (safe) put(", safe mode: no mods");
+            }
         }
     }
 

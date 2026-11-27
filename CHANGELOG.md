@@ -2,6 +2,36 @@
 
 ## 1.1.0-rc.10 (2026-11-25)
 
+- **Safe mode: every mod off at once, nothing removed** (review of 2026-11-26). While
+  `/data/hmgapi/SAFE` is there, the runtime loads no mod's hooks, hmgapid runs no mod's
+  service (boot-start ones included, even before the engine has run), the mods' apps are
+  turned off and their network rules come out, except a rule to adbd's port, so adb over the
+  hotspot stays reachable. HMG-API, its own hooks and its app stay on. The mods' file changes
+  stay. On and off: `hmgapid engine safe on|off` (root, adb, the app), Settings → Safe mode,
+  or the file by hand; the top bar says "Safe mode: mods off". Before, the only switch was
+  `hook/disable`, which turns off hooks only (HMG-API's own too) and was documented only in
+  `core/README.md`; mods' services, apps and network rules kept running.
+- **The boot guard turns safe mode on.** Its first trip (3 failed starts in one boot, or 6
+  in a row) writes `SAFE` and starts the count again, so HMG-API's own hooks (its tile, its ★
+  choice, the update block) get one more try without any mod; a trip in safe mode turns the
+  hooks off as before. `engine safe off` resets the counters.
+- **Service logs stay capped while the service runs.** hmgapid read a service's log size only
+  when it started it, so a service that kept running wrote forever (a looping `echo` under the
+  real hmgapid: 885 MB in 8 s). Output now comes through a pipe hmgapid reads: 256 KB, then
+  `.1`, and at most 256 KB kept a minute (a line says how much was left out). HMG-API's own log
+  (LogKeeper) is capped the same way, and keeps each mod's lines to 300 a minute so a mod
+  logging on a hot path can't push HMG-API's own lines out.
+- **Mods' services run at a lower priority**: nice 10 and the lowest best-effort I/O class,
+  unless the service asks for `"priority": "normal"` in `mod.json`. HMG-API's own services
+  are unchanged. A service gets only fds 0-2.
+- **Recovery without the screen** in the wiki: Troubleshooting's "Stuck on the boot animation,
+  no home screen, or an app keeps crashing" (adb first, safe mode, `hook/disable`, `/data`
+  full, back to stock) and Uninstalling's no-screen route over adb. A USB stick can't trigger
+  any of it: Android mounts it, after the point where such a unit is stuck.
+  Tested off-car only, not on a car: the engine's safe mode, network and priority checks
+  (`core/runtime/safe-test.sh`) and `tools/test-all.sh --fast`; hmgapid's and the zygote
+  wrapper's new checks run under qemu-arm (`core/hmgapid/test.sh`, `core/zygote/test.sh`).
+
 - **No owner-facing way to force an unknown `app_process`, for now.** An empty `HMGAPI/FORCE`
   file on the USB stick no longer forces the USB install or the NEMESIS package, and the
   refusals no longer say how to force: an `app_process` not in `stock.txt` is refused with
