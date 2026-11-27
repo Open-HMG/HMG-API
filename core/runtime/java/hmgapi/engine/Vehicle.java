@@ -16,6 +16,9 @@ import java.util.Map;
  * the car's own services too, each with the guard its review gave it.
  */
 public final class Vehicle {
+    /** state/<this>: the guide lines' stock state while a mod has them changed (hmgapi.vehicle.Hub); the vehicle service runs while it's there */
+    public static final String LINES_STOCK = "guide-lines.stock";
+
     private Vehicle() {}
 
     public static final class Reading {

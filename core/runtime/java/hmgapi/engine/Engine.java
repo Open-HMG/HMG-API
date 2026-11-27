@@ -450,6 +450,7 @@ public final class Engine {
         p.report(this);
         if (!restoreAll) {
             out.addAll(hookPlan().report());
+            if ("plan".equals(cmd)) for (String s : Protected.describe()) out.add("safety   " + s + " (no mod, built in)");
             Set<String> on = new LinkedHashSet<String>();
             Map<String, Map<String, Object>> all = LiveState.mods(this, on);
             out.addAll(ModRuntime.describe(this, all, on));

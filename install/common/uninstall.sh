@@ -125,6 +125,14 @@ if [ -z "$ROOT" ] && [ "$(getprop sys.boot_completed)" = 1 ]; then
     if [ "$(getprop persist.sys.hmgapi.otaoff)" = 1 ]; then pm enable com.hkmc.system.app.OTAClient >/dev/null && setprop persist.sys.hmgapi.otaoff ""; fi
     p=$(getprop persist.sys.hmgapi.autoupd)
     [ -n "$p" ] && settings put system gen_auto_update "$p" && setprop persist.sys.hmgapi.autoupd ""
+    # the parking guide lines a mod changed (vehicle command guide_lines): their stock state back
+    if [ -f "$D/state/guide-lines.stock" ]; then
+        if r=$(CLASSPATH=/system/framework/hmgapi-hook.jar app_process /system/bin hmgapi.vehicle.Hub restore-lines 2>&1); then
+            log "parking guide lines: back to stock ($r)"
+        else
+            log "parking guide lines: couldn't put them back ($r); set them in the camera settings"
+        fi
+    fi
     # the side panel's page lists: HMG-API's page (slot 22) out
     for k in ss_list ss_list_dr1 ss_list_dr2 ss_setting ss_setting_dr1 ss_setting_dr2; do
         v=$(settings get system $k)

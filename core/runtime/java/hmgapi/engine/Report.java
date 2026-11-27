@@ -133,6 +133,7 @@ final class Report {
             }
         }
         r.put("mods", mods);
+        r.put("protection", protection(e));
         r.put("errors", errors(e));
         Map<String, Object> net;
         try {
@@ -177,10 +178,20 @@ final class Report {
         if (dis != null) e.out.add("check the map: " + dis);
         e.out.add("saved: " + dir.getPath() + "/" + name + ".json");
         if (net.get("summary") != null) e.out.add("network: " + net.get("summary"));
+        Map<String, Object> pr = (Map<String, Object>) r.get("protection");
+        e.out.add("safety: " + ((List<?>) pr.get("processes_seen")).size() + " protected process(es) started with no mod, "
+                + ((List<?>) pr.get("refused")).size() + " mod hook(s) refused, " + ((List<?>) pr.get("undeclared_hooks")).size()
+                + " direct hook(s) outside declared points");
         for (String s : sticks) e.out.add("usb: " + s + "/" + name + ".json");
         if (usb && sticks.isEmpty()) e.out.add("usb: no USB stick found (the report is in HMG-API's folder; adb pull works too)");
         e.out.add("issue-url: " + issueUrl(r, name));
         return 0;
+    }
+
+    static String join(List<Object> l) {
+        StringBuilder b = new StringBuilder();
+        for (Object o : l) b.append(b.length() == 0 ? "" : ", ").append('`').append(o).append('`');
+        return b.toString();
     }
 
     static Map<String, Object> notNoFiles(Map<String, String> missing) {
@@ -208,6 +219,41 @@ final class Report {
             // not installed by the installer (dev setup)
         }
         return null;
+    }
+
+    /**
+     * The safety functions no mod touches (Protected) and what the runtime did about them,
+     * from the log keeper's lines: the protected processes that started (no mod loaded
+     * there), mods' hooks refused, and mods' direct hooks outside their declared points.
+     * Each distinct line once (the time and process id left out), scrubbed.
+     */
+    static Map<String, Object> protection(Engine e) {
+        java.util.Set<String> seen = new java.util.TreeSet<String>(), refused = new java.util.LinkedHashSet<String>(),
+                undeclared = new java.util.LinkedHashSet<String>();
+        for (String name : new String[] { "log.log.1", "log.log" }) {
+            try {
+                File k = new File(e.data, "logs/hmgapi/" + name);
+                if (!k.isFile()) continue;
+                for (String l : Engine.read(k).split("\n")) {
+                    if (!l.contains("/HMG-API")) continue;
+                    int at = l.indexOf("): ");
+                    String msg = scrub(at < 0 ? l : l.substring(at + 3)).trim();
+                    if (msg.startsWith(Protected.UNDECLARED)) undeclared.add(msg.substring(Protected.UNDECLARED.length()));
+                    else if (msg.startsWith(Protected.MARK + "refused ")) refused.add(msg.substring(Protected.MARK.length()));
+                    else if (msg.startsWith(Protected.MARK) && msg.contains(" runs ")) {
+                        seen.add(msg.substring(Protected.MARK.length(), msg.indexOf(" runs ")));
+                    }
+                }
+            } catch (Exception ignored) {
+                // unreadable: left out
+            }
+        }
+        Map<String, Object> p = new LinkedHashMap<String, Object>();
+        p.put("rules", new ArrayList<Object>(Protected.describe()));
+        p.put("processes_seen", new ArrayList<Object>(seen));
+        p.put("refused", new ArrayList<Object>(refused));
+        p.put("undeclared_hooks", new ArrayList<Object>(undeclared));
+        return p;
     }
 
     /** HMG-API's recent warnings and errors: hmgapid's log and the log keeper's (scrubbed, last 60) */
@@ -307,6 +353,18 @@ final class Report {
             if (m.get("why_not") != null) s.append(": not for this car (").append(m.get("why_not")).append(")");
             if (m.get("hooks_not_loaded") != null) s.append(": hooks not loaded (").append(m.get("hooks_not_loaded")).append(")");
             s.append("\n");
+        }
+        Map<String, Object> pr = (Map<String, Object>) r.get("protection");
+        if (pr != null) {
+            List<Object> seen = (List<Object>) pr.get("processes_seen"), ref = (List<Object>) pr.get("refused"),
+                    und = (List<Object>) pr.get("undeclared_hooks");
+            s.append("\n## Safety functions (no mod, built in)\n\n");
+            s.append("- Protected processes that started here, with no mod loaded: ")
+                    .append(seen.isEmpty() ? "none seen in the kept log" : join(seen)).append("\n");
+            s.append("- Mods' hooks refused: ").append(ref.size()).append("\n");
+            for (Object x : ref) s.append("  - ").append(x).append("\n");
+            s.append("- Direct hooks outside a mod's declared points: ").append(und.size()).append("\n");
+            for (Object x : und) s.append("  - ").append(x).append("\n");
         }
         Map<String, Object> net = (Map<String, Object>) r.get("network");
         if (net != null && net.get("summary") != null) {

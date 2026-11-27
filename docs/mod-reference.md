@@ -80,6 +80,40 @@ For a mod:
 The owner can turn local points off ("Use points mapped on this car"), and
 `map-car --forget` deletes them.
 
+### Safety functions: no mod, ever
+
+The rear camera, the 360 view (AVM/SVM), the parking guide lines (PGS) and the
+telematics emergency calls (SOS, eCall) are off limits to every mod. This is built in.
+No setting, override (`overrides.ignore_system` included), stick file or mod.json turns
+it off (`hmgapi.engine.Protected`; `hmgapid engine plan` lists every rule under `safety`):
+
+- **Processes no mod loads in:** `com.hkmc.system.app.rearcamera` (rear camera, 360
+  view, guide lines' screen), `com.hkmc.telematics.ECall` (eCall, where installed) and
+  `com.hkmc.telematics.service` (telematics), with every other process of those
+  packages. So does any stock process (`com.hkmc.`, `com.mobis.`, `com.daudio.` …, never
+  a mod's own app) whose name looks like a camera or emergency-call app (`rearcamera`,
+  `.avm`, `.svm`, `.pgs`, `ecall`, `.sos` …), for builds not checked yet.
+  There, at boot or live, no mod's `zygoteInit`/`appLoaded` runs. The hooks mods put on
+  in the zygote pass straight through, and HMG-API adds nothing of its own. The log
+  says `protected: <process> runs …` once per start.
+- **Classes no mod hooks, in any process:** the camera and telematics services run
+  inside `system_server`, so they're protected by class instead: `com.hkmc.pgs.*`,
+  `com.hkmc.micom.PgsService` (and `PgsServiceV2`), `com.hkmc.micom.TMUService`,
+  `com.hkmc.micom.protocol.AVM`/`Camera`/`PGS`/`TMU` and `…protocol.camera.*`,
+  `com.hkmc.tmu.*`. A hook there, declared or not, throws `IllegalStateException`
+  and is logged as `protected: refused …`.
+- **Hook points no mod declares:** `framework.pgs_service*`, `framework.car_services.pgs`
+  and `framework.tmu*`. A mod that declares one isn't loaded (the plan says why). Use
+  the vehicle commands `guide_lines` and `rear_camera` instead.
+
+**Direct hooks.** `Hooks.findAndHookMethod` and `Bridge.hookMethod` are public, but a mod
+should hook through `ModContext.hook` and the points it declares. A direct call works
+outside the protected processes and classes. Each one is logged once per process:
+`undeclared hook: <mod> hooked <class>.<method> in <process> directly …`. The Car Report
+lists them (`protection.undeclared_hooks`) next to the refused hooks and the protected
+processes it saw start. If you need a method HMG-API has no point for, ask for a new
+hook point instead.
+
 ## Talking to HMG-API from your app or service
 
 Compile against `hmgapi-client.jar` (`./build.sh client`) and bundle it:
@@ -439,7 +473,8 @@ check for updates.
 - **Rear camera turns:** `"vehicle": {"commands": ["rear_camera"]}`, then
   `vehicle-do rear_camera take|release` before and after opening the camera; one mod
   at a time, freed when it's turned off. The car's reverse view always comes first
-  (`com.hkmc.intent.action.CAMERA_APP_START`, the gear).
+  (`com.hkmc.intent.action.CAMERA_APP_START`, the gear). It's coordination only: no
+  mod hooks the camera app or its service (see Safety functions).
 
 ## Vehicle commands
 
@@ -448,6 +483,13 @@ charge_door open` or `api.command("seat_heat", "driver", "low")`, without root. 
 review gave it (park only, one holder of the ambient light, conditioning stopped
 when its mod is turned off ...): the list, arguments and guards are in
 `vehicle-commands.md`.
+
+`guide_lines on|off` keeps the lines' stock state on disk (`state/guide-lines.stock`)
+before the first change. So they go back to stock on `restore`, when the mod is turned
+off, and also after a restart of the vehicle service or the head unit while the mod
+held them, or after the mod's removal. The vehicle service keeps running until they're
+back, retrying until the car's camera service answers. HMG-API's uninstall puts them
+back too.
 
 ## Car events
 

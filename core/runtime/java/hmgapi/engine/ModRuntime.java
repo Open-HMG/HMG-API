@@ -442,7 +442,8 @@ final class ModRuntime {
         }
         // always: the gear check before a restart, an apply or an install reads gear.park through it (Gear,
         // hmgapid reboot, lib.sh gear_gate), on a unit with no mod reading the car too; and mods' readings,
-        // commands and car events, the owner's MICOM recorder, home Wi-Fi (parked and power)
+        // commands and car events, the owner's MICOM recorder, home Wi-Fi (parked and power), and the guide
+        // lines a mod changed going back to stock (Vehicle.LINES_STOCK) even after that mod is gone
         svcs.append(VEHICLE_SERVICE).append('\n');
         svcs.append(LOG_SERVICE).append('\n');
         e.stateDir.mkdirs();
