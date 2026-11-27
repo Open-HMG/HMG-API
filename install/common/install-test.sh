@@ -82,6 +82,18 @@ run $P/install.sh $P
 has "payload without its hook maps refused" "the hook maps folder (payload/maps) is missing" "$out"
 has "... before anything changed" "Nothing was changed." "$out"
 mv $T/maps.away $P/maps
+# the engine's HTTPS library goes into /data before /system changes: when it can't, the
+# install stops with /system as it was (not with the wrapper in and the maps and app skipped)
+if [ -f $P/libhmgapi_fetch.so ]; then
+    mkdir -p $R/data/hmgapi; : > $R/data/hmgapi/lib   # a file where its folder goes
+    run $P/install.sh $P
+    check "HTTPS library can't be kept: refused" 1 $rc
+    has "... said, before /system" "keep the engine's HTTPS library in $R/data/hmgapi/lib, so nothing on /system was changed" "$out"
+    check "... /system unchanged" "$BEFORE" "$(tree)"
+    rm -rf $R/data/hmgapi
+else
+    echo "skip  HTTPS library before /system (no libhmgapi_fetch.so in the payload)"
+fi
 check "still stock after refusals" "$BEFORE" "$(tree)"
 
 run $P/install.sh $P
