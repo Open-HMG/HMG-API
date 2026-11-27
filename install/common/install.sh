@@ -11,6 +11,11 @@
 # off in troubleshooter and the NEMESIS package's postinstall, for putting back later).
 # ROOT prefixes every path, for off-car tests only.
 umask 077
+# a cut-off install can leave /system half changed: a dropped reader of its output (adb, the
+# NEMESIS Manager or Engineering Mode screen closed, say by the reverse camera taking over) or a
+# hang-up doesn't end it. Each file still goes in whole (copied beside, synced, renamed), for a
+# reset or a SIGKILL.
+trap '' HUP PIPE INT TERM
 P=${1:-${0%/*}}
 ROOT=${ROOT:-}
 . "$P/lib.sh"
@@ -49,6 +54,7 @@ put() {
     cp "$src" "$dst.hmgapi-new" || fail "copy $1"
     chmod "$3" "$dst.hmgapi-new"; chown root:"$4" "$dst.hmgapi-new" 2>/dev/null
     [ "$(sum "$dst.hmgapi-new")" = "$want" ] || { rm -f "$dst.hmgapi-new"; fail "md5 mismatch after copying $1"; }
+    sync   # on disk before the rename: a reset right after it never leaves an empty file (no zygote)
     mv "$dst.hmgapi-new" "$dst" || { rm -f "$dst.hmgapi-new"; fail "rename onto $2"; }
     log "installed $2"
 }
@@ -75,6 +81,7 @@ backup() {
 
 capcheck
 log "HMG-API $VERSION install $(date)"
+gear_gate "the install"   # only in P, before anything changes (lib.sh)
 
 # the payload is whole
 while read m f; do
@@ -286,11 +293,13 @@ if [ -z "$UPDATE" ]; then
     cp "$B" "$KEEP.hmgapi-new" || fail "copy app_process"
     chmod 755 "$KEEP.hmgapi-new"; chown root:shell "$KEEP.hmgapi-new" 2>/dev/null
     [ "$(sum "$KEEP.hmgapi-new")" = "$HAVE" ] || { rm -f "$KEEP.hmgapi-new"; fail "app_process copy md5 mismatch"; }
+    sync
     mv "$KEEP.hmgapi-new" "$KEEP" || fail "keep stock app_process"
 elif [ -n "$RESCUE" ]; then
     cp "$BAK" "$KEEP.hmgapi-new" || fail "copy the app_process backup"
     chmod 755 "$KEEP.hmgapi-new"; chown root:shell "$KEEP.hmgapi-new" 2>/dev/null
     [ "$(sum "$KEEP.hmgapi-new")" = "$RBAK" ] || { rm -f "$KEEP.hmgapi-new"; fail "app_process backup copy md5 mismatch"; }
+    sync
     mv "$KEEP.hmgapi-new" "$KEEP" || fail "keep stock app_process"
     log "app_process.hmgapi-stock: back from the stock backup ($RBAK)"
 fi

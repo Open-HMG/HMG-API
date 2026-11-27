@@ -10,6 +10,11 @@
 # only, over adb, for now: no USB stick file sets it and no message names it.
 # ROOT prefixes every path, for off-car tests only.
 umask 077
+# a cut-off uninstall can leave /system half changed: a dropped reader of its output (adb, the
+# NEMESIS Manager or Engineering Mode screen closed, say by the reverse camera taking over) or a
+# hang-up doesn't end it. Each file still goes back whole (copied beside, synced, renamed), for a
+# reset or a SIGKILL.
+trap '' HUP PIPE INT TERM
 H=${0%/*}
 ROOT=${ROOT:-}
 . "$H/lib.sh"
@@ -32,6 +37,7 @@ capcheck() {
 }
 capcheck
 log "HMG-API uninstall $(date)"
+gear_gate "the uninstall"   # only in P, before anything changes (lib.sh)
 
 # the zygote binaries the install wrapped: app_process unless it's NEMESIS 1.17's LivePatch script,
 # and app_process.real whenever it's there (lib.sh, zygote_files). The stock bytes go back into each,
@@ -100,7 +106,8 @@ if [ -n "$RESET" ]; then
 elif [ -z "$ROOT" ] && [ -f "$D/state/files.json" ]; then
     /system/bin/hmgapid ping >/dev/null 2>&1 || /system/bin/hmgapid daemon >/dev/null 2>&1   # the engine runs through it
     [ -f "$D/state/journal.json" ] && /system/bin/hmgapid engine recover
-    if ! r=$(/system/bin/hmgapid engine restore 2>&1); then
+    # --gear-unknown-ok: gear_gate above checked (not in P stops there), and warned when it couldn't
+    if ! r=$(/system/bin/hmgapid engine restore --gear-unknown-ok 2>&1); then
         echo "$r"
         fail "engine restore didn't finish, so HMG-API stays installed (mods' files must go back first). See the lines above."
     fi
@@ -155,6 +162,7 @@ else
             cp "$SRC" "$b.hmgapi-new" || fail "copy the stock app_process"
             chmod 755 "$b.hmgapi-new"; chown root:shell "$b.hmgapi-new" 2>/dev/null
             [ "$(sum "$b.hmgapi-new")" = "$ORIG" ] || { rm -f "$b.hmgapi-new"; fail "app_process md5 mismatch after copy"; }
+            sync   # on disk before the rename: a reset right after it never leaves an empty file (no zygote)
             mv "$b.hmgapi-new" "$b" || { rm -f "$b.hmgapi-new"; fail "rename onto ${z#/system/bin/}"; }
         fi
         log "${z#/system/bin/}: stock again ($ORIG)"

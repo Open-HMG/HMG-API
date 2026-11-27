@@ -33,8 +33,12 @@ if ! "$H" engine install "$PWD/mod/package.zip" $any --from-nemesis; then
     toast "HMG-API didn't install $ID: see NEMESIS's log"
     exit 1
 fi
-if ! r=$("$H" engine apply 2>&1); then
+# the apply only starts in P (the engine's gear check: not in P, refused with nothing changed);
+# NEMESIS has no one to ask when the car gives no gear reading, and the owner started this:
+# --gear-unknown-ok, with the engine's warning to keep the car in P
+if ! r=$("$H" engine apply --gear-unknown-ok 2>&1); then
     echo "$r"
+    case $r in *"the car isn't in P"*) toast "HMG-API: shift to P, then install $ID again in NEMESIS Manager" ;; esac
     if [ $new = yes ]; then
         "$H" engine remove "$ID" --from-nemesis >/dev/null 2>&1
         say "HMG-API couldn't apply it (see above), so it's not installed: nothing changed. Uninstall this package in NEMESIS Manager."

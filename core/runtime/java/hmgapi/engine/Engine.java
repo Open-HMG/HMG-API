@@ -23,6 +23,8 @@ import java.util.TreeMap;
  *
  *   engine plan                what would change, conflicts, restarts (writes nothing)
  *   engine apply [--trial]     build and install; --trial: undone at the next start unless kept
+ *                              (a change to /system only starts in P: Gear; --gear-unknown-ok
+ *                              when the car gives no gear reading)
  *   engine keep                keep a trial apply
  *   engine restore             every file and setting HMG-API changed back to stock
  *   engine status              files HMG-API owns: stock, mods, expected and live md5
@@ -70,6 +72,7 @@ public final class Engine {
     public static final String HMGAPI_API = HMGAPI_VERSION.replaceFirst("-.*$", "");
     final String root = env("HMGAPI_ROOT", "");
     final boolean host = "1".equals(env("HMGAPI_HOST", ""));
+    boolean gearUnknownOk;   // --gear-unknown-ok: the owner's go-ahead when the car gives no gear reading (Gear)
     final String lpatch = env("HMGAPI_LPATCH", "/system/bin/lpatch");
     /** How the enabled mods' hooks fit together (the same rules the zygote's loader uses). */
     HookPlan hookPlan() {
@@ -123,6 +126,7 @@ public final class Engine {
     final File prevDir = new File(stateDir, "prev");
     final File stateFile = new File(stateDir, "files.json");
     final File journalFile = new File(stateDir, "journal.json");
+    final File heldFile = new File(stateDir, "held.txt");   // apps an apply stopped (hold), until it lets them go
 
     final List<String> out = new ArrayList<String>();
     final List<String> problems = new ArrayList<String>();   // stop the apply
@@ -358,6 +362,7 @@ public final class Engine {
         for (int i = 1; i < args.length; i++) {
             if ("--trial".equals(args[i])) trial = true;
             else if ("--force".equals(args[i])) force = true;
+            else if (Gear.OVERRIDE.equals(args[i])) gearUnknownOk = true;
         }
         stateDir.mkdirs();
         if (!lock(cmd)) return 4;
@@ -386,7 +391,7 @@ public final class Engine {
         }
         if ("update-hmgapi".equals(cmd)) {
             if (args.length < 2) {
-                out.add("usage: engine update-hmgapi <zip> [--force]");
+                out.add("usage: engine update-hmgapi <zip> [--force] [--gear-unknown-ok]");
                 return 2;
             }
             return UsbUpdates.updateHmgApi(this, args[1], force);
@@ -438,7 +443,7 @@ public final class Engine {
             if (!map.runnable) out.add("hooks are off on this car (" + map.reason + "): mods apply without their hooks");
         }
         if (!restoreAll && !"plan".equals(cmd) && !"apply".equals(cmd)) {
-            out.add("usage: engine plan | apply [--trial] | keep | restore | status | recover | firmware-reset | install <zip|dir> | remove <id> | nemesis-sync | map | map-car [--local [--if-needed] | --write | --forget] | verify-map | report [--usb] | boot-guard [reset] | usb-scan | update-hmgapi <zip> | publish-state | apps");
+            out.add("usage: engine plan | apply [--trial] [--gear-unknown-ok] | keep | restore | status | recover | firmware-reset | install <zip|dir> | remove <id> | nemesis-sync | map | map-car [--local [--if-needed] | --write | --forget] | verify-map | report [--usb] | boot-guard [reset] | usb-scan | update-hmgapi <zip> | publish-state | apps");
             return 2;
         }
         Plan p = plan(restoreAll, force);
@@ -461,6 +466,11 @@ public final class Engine {
             out.add("nothing to do");
             if ("apply".equals(cmd)) LiveState.publish(this);   // a switch with no file change still reaches running apps
             return 0;
+        }
+        // files on /system change (and apps may be held): only in P (Gear)
+        if (p.filesChange()) {
+            int g = Gear.check(this, restoreAll ? "the restore" : "the apply", gearUnknownOk);
+            if (g != 0) return g;
         }
         int rc = apply(p, trial);
         if (rc == 0) LiveState.publish(this);
@@ -931,6 +941,14 @@ public final class Engine {
         Map<String, String> rebased = new TreeMap<String, String>();   // path -> live md5: changed outside HMG-API, built on again
         Map<String, String> rebasedFrom = new TreeMap<String, String>();   // path -> what HMG-API had written (merges: checked after build)
         boolean force;           // --force: owned files that aren't what HMG-API wrote are written again
+
+        /** what apply() writes on /system: a file that changes or goes back to stock */
+        boolean filesChange() throws IOException {
+            for (Target t : targets.values()) {
+                if (t.restore || !t.result.equals(owned(t.path)) || (force && !t.result.equals(md5(sys(t.path))))) return true;
+            }
+            return false;
+        }
 
         boolean isEmpty() throws IOException {
             if (!rebased.isEmpty()) return false;
@@ -2303,6 +2321,13 @@ public final class Engine {
         }
     }
 
+    /**
+     * The apps whose files change, stopped (pm disable) for the swap. pm disable lasts
+     * across restarts, so the list is written down first (state/held.txt): an apply cut off
+     * between here and release() (the engine killed, a reset) leaves them disabled, and
+     * recover() (the next start, with the journal) turns them on again. Only in P: run()
+     * checked the gear before the journal (Gear).
+     */
     Set<String> hold(List<Target> changed) throws Exception {
         Set<String> held = new LinkedHashSet<String>();
         if (host || !"1".equals(getprop("sys.boot_completed"))) return held;
@@ -2312,16 +2337,47 @@ public final class Engine {
             int eq = l.lastIndexOf('=');
             if (l.startsWith("package:") && eq > 0) pkgs.put(l.substring(8, eq), l.substring(eq + 1));
         }
+        List<String> want = new ArrayList<String>();
         for (Target t : changed) {
             String pkg = pkgs.get(t.path);
-            if (pkg != null && exec("/system/bin/pm", "disable", pkg).code == 0) held.add(pkg);
+            if (pkg != null) want.add(pkg);
         }
+        if (want.isEmpty()) return held;
+        StringBuilder b = new StringBuilder();
+        for (String pkg : want) b.append(pkg).append('\n');
+        write(heldFile, b.toString());
+        for (String pkg : want) if (exec("/system/bin/pm", "disable", pkg).code == 0) held.add(pkg);
         if (!held.isEmpty()) out.add("stopped  " + held + " while their files change");
         return held;
     }
 
     void release(Set<String> held) throws Exception {
         for (String pkg : held) exec("/system/bin/pm", "enable", pkg);
+        heldFile.delete();
+    }
+
+    /**
+     * Apps a cut-off apply left stopped (hold): on again. At boot this runs before Android
+     * is up (boot.sh), and pm needs the package manager: so it waits for Android (up to five
+     * minutes), and keeps the list until every app is on, for the next recover (boot.sh runs
+     * one while the list is there).
+     */
+    void releaseLeftHeld() throws Exception {
+        if (!heldFile.isFile()) return;
+        for (int i = 0; !host && i < 150 && !"1".equals(getprop("sys.boot_completed")); i++) Thread.sleep(2000);
+        StringBuilder left = new StringBuilder();
+        for (String pkg : read(heldFile).split("\n")) {
+            pkg = pkg.trim();
+            if (pkg.isEmpty()) continue;
+            if (!host && exec("/system/bin/pm", "enable", pkg).code != 0) {
+                left.append(pkg).append('\n');
+                out.add("couldn't turn on " + pkg + " (stopped by an apply that was cut off): tried again at the next start");
+                continue;
+            }
+            out.add("enabled  " + pkg + " (stopped by an apply that was cut off)");
+        }
+        if (left.length() == 0) heldFile.delete();
+        else write(heldFile, left.toString());
     }
 
     void remount(String mode) throws Exception {
@@ -2442,6 +2498,7 @@ public final class Engine {
     @SuppressWarnings("unchecked")
     int recover() throws Exception {
         if (!journalFile.exists()) {
+            releaseLeftHeld();
             out.add("nothing to recover");
             return 0;
         }
@@ -2510,6 +2567,7 @@ public final class Engine {
             setAside(lost.size() + " file(s) couldn't be put back");
             out.add("`engine status` shows them (CHANGED); `engine apply --force` builds them again");
         }
+        releaseLeftHeld();   // after the files are back: the apps start on the files they had
         out.add(Boolean.TRUE.equals(j.get("trial")) && Boolean.TRUE.equals(j.get("committed")) ? "trial undone" : "unfinished apply rolled back");
         return 0;
     }

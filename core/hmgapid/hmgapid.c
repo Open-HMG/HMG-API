@@ -15,7 +15,7 @@
  *   anyone else                     ping, version
  *
  * HMG-API ops: mods, enable <id>, disable <id>, setting-get <id>,
- * setting-set <id> <json>, log, reboot, engine <plan|apply|keep|restore|
+ * setting-set <id> <json>, log, reboot [--gear-unknown-ok] (only in P), engine <plan|apply|keep|restore|
  * status|recover> (the patch engine, run as root with app_process and the
  * runtime jar). Root ops: sh <command>, remount rw|ro.
  *
@@ -644,7 +644,7 @@ static int op_engine(int fd, int argc, char **argv)
           || seq(sub, "usb-scan") || seq(sub, "update-hmgapi") || seq(sub, "apps") || seq(sub, "probe")
           || seq(sub, "map-car") || seq(sub, "report") || seq(sub, "problem") || seq(sub, "nemesis-sync")
           || seq(sub, "boot-guard"))) {
-        say(fd, "usage: engine plan | apply [--trial] [--force] | keep | restore | status | recover | install <zip> | remove <id>"
+        say(fd, "usage: engine plan | apply [--trial] [--force] [--gear-unknown-ok] | keep | restore | status | recover | install <zip> | remove <id>"
                 " | nemesis-sync | map | map-car [--local | --write | --forget] | verify-map | report [--usb]"
                 " | problem record [--no-log] [--crash-dumps] [--crash-reports] [--kernel] [--usb] [--seconds N] | problem stop"
                 " | boot-guard [reset]\n");
@@ -1572,6 +1572,52 @@ static int op_vehicle(int fd, const char *mod, int argc, char **argv)
     return n < 0 ? 1 : 0;
 }
 
+/* The gear, for a restart (as hmgapi.engine.Gear): 1 in P, 0 not in P, -1 no reading (the
+   vehicle service isn't up yet, or the car didn't answer: "-"). */
+static int gear_park(void)
+{
+    static char buf[256];
+    static const char req[] = "read gear.park\n";
+    struct sun a;
+    int alen = sockaddr_of(&a, VEHICLE_SOCK);
+    sl s, n;
+    ul got = 0;
+    struct { sl sec, usec; } tv = { 3, 0 };
+    s = x_socket(1, 1 | 02000000, 0);
+    if (s < 0) return -1;
+    x_setsockopt((int)s, 1 /* SOL_SOCKET */, 20 /* SO_RCVTIMEO */, &tv, sizeof tv);
+    if (x_connect(s, &a, alen) < 0 || wall((int)s, req, sizeof req - 1)) { x_close(s); return -1; }
+    while (got < sizeof buf - 1 && (n = x_read((int)s, buf + got, sizeof buf - 1 - got)) > 0) {
+        got += (ul)n;
+        if (buf[got - 1] == '\n') break;   /* one line; the service's close may not reach us (#145) */
+    }
+    x_close(s);
+    buf[got] = 0;
+    if (seq(buf, "gear.park 1\n")) return 1;
+    if (seq(buf, "gear.park 0\n")) return 0;
+    return -1;
+}
+
+/* A restart only in P: it takes the reverse camera's picture away for about a minute (Android
+   shows it on these units), and a driver may be about to reverse. Not in P: refused (75), no
+   override. No reading: refused (76) unless the caller says to go on, after asking the owner
+   (the HMG-API app) or deciding it can't (boot.sh waits instead). */
+static int op_reboot(int fd, int unknown_ok)
+{
+    char *a[] = { REBOOT, 0 };
+    int g = gear_park();
+    if (g == 0) {
+        say(fd, "not restarting: the car isn't in P (a restart takes the reverse camera's picture away for about a minute). Shift to P first.\n");
+        return 75;
+    }
+    if (g < 0 && !unknown_ok) {
+        say(fd, "not restarting: the gear can't be read, so hmgapid can't check that the car is in P. With the car in P: reboot --gear-unknown-ok\n");
+        return 76;
+    }
+    say(fd, "restarting\n");
+    return run(fd, a);
+}
+
 /* A vehicle command (hmgapi.engine.Vehicle.COMMANDS) through HMG-API's vehicle service,
    which applies its guard. A mod only the ones it declared (state/commands.txt:
    "<mod> <command>"); mod 0 (root, HMG-API's app): any, as "-". */
@@ -1646,7 +1692,7 @@ static int op_micom_watch(int fd, int argc, char **argv)
         path3(want, sizeof want, want, i > 1 ? " " : "", argv[i]);
     }
     if (write_small(ROOTDIR "/state/micom-watch.txt", want) < 0) { say(fd, "can't save it\n"); return 1; }
-    publish_state();   // the vehicle service runs while the watch is on
+    publish_state();   // the vehicle service (always running) picks the watch up
     say(fd, want);
     say(fd, "\n");
     return 0;
@@ -1832,11 +1878,8 @@ static int handle(int fd, int whoami, int argc, char **argv)
     if (seq(op, "park-rule") && argc <= 2) return op_park_rule(fd, argc, argv);
     if (seq(op, "micom-watch") && argc <= 9) return op_micom_watch(fd, argc, argv);
     if (seq(op, "micom-log") && argc == 1) return op_svc_log(fd, "hmgapi", "micom");
-    if (seq(op, "reboot") && argc == 1) {
-        char *a[] = { REBOOT, 0 };
-        say(fd, "restarting\n");
-        return run(fd, a);
-    }
+    if (seq(op, "reboot") && argc == 1) return op_reboot(fd, 0);
+    if (seq(op, "reboot") && argc == 2 && seq(argv[1], "--gear-unknown-ok")) return op_reboot(fd, 1);
     if (whoami != WHO_ROOT) { say(fd, "not allowed\n"); return 13; }
 
     if (seq(op, "whoami") && argc == 1) { say(fd, g_mod[0] ? g_mod : "root"); say(fd, "\n"); return 0; }
@@ -2120,7 +2163,7 @@ int main(int argc, char **argv, char **envp)
     if (argc < 2) {
         out(2, "usage: hmgapid daemon | hmgapid boot | hmgapid <op> [args...]\n"
                "ops: ping, version, mods, enable <id>, disable <id>, setting-get <id>,\n"
-               "     setting-set <id> <json>, mod-file <id> mod.json|settings.json, log, reboot, engine <plan|apply|keep|restore|status|recover>,\n"
+               "     setting-set <id> <json>, mod-file <id> mod.json|settings.json, log, reboot [--gear-unknown-ok], engine <plan|apply|keep|restore|status|recover>,\n"
                "     services [mod], service-restart|service-stop|service-start <mod> <name>, service-log <mod> <name>,\n"
                "     usb [mod], sh <command>, remount rw|ro, binds\n"
                "a mod's own app: whoami, setting-get, setting-set <json>, services, service-restart|stop|start <name>,\n"
