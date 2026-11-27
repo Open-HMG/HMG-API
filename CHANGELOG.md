@@ -26,7 +26,10 @@
   never started ("Wi-Fi will not be enabled") and home Wi-Fi stayed "searching". Adding or
   forgetting a network now updates it, and it's checked before each switch to home Wi-Fi.
   A first network no longer needs `printf` (not on the unit): the config starts from the car's
-  own template.
+  own template, and the whole text is built before the one write that sets Android's owner and
+  mode. A checksum that can't be written (its `chown` or `chmod` failing) is said in the
+  keeper's log and in the answer to adding or forgetting a network, instead of home Wi-Fi only
+  staying "searching".
 - **Mods' connections over home Wi-Fi are no longer refused** (Ioniq 5 US 260507). The block
   that keeps mods off mobile data was in `filter OUTPUT`, where `-o` is the route a packet had
   before HMG-API's mark moved it to home Wi-Fi: every connection that started on the main
@@ -34,16 +37,30 @@
   (`mangle POSTROUTING`, `HMGAPI_HOMECELL`: nothing marked for home Wi-Fi leaves on `rmnet`),
   and table 95 holds an unreachable default while home Wi-Fi is down, so marked traffic never
   falls through to mobile data. IPv6, and everything with home Wi-Fi off, stays refused as before.
+  The keeper builds the home Wi-Fi rules (the post-reroute block, the mark, masquerade, table 95
+  and the fwmark rule) before the IPv4 home REJECTs leave, and fills the cellular chain before
+  OUTPUT jumps to it; its check also looks for the DROP inside `HMGAPI_HOMECELL`. Home Wi-Fi off
+  and the uninstaller take table 95's unreachable default out.
 - **Mods' services can look names up on home Wi-Fi** (Ioniq 5 US 260507). Their resolver
   (`ANDROID_DNS_MODE=local`) has no servers in the service's process and asks 127.0.0.1;
   HMG-API's redirect to home Wi-Fi's DNS server kept that source address, so no query left the
   unit. While home Wi-Fi is up, `route_localnet` is on for `wlan0` (the queries are
-  masqueraded) and only the answers may come back in for 127.x (`HMGAPI_HOMELO`).
+  masqueraded) and, for 127.x on `wlan0`, only the DNS server's answers (its address, port 53)
+  get in (`HMGAPI_HOMELO`). The guard is checked on every pass, not only when the lease changes,
+  and put back first in INPUT after the stock firewall reloads; `route_localnet` is on only
+  while it's there.
 - **HMG-API's own HTTPS** (`/data/hmgapi/lib/libhmgapi_fetch.so`, `core/fetch`): Android 4.4's
   Java TLS can't reach GitHub, so the engine uses the unit's own `libssl.so` (TLS 1.2), on a
   socket marked for home Wi-Fi only, with its own DNS lookup on home Wi-Fi's server. Tested
   first as a mod on an Ioniq 5 US 260507 (HMG-API rc.10): the catalogue and three packages
-  over home Wi-Fi, each with its SHA-256.
+  over home Wi-Fi, each with its SHA-256. Each socket has home Wi-Fi's mark and is bound to
+  `wlan0`, or the call fails (never an unmarked socket on the main table's mobile data, even
+  before the fwmark rule is in), with 20 s send and receive timeouts (connect, the handshake,
+  each read). The DNS server comes from home Wi-Fi's lease (there only while its route is up,
+  not a leftover `dhcp.wlan0.dns1`), asked on the same kind of socket. An answer the server
+  didn't end with a TLS close counts only when its Content-Length or last chunk says it is
+  whole; chunk sizes are hex digits only (a negative one passed the cap), and a broken body
+  leaves no `.part`. Each call has its own answer file, opened `O_EXCL` and `O_NOFOLLOW`.
 
 ## 1.1.0-rc.10 (2026-11-25)
 
