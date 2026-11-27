@@ -224,7 +224,7 @@ rm "$D/settings/allow/auto_stage_updates"
 # ---- HMG-API's own release
 cat > "$W/api.github.com/repos/Open-HMG/HMG-API/releases_per_page=15" <<'J'
 [{"tag_name": "v9.0.0", "draft": true, "prerelease": false, "assets": []},
- {"tag_name": "v1.1.0", "draft": false, "prerelease": false, "html_url": "https://github.com/Open-HMG/HMG-API/releases/tag/v1.1.0",
+ {"tag_name": "v1.1.0", "draft": false, "prerelease": false, "html_url": "https://github.com/Open-HMG/HMG-API/releases/tag/v1.1.0", "body": "What's new in 1.1.0",
   "assets": [{"name": "hmgapi-1.1.0-update.zip", "browser_download_url": "https://github.com/Open-HMG/HMG-API/releases/download/v1.1.0/hmgapi-1.1.0-update.zip"},
              {"name": "SHA256SUMS", "browser_download_url": "https://github.com/Open-HMG/HMG-API/releases/download/v1.1.0/SHA256SUMS"}]},
  {"tag_name": "v1.0.2", "draft": false, "prerelease": false, "assets": []}]
@@ -235,6 +235,7 @@ printf '%s  hmgapi-1.1.0-update.zip\n' "$(printf '%064d' 0)" > $W/github.com/Ope
 eng updates --refresh
 check "HMG-API's newer release offered (not the draft)" 1.1.0 "$(j 'd["hmgapi"]["version"]')"
 check "... counted" 1 "$(j 'd["count"]')"
+check "... with its release notes, for the app" "What's new in 1.1.0" "$(j 'd["hmgapi"]["notes"]')"
 eng update hmgapi
 has "a release that isn't its SHA256SUMS: refused" "refused HMG-API 1.1.0: the download's SHA-256 is" "$out"
 echo '[{"tag_name": "v1.0.2", "draft": false, "prerelease": false, "assets": []}]' > "$W/api.github.com/repos/Open-HMG/HMG-API/releases_per_page=15"
