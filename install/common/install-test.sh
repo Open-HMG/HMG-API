@@ -24,6 +24,8 @@ printf '#!/bin/sh\necho "setprop $*" >> "%s/calls.log"\n' "$T" > $T/bin/setprop
 # INSTALL_FAILED_INVALID_URI, as on the car (#187)
 printf '#!/bin/sh\necho "pm $*" >> "%s/calls.log"\ncase "$1" in path) [ -n "$FAKE_HAVE_APP" ] && echo package:/data/app/hmgapi.app-1.apk ;; install) case "$(ls -l "$3" | cut -c8)" in r) echo "${FAKE_PM:-Success}" ;; *) echo "Failure [INSTALL_FAILED_INVALID_URI]" ;; esac ;; esac\nexit 0\n' "$T" > $T/bin/pm
 printf '#!/bin/sh\necho "am $*" >> "%s/calls.log"\n' "$T" > $T/bin/am
+# sync: what was on /system when it ran (the stock copy, and whether a wrapper was in yet)
+printf '#!/bin/sh\nk=$(md5sum < "%s/system/bin/app_process.hmgapi-stock" 2>/dev/null | cut -c1-32)\na=$(md5sum < "%s/system/bin/app_process" | cut -c1-32)\necho "keep=${k:-none} app_process=$a" >> "%s/sync.log"\n' "$R" "$R" "$T" > $T/bin/sync
 chmod +x $T/bin/*
 calls() { cat $T/calls.log 2>/dev/null || true; : > $T/calls.log; }
 run() { set +e; out=$(cd $T && env PATH="$T/bin:$PATH" ROOT=$R CAPCHECK=0 $SH "$@" 2>&1); rc=$?; set -e; }
@@ -84,8 +86,10 @@ has "... before anything changed" "Nothing was changed." "$out"
 mv $T/maps.away $P/maps
 check "still stock after refusals" "$BEFORE" "$(tree)"
 
+rm -f $T/sync.log
 run $P/install.sh $P
 has "install finishes" "installed. Restart the head unit" "$out"
+check "the stock copy reaches storage (sync) before the wrapper is written" "keep=$(md5sum < $T/real | cut -c1-32) app_process=$(md5sum < $T/real | cut -c1-32)" "$(sed -n 1p $T/sync.log)"
 check "app_process is the wrapper" "$(md5sum < $P/app_process)" "$(md5sum < $R/system/bin/app_process)"
 check "stock app_process kept beside it" "$(md5sum < $T/real)" "$(md5sum < $R/system/bin/app_process.hmgapi-stock)"
 check "stock app_process backed up" "$(md5sum < $T/real)" "$(md5sum < $R/data/hmgapi/stock/system/bin/app_process)"

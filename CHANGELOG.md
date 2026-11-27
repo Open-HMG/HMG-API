@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **The stock copy is on storage before the wrapper goes in.** The installer makes
+  `app_process.hmgapi-stock` under a new name, and the kernel can keep a new file's data in
+  memory for up to ~30 s; the wrapper then goes over `app_process` (or `.real`), which reaches
+  storage at once. A hard reset (Reset pinhole, power loss) in the seconds before the
+  install's final `sync` could leave the wrapper running an empty stock copy: no zygote, and
+  no stock `app_process` left on `/system`. The install now runs `sync` as soon as the stock
+  copy is made. The uninstall was already safe (stock goes back over existing files, then
+  `sync`). The same gap in NEMESIS 1.17's `app_process.real` was reported to NEMESIS.
+  Tested off-car only.
+
 ## 1.1.0-rc.10 (2026-11-25)
 
 - **No owner-facing way to force an unknown `app_process`, for now.** An empty `HMGAPI/FORCE`
