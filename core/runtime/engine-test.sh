@@ -433,4 +433,163 @@ for i in 1 2 3; do
 done
 echo "ok    three plans at once on a fresh mod, three rounds"
 check "... the feature file written once, no .tmp left" "android.hardware.wifi.xml" "$(ls -A $R/data/hmgapi/mods/wa/.features)"
+
+# ---- a failed apply: rolled back in the same run; a cut-off one: by recover. Apps held while
+# their files change are journaled first and always started again; modes, owners, labels kept.
+# Off the unit, owners and labels live in $R/meta.txt (FileMeta), the mode is the file's own.
+rm -rf $R/data/hmgapi/mods/* $R/data/hmgapi/state $R/data/hmgapi/stock
+check "app stock before" "$STOCK_APK $STOCK_ODEX" "$(md5 $R/system/app/Test.apk) $(md5 $R/system/app/Test.odex)"
+mkdir -p $R/system/bin $R/system/framework $R/data/system
+mode() { python3 -c 'import os, sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o7777)[2:])' "$1"; }
+own() { m=$(mode $R$1); o=$(grep "^$1 " $R/meta.txt 2>/dev/null | sed "s#^$1 ##"); echo "$m ${o:-0 0 -}"; }
+for f in lib/a.so lib/z.so bin/netd framework/framework-res.apk app/Pers.apk app/Off.apk; do
+    head -c 4096 /dev/urandom > $R/system/$f; head -c 4096 /dev/urandom > $T/m/$(basename $f).new
+done
+chmod 640 $R/system/lib/a.so; chmod 644 $R/system/lib/z.so; chmod 755 $R/system/bin/netd
+printf '%s\n' "/system/lib/a.so 1000 1000 u:object_r:system_file:s0" "/system/bin/netd 0 2000 u:object_r:netd_exec:s0" > $R/meta.txt
+cp -p $R/meta.txt $T/meta.stock
+OWN_A=$(own /system/lib/a.so); OWN_Z=$(own /system/lib/z.so); OWN_N=$(own /system/bin/netd)
+check "stock modes and owners set up" "640 1000 1000 u:object_r:system_file:s0|644 0 0 -|755 0 2000 u:object_r:netd_exec:s0" "$OWN_A|$OWN_Z|$OWN_N"
+sums() { for f in lib/a.so lib/z.so bin/netd app/Test.apk app/Test.odex framework/framework-res.apk app/Pers.apk app/Off.apk; do md5 $R/system/$f; done | tr '\n' ' '; }
+STOCK_ALL=$(sums)
+# a package manager: Test.apk's app runs, Off.apk's is off already, Pers.apk's is persistent, framework-res is android
+cat > $T/pm <<EOF
+#!/bin/sh
+echo "\$*" >> $T/pm.calls
+case "\$1 \$2" in
+    "list packages") if [ "\$3" = -f ]; then cat $T/pm.pkgs; else sed 's/^/package:/' $T/pm.off; fi ;;
+    "disable "*) echo "\$2" >> $T/pm.off; echo "Package \$2 new state: disabled" ;;
+    "enable "*) grep -vx "\$2" $T/pm.off > $T/pm.off.n || true; mv $T/pm.off.n $T/pm.off; echo "Package \$2 new state: enabled" ;;
+esac
+EOF
+chmod +x $T/pm
+printf 'package:%s\n' /system/app/Test.apk=com.test.app /system/app/Off.apk=com.test.off /system/app/Pers.apk=com.test.pers \
+    /system/framework/framework-res.apk=android > $T/pm.pkgs
+cat > $R/data/system/packages.xml <<'X'
+<packages>
+<package name="android" codePath="/system/framework/framework-res.apk" nativeLibraryPath="/data/app-lib/framework-res" flags="573005" ft="1" version="19" sharedUserId="1000">
+<package name="com.test.app" codePath="/system/app/Test.apk" nativeLibraryPath="/data/app-lib/Test" flags="572997" ft="1" version="1" userId="10010">
+<package name="com.test.off" codePath="/system/app/Off.apk" flags="572997" ft="1" version="1" userId="10011">
+<package name="com.test.pers" codePath="/system/app/Pers.apk" flags="573005" ft="1" version="1" userId="10012">
+<updated-package name="com.test.app" codePath="/system/app/Test.apk" flags="8" ft="1" version="1" />
+</packages>
+X
+pmreset() { echo com.test.off > $T/pm.off; rm -f $T/pm.calls; }
+# engf "<step>:<path> ...": eng with those steps failing (Engine.testFail); exported and unset again, since
+# sh keeps a variable put before a function call
+engf() { HMGAPI_TEST_FAIL=$1; export HMGAPI_TEST_FAIL; shift; eng "$@"; unset HMGAPI_TEST_FAIL; }
+pmreset
+export HMGAPI_PM=$T/pm HMGAPI_PROPS="sys.boot_completed=1"
+mod rb 1.0.0 '' '
+  {"type": "add", "path": "/system/lib/a.so", "src": "a.so.new", "stock": "any"},
+  {"type": "add", "path": "/system/lib/z.so", "src": "z.so.new", "stock": "any"},
+  {"type": "add", "path": "/system/bin/netd", "src": "netd.new", "stock": "any", "mode": "755"},
+  {"type": "app", "path": "/system/app/Test.apk", "delta": "Test.lpd"},
+  {"type": "add", "path": "/system/framework/framework-res.apk", "src": "framework-res.apk.new", "stock": "any"},
+  {"type": "add", "path": "/system/app/Pers.apk", "src": "Pers.apk.new", "stock": "any"},
+  {"type": "add", "path": "/system/app/Off.apk", "src": "Off.apk.new", "stock": "any"}'
+cp $T/m/*.new $T/m/Test.lpd $R/data/hmgapi/mods/rb/
+J=$R/data/hmgapi/state/journal.json; HELD=$R/data/hmgapi/state/held.txt
+left() { find $R/system -name '*.hmgapi-new' | tr '\n' ' '; }
+allstock() {   # allstock <what>: every file, mode, owner and label as before, nothing left over, apps as before
+    check "$1: every file as it was" "$STOCK_ALL" "$(sums)"
+    check "$1: modes, owners, labels as they were" "$OWN_A|$OWN_Z|$OWN_N" "$(own /system/lib/a.so)|$(own /system/lib/z.so)|$(own /system/bin/netd)"
+    check "$1: no journal, no prev/, no held list, no temp files" "no no no " "$([ -f $J ] && echo yes || echo no) $([ -d $R/data/hmgapi/state/prev ] && echo yes || echo no) $([ -f $HELD ] && echo yes || echo no) $(left)"
+    check "$1: the app it held started again; the one off before still off" "com.test.off" "$(cat $T/pm.off)"
+}
+
+engf "swap:/system/lib/z.so" apply
+check "a swap failing part-way (a.so written, z.so not): the apply fails" 1 $rc
+has "... saying why" "apply failed: java.io.IOException: test: swap fails at /system/lib/z.so" "$out"
+has "... rolled back in the same run, last written first" "rolled back /system/lib/a.so" "$out"
+has "... all of it" "rolled back: every file is as it was before this apply" "$out"
+allstock "swap failure"
+has "... the app was stopped first, then started again" "disable com.test.app|" "$(tr '\n' '|' < $T/pm.calls)"
+hasnt "... Android itself (framework-res.apk) never stopped" "disable android" "$(cat $T/pm.calls)"
+hasnt "... nor a persistent app" "disable com.test.pers" "$(cat $T/pm.calls)"
+hasnt "... nor one that was off already (or started)" "com.test.off" "$(grep -v '^list' $T/pm.calls)"
+has "... said" "note     com.test.pers keeps running while /system/app/Pers.apk changes (persistent)" "$out"
+check "... no record of the failed apply" "" "$(grep -o 'a\.so' $R/data/hmgapi/state/files.json 2>/dev/null || true)"
+eng plan
+check "... other commands aren't refused after it" 0 $rc
+
+pmreset
+engf "dexopt:/system/app/Test.apk" apply
+check "dexopt failing (the odex deleted already): the apply fails" 1 $rc
+allstock "dexopt failure"
+check "... the odex back" "$STOCK_ODEX" "$(md5 $R/system/app/Test.odex)"
+
+pmreset
+engf "put:/system/lib/z.so" apply
+check "a copy failing: the apply fails" 1 $rc
+allstock "copy failure (its temp file deleted)"
+
+pmreset
+engf "remount:rw" apply
+check "remount rw failing: the apply fails" 1 $rc
+allstock "remount failure"
+hasnt "... nothing had changed, so nothing rolled back" "rolled back /system" "$out"
+
+# a power cut (or a killed engine) in the middle: a.so new, z.so stock, the app off
+pmreset
+engf "halt:/system/lib/z.so" apply
+check "cut off mid-swap: the journal stays" yes "$([ -f $J ] && echo yes)"
+check "... a.so new, z.so stock" "$(md5 $T/m/a.so.new) $(md5 $R/data/hmgapi/state/prev/_system_lib_z.so)" "$(md5 $R/system/lib/a.so) $(md5 $R/system/lib/z.so)"
+check "... the held app journaled before it was stopped, and still off" "com.test.app|com.test.app" "$(cat $HELD)|$(python3 -c 'import json,sys; print(" ".join(json.load(open(sys.argv[1]))["held"]))' $J)"
+has "... (off in the package manager)" "com.test.app" "$(cat $T/pm.off)"
+eng plan
+check "... other commands wait for recover" 1 $rc
+eng status
+has "... status names the held app" "held     [com.test.app]" "$out"
+export HMGAPI_PROPS=""   # recover at boot runs before Android is up
+eng recover
+check "recover before Android is up" 0 $rc
+has "... rolled back" "unfinished apply rolled back" "$out"
+check "... files, modes, owners back" "$STOCK_ALL|$OWN_A|$OWN_Z|$OWN_N" "$(sums)|$(own /system/lib/a.so)|$(own /system/lib/z.so)|$(own /system/bin/netd)"
+has "... the app left for boot.sh" "start again once Android is up (boot.sh: engine release-held)" "$out"
+check "... still in held.txt" "com.test.app" "$(cat $HELD)"
+eng release-held
+check "release-held with Android not up: waits" 1 $rc
+export HMGAPI_PROPS="sys.boot_completed=1"
+eng release-held
+check "release-held once Android is up" 0 $rc
+allstock "power cut, then recover and release-held"
+
+# the rollback fails too: the journal stays, the apps stay off with their files half-changed, recover finishes later
+pmreset
+engf "swap:/system/lib/z.so rollback:/system/lib/a.so" apply
+check "a rollback that fails too: the apply fails" 1 $rc
+has "... said" "NOT rolled back: [/system/lib/a.so (test: rollback fails at /system/lib/a.so)]" "$out"
+check "... the journal kept" yes "$([ -f $J ] && echo yes)"
+has "... the app stays off" "com.test.app" "$(cat $T/pm.off)"
+eng release-held
+check "... release-held won't start it over half-changed files" 1 $rc
+eng recover
+check "... recover finishes it" 0 $rc
+allstock "failed rollback, then recover"
+
+# a good apply: modes and owners kept, a mod's mode used, stock ones recorded; restore puts them back
+pmreset
+eng apply
+check "apply" 0 $rc
+check "a file with no mode keeps its stock mode, owner and label" "$OWN_A" "$(own /system/lib/a.so)"
+check "netd: the mod's mode, the stock owner and label" "$OWN_N" "$(own /system/bin/netd)"
+check "the held app started again" "com.test.off" "$(cat $T/pm.off)"
+check "no held list left" no "$([ -f $HELD ] && echo yes || echo no)"
+check "stock modes recorded" "640 1000 1000 u:object_r:system_file:s0" "$(python3 -c 'import json, sys; m = json.load(open(sys.argv[1]))["files"]["/system/lib/a.so"]["stockMeta"]["/system/lib/a.so"]; print(m["mode"], m["uid"], m["gid"], m["context"])' $R/data/hmgapi/state/files.json)"
+eng restore
+check "restore" 0 $rc
+check "restore: files, modes, owners, labels stock" "$STOCK_ALL|$OWN_A|$OWN_Z|$OWN_N" "$(sums)|$(own /system/lib/a.so)|$(own /system/lib/z.so)|$(own /system/bin/netd)"
+# a record from before modes were kept, and netd as that HMG-API wrote it (644 0:0): restore uses /system/bin's 755 0:2000
+eng apply
+python3 - $R/data/hmgapi/state/files.json <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))
+for f in s["files"].values(): f.pop("stockMeta", None)
+json.dump(s, open(sys.argv[1], "w"))
+PY
+chmod 644 $R/system/bin/netd; sed -i.bak '/^\/system\/bin\/netd /d' $R/meta.txt
+eng restore
+check "restore of an old record: /system/bin's defaults" "755 0 2000 -" "$(own /system/bin/netd)"
+unset HMGAPI_PM HMGAPI_PROPS
 exit $fail

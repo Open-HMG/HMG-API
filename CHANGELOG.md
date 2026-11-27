@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+- **A failed apply is rolled back at once.** When a rename, a dexopt, a remount or a copy
+  failed part-way, /system stayed half-applied (one library new, the next stock, an app's
+  odex deleted) until the next start, and every other engine command was refused. Now the
+  same run puts every file and setting back, last changed first, deletes its temp files
+  (`*.hmgapi-new`, `stage/`), and starts the apps it stopped. Only a power cut, a killed
+  engine or a rollback that fails too leaves the journal for the next start (`engine recover`).
+- **Apps stopped during an apply always come back.** The apps whose files change (GPM,
+  DiPO, iAP2, navigation, BtSettings) are `pm disable`d for the swap, and Android keeps them
+  off across restarts. The list lived only in memory, so a power cut (the driver's door, the
+  battery saver) or a killed engine left them off for good. It's now written to the journal
+  and `state/held.txt` before any is stopped; `engine recover` starts them again, and at boot,
+  once Android is up, `engine release-held` does (only with no unfinished apply left, so they
+  never run on half-changed files). Android itself (`framework-res.apk`), persistent apps
+  (`packages.xml`), OTAClient and apps that were off already are never stopped.
+- **File modes, owners and SELinux labels are kept.** Every file was written, restored and
+  rolled back as 644 root:root, whatever it was: uninstalling a mod that patched a binary in
+  `/system/bin` put the stock one back unable to run. Each file's own mode, owner and label
+  are now read before HMG-API first writes it and put back on restore and rollback; a change
+  with no `"mode"` keeps them. A change under `/system/bin` or `/system/xbin` with no `"mode"`
+  is refused. Files recorded by an earlier HMG-API get Android's defaults on restore (755
+  root:shell in `/system/bin` and `/system/xbin`, 644 root:root elsewhere).
+  Tested off-car only.
+
 ## 1.1.0-rc.10 (2026-11-25)
 
 - **No owner-facing way to force an unknown `app_process`, for now.** An empty `HMGAPI/FORCE`

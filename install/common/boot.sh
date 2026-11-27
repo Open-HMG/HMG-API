@@ -46,4 +46,12 @@ if [ -f $D/state/journal.json ]; then
         echo "$(date) recover didn't finish (see $D/recover.log): not restarting, tried again at the next start"
     fi
 fi
+# Apps an apply stopped (pm disable) while their files changed and never started again: a power
+# cut or a killed engine in the middle. Android keeps them off across restarts (GPM, DiPO, iAP2,
+# navigation...). pm needs Android up, so once it is, and only with the files put back (the
+# engine keeps them off while an unfinished apply's journal is there).
+if [ -s $D/state/held.txt ]; then
+    (n=0; while [ "$(getprop sys.boot_completed)" != 1 ] && [ $n -lt 300 ]; do sleep 2; n=$((n + 1)); done
+     $H engine release-held) </dev/null >$D/held.log 2>&1 &
+fi
 echo "$(date) boot done"

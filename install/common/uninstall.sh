@@ -99,7 +99,8 @@ if [ -n "$RESET" ]; then
     [ -f "$D/state/files.json" ] && log "mods' file changes went with the firmware update. Settings mods changed stay as they are: to put them back too, install HMG-API again, then uninstall it"
 elif [ -z "$ROOT" ] && [ -f "$D/state/files.json" ]; then
     /system/bin/hmgapid ping >/dev/null 2>&1 || /system/bin/hmgapid daemon >/dev/null 2>&1   # the engine runs through it
-    [ -f "$D/state/journal.json" ] && /system/bin/hmgapid engine recover
+    # an unfinished apply rolled back, and apps an apply left stopped started again
+    if [ -f "$D/state/journal.json" ] || [ -f "$D/state/held.txt" ]; then /system/bin/hmgapid engine recover; fi
     if ! r=$(/system/bin/hmgapid engine restore 2>&1); then
         echo "$r"
         fail "engine restore didn't finish, so HMG-API stays installed (mods' files must go back first). See the lines above."
