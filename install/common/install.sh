@@ -157,6 +157,25 @@ if [ -n "$LPFIX" ]; then
 elif [ -f "$KEEP" ] && { [ "$HAVE" = "$WRAP" ] || [ -f "$BAK" ] || is_wrapper "$B"; }; then
     log "app_process: HMG-API's wrapper is in place (stock kept as app_process.hmgapi-stock)"
     UPDATE=1
+    # the stock copy by the md5 of the whole file, as a new install checks app_process: not_stock
+    # below only sees whether it starts like a binary, and a copy cut short, zero-filled or
+    # otherwise damaged would pass that, then start no zygote. One that isn't a known stock build
+    # comes back from the backup when that is one (as RESCUE does for a missing copy); with
+    # neither known, refused as a new install is (HMGAPI_FORCE: maintainers only)
+    KS=$(sum "$KEEP"); kk=
+    while read m label; do [ "$m" = "$KS" ] && kk=$label; done < "$P/stock.txt"
+    RBAK=$(sum "$BAK"); rk=
+    [ -n "$RBAK" ] && while read m label; do [ "$m" = "$RBAK" ] && rk=$label; done < "$P/stock.txt"
+    if [ -n "$kk" ]; then
+        log "app_process.hmgapi-stock: stock ($kk)"
+    elif [ -n "$rk" ]; then
+        log "app_process.hmgapi-stock md5 $KS isn't a known stock build (a copy cut short or damaged?): putting it back from the stock backup ($rk)"
+        RESCUE=1
+    elif [ "$HMGAPI_FORCE" = 1 ]; then
+        log "WARNING: app_process.hmgapi-stock md5 $KS isn't a known stock build, and there's no stock backup to put back; HMGAPI_FORCE=1, going on at your own risk"
+    else
+        fail "app_process.hmgapi-stock, the stock copy HMG-API's wrapper runs, has md5 $KS, which isn't a known stock build (it may have been cut short or damaged), and there's no stock backup to put it back from, so nothing was changed. $ASK_BUILD, and we'll add your build."
+    fi
 elif [ ! -f "$KEEP" ] && { [ "$HAVE" = "$WRAP" ] || is_wrapper "$B"; }; then
     # an HMG-API wrapper (this release's, or an older one: every version names
     # app_process.hmgapi-stock) with its stock copy gone: what an older uninstall leaves on NEMESIS

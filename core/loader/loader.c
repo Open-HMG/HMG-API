@@ -62,10 +62,12 @@ int cacheflush(long start, long end, long flags);
 /* ---- Dalvik 4.4 layouts (offsets checked on the EV6 libdvm) ---- */
 #define ACC_STATIC 0x0008
 #define ACC_NATIVE 0x0100
+#define M_CLASS(m)   (*(void **)(m))
 #define M_ACCESS(m)  (*(u4 *)((char *)(m) + 0x04))
 #define M_REGS(m)    (*(u2 *)((char *)(m) + 0x0a))
 #define M_OUTS(m)    (*(u2 *)((char *)(m) + 0x0c))
 #define M_INS(m)     (*(u2 *)((char *)(m) + 0x0e))
+#define M_NAME(m)    (*(const char **)((char *)(m) + 0x10))
 #define M_SHORTY(m)  (*(const char **)((char *)(m) + 0x1c))
 #define M_INSNS(m)   (*(void **)((char *)(m) + 0x20))
 #define M_NATIVE(m)  (*(void **)((char *)(m) + 0x28))
@@ -74,6 +76,8 @@ int cacheflush(long start, long end, long flags);
 #define CLASS_PRIM(c) (*(int *)((char *)(c) + 0x44))
 #define PRIM_NOT 0
 #define PRIM_VOID 1
+#define PRIM_INT 6
+#define ARRAY_LEN(a)  (*(u4 *)((char *)(a) + 0x08))
 #define ARRAY_DATA(a) ((void **)((char *)(a) + 0x10))
 
 typedef union { int i; long long j; float f; double d; void *l; } JValue;
@@ -313,6 +317,47 @@ static int failed(JNIEnv *env, const char *what)
     return 1;
 }
 
+static int streq(const char *a, const char *b)
+{
+    if (!a || !b) return 0;
+    while (*a && *a == *b) a++, b++;
+    return *a == *b;
+}
+
+/*
+ * The offsets above are the EV6 libdvm's (AOSP 4.4), with no check that this unit's libdvm is
+ * that build. A libdvm laid out otherwise would have the hooks write the wrong words of every
+ * hooked Method: in the zygote the boot guard catches the crash, but in an app it would crash
+ * as each one starts, which nothing catches. So before the first hook, the layout is read back
+ * from Bridge's own methods, which libdvm found by name, where nothing can be wrong but the
+ * offsets: the declaring class, name, shorty, flags and argument count of each, the 0x28
+ * nativeFunc that dvmSetNativeFunc (libdvm's own code) just wrote, the primitive type of int,
+ * void and Bridge, and an array's length. 0, with the reason logged: no hooks.
+ */
+static const char *layout_bad(void *bc, void *orig, void *handle, void *self)
+{
+    void *a;
+    u4 len;
+    if (M_CLASS(handle) != bc || M_CLASS(orig) != bc) return "Method.clazz (0x00)";
+    if (!streq(M_NAME(handle), "handleHookedMethod") || !streq(M_NAME(orig), "invokeOriginalMethodNative"))
+        return "Method.name (0x10)";
+    /* (Member, int, Object, Object, Object[]) Object; (Member, int, Class[], Class, Object, Object[]) Object */
+    if (!streq(M_SHORTY(handle), "LLILLL") || !streq(M_SHORTY(orig), "LLILLLL")) return "Method.shorty (0x1c)";
+    if ((M_ACCESS(handle) & (ACC_STATIC | ACC_NATIVE)) != ACC_STATIC
+        || (M_ACCESS(orig) & (ACC_STATIC | ACC_NATIVE)) != (ACC_STATIC | ACC_NATIVE)) return "Method.accessFlags (0x04)";
+    if (M_INS(handle) != 5 || M_INS(orig) != 6 || M_REGS(handle) < M_INS(handle)) return "Method.insSize/registersSize (0x0a, 0x0e)";
+    if (!M_INSNS(handle)) return "Method.insns (0x20)";
+    if (M_NATIVE(orig) != (void *)invokeOriginal) return "Method.nativeFunc (0x28)";
+    if (CLASS_PRIM(dvm.findPrim('I')) != PRIM_INT || CLASS_PRIM(dvm.findPrim('V')) != PRIM_VOID || CLASS_PRIM(bc) != PRIM_NOT)
+        return "ClassObject.primitiveType (0x44)";
+    a = dvm.allocArray(gObjectArrayClass, 3, 0);
+    if (!a) return "an Object[3] (no memory)";
+    len = ARRAY_LEN(a);
+    dvm.release(a, self);
+    if (len != 3) return "ArrayObject.length (0x08)";
+    return 0;
+}
+
 static int load_dvm(void)
 {
     void *h = dlopen("libdvm.so", 0);
@@ -359,6 +404,14 @@ static void start_bridge(JNIEnv *env, const char *jar, const char *entry)
     gObjectArrayClass = dvm.findArrayClass("[Ljava/lang/Object;", 0);
     if (!m || !gHandleHooked || !gObjectArrayClass) { LOGE("init: bridge methods not found"); return; }
     dvm.setNativeFunc(m, invokeOriginal, 0);
+    {
+        const char *bad = layout_bad(bc, m, gHandleHooked, self);
+        if (bad) {
+            /* Bridge.init never runs, so nothing is hooked: the unit runs stock */
+            LOGE("init: this libdvm's layout isn't the one HMG-API was built for (%s doesn't match), so hooks are off. Please send this line to the HMG-API maintainers with your car and its head unit software version", bad);
+            return;
+        }
+    }
 
     m = GetStaticMethodID(env, bridge, entry, "()V");
     if (failed(env, entry) || !m) return;

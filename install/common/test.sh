@@ -7,8 +7,10 @@ SH=${UNIT_SH:-sh}
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 fail=0
 check() { if [ "$2" = "$3" ]; then echo "ok    $1"; else echo "FAIL  $1: wanted [$2], got [$3]"; fail=1; fi; }
-L() { env ROOT="$T" $SH -c ". $PWD/lib.sh; $*"; }
-mkdir -p "$T/system/etc"
+mkdir -p "$T/system/etc" "$T/bin" "$T/bak"
+printf '#!/bin/sh\n[ -f "$1" ] || exit 1\nset -- $(md5sum "$1"); echo "$1 $2"\n' > "$T/bin/md5"; chmod +x "$T/bin/md5"   # the unit's md5
+L() { env PATH="$T/bin:$PATH" ROOT="$T" $SH -c ". $PWD/lib.sh; $*"; }
+LM() { L "$@"; }
 printf '#!/system/bin/sh\n# NEMESIS\nnemesis watchdog\nexit 0\n' > "$T/system/etc/install-recovery.sh"; chmod 755 "$T/system/etc/install-recovery.sh"
 printf 'echo qb stock\n# NEMESIS_QB_HOOK\nnemesis watchdog\n' > "$T/system/etc/qb_runtime.sh"
 IR=$(md5sum < "$T/system/etc/install-recovery.sh"); QB=$(md5sum < "$T/system/etc/qb_runtime.sh")
@@ -36,12 +38,49 @@ check "created when missing" "yes" "$([ -x "$T/system/etc/install-recovery.sh" ]
 L hook_remove /system/etc/install-recovery.sh
 check "created file removed again" "no" "$([ -e "$T/system/etc/install-recovery.sh" ] && echo yes || echo no)"
 
+# every line written back as it is: echo expanded backslashes in both mksh (the unit) and dash,
+# and "\c" ended the output (the line cut short, the next joined to it: an unclosed quote)
+# (in $SH, and in mksh when it's installed: its print -r is what the unit uses)
+bs_checks() {
+    B=$T/system/etc/bs.sh
+    printf '#!/system/bin/sh\nV="x\\cY"; echo ok\nP="a\\\\b"\nE="\\x1b[1;31m\\n\\t\\0101"\n  indented\\\n-n\n-e\nexit 0\n' > "$B"; chmod 755 "$B"
+    BS=$(md5sum < "$B")
+    L hook_add /system/etc/bs.sh top
+    check "[$SH] backslashes: block in once" "1" "$(grep -c 'HMGAPI_HOOK begin' "$B")"
+    check "[$SH] ... the file minus the block is the file as it was" "$BS" "$(grep -v HMGAPI_HOOK "$B" | grep -v 'hmgapid boot' | md5sum)"
+    check "[$SH] ... the line with backslash-c whole" 'V="x\cY"; echo ok' "$(grep -F 'V="x' "$B")"
+    sh -n "$B" && echo "ok    ... still parses" || { echo "FAIL  ... backslash script syntax"; fail=1; }
+    L hook_add /system/etc/bs.sh top
+    check "[$SH] ... adding again: one block, nothing else changed" "1|$BS" "$(grep -c 'HMGAPI_HOOK begin' "$B")|$(grep -v HMGAPI_HOOK "$B" | grep -v 'hmgapid boot' | md5sum)"
+    L hook_remove /system/etc/bs.sh
+    check "[$SH] ... hook_remove: back byte for byte" "$BS" "$(md5sum < "$B")"
+    L hook_add /system/etc/bs.sh end
+    check "[$SH] ... at the end too" "$BS" "$(grep -v HMGAPI_HOOK "$B" | grep -v 'hmgapid boot' | md5sum)"
+    L hook_remove /system/etc/bs.sh
+    check "[$SH] ... and back" "$BS" "$(md5sum < "$B")"
+    printf 'A="\\\\"\nB="\\c"' > "$B"   # no newline at the end: the block goes after one
+    L hook_add /system/etc/bs.sh end
+    check "[$SH] no last newline: one added, nothing else changed" "$(printf 'A="\\\\"\nB="\\c"\n' | md5sum)" "$(grep -v HMGAPI_HOOK "$B" | grep -v 'hmgapid boot' | md5sum)"
+    rm -f "$B"
+    # nothing to write lines with that keeps them as they are: the file is left as it is
+    printf 'echo qb stock\n' > "$B"; BS=$(md5sum < "$B")
+    env PATH="$T/bin:$PATH" ROOT="$T" $SH -c ". $PWD/lib.sh; hook_line() { return 1; }; hook_add /system/etc/bs.sh end" && r=0 || r=$?
+    check "[$SH] no faithful copy: hook_add fails, file untouched, no work files" "1|$BS|bs.sh" "$r|$(md5sum < "$B")|$(ls "$T/system/etc" | grep bs)"
+    # a copy that changes a line (a shell's echo): caught before the file is replaced
+    env PATH="$T/bin:$PATH" ROOT="$T" $SH -c ". $PWD/lib.sh; hook_line() { echo \"\$1x\"; }; hook_add /system/etc/bs.sh end" && r=0 || r=$?
+    check "[$SH] a copy that changes lines: hook_add fails, file untouched" "1|$BS|bs.sh" "$r|$(md5sum < "$B")|$(ls "$T/system/etc" | grep bs)"
+    rm -f "$B"
+}
+bs_checks
+if [ "${SH##*/}" != mksh ] && command -v mksh >/dev/null 2>&1; then
+    SH0=$SH; SH=mksh; bs_checks; SH=$SH0
+else
+    echo "skip  backslashes in mksh (no mksh here)"
+fi
+
 # hook_restore (the uninstall): the install's backup byte for byte, for a stock file the
 # shell can't write back exactly (backslashes, as the EV6's qb_runtime.sh has; no newline
 # at the end), as long as nothing else changed the file since
-mkdir -p "$T/bin" "$T/bak"
-printf '#!/bin/sh\n[ -f "$1" ] || exit 1\nset -- $(md5sum "$1"); echo "$1 $2"\n' > "$T/bin/md5"; chmod +x "$T/bin/md5"   # the unit's md5
-LM() { env PATH="$T/bin:$PATH" ROOT="$T" $SH -c ". $PWD/lib.sh; $*"; }
 Q=$T/system/etc/qb_runtime.sh
 printf 'RED="\\x1b[1;31m"\necho "a\\nb\\\\c"\nnemesis watchdog' > "$Q"
 cp "$Q" "$T/bak/qb"; QS=$(md5sum < "$Q")
@@ -73,7 +112,7 @@ printf 'echo qb stock\n# NEMESIS_QB_HOOK\nnemesis watchdog\n' > "$Q"
 # hook-check.sh at boot: a NEMESIS install or update rewrites install-recovery.sh as a whole
 D=$T/data/hmgapi
 mkdir -p "$D"; cp lib.sh "$D/"; echo "version 1.0.0" > "$D/installed.txt"
-HC() { env ROOT="$T" $SH "$PWD/hook-check.sh" 2>&1; }
+HC() { env PATH="$T/bin:$PATH" ROOT="$T" $SH "$PWD/hook-check.sh" 2>&1; }
 printf '#!/system/bin/sh\n# NEMESIS\nnemesis watchdog\nexit 0\n' > "$T/system/etc/install-recovery.sh"; chmod 755 "$T/system/etc/install-recovery.sh"
 L hook_add /system/etc/install-recovery.sh top
 L hook_add /system/etc/qb_runtime.sh end

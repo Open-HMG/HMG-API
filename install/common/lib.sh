@@ -71,7 +71,37 @@ hook_block() {
     echo "$HOOK_END"
 }
 
-# copy <file> without the HMG-API block to stdout
+# hook_line <line>: the line and a newline, byte for byte. Never echo: the unit's mksh and dash
+# (the off-car tests) both expand backslashes in echo's arguments, so "\\" became "\" and a
+# "\c" ended the output there, cutting the line short and joining the next one to it (a stock
+# line like V="x\cY" left an unclosed quote, and the boot script no longer ran). On the unit:
+# mksh's `print -r`. A shell without it (dash in the off-car tests; the unit has no printf):
+# echo with every backslash doubled, which an expanding echo turns back into one. Either is
+# checked here on a line with backslashes; with neither exact, nothing is written (hook_add
+# fails, the file stays as it is). A leading "-" goes as \0055, so echo never takes a line
+# like "-n" for an option; hook_add's check catches anything else.
+hook_echo() {
+    _r=$1; _o=
+    while :; do
+        case "$_r" in
+            *\\*) _o="$_o${_r%%\\*}\\\\"; _r=${_r#*\\} ;;
+            *) break ;;
+        esac
+    done
+    _o=$_o$_r
+    case "$_o" in -*) _o="\\0055${_o#-}" ;; esac
+    echo "$_o"
+}
+if [ "$(print -r -- 'a\\c\n' 2>/dev/null)" = 'a\\c\n' ]; then
+    hook_line() { print -r -- "$1"; }
+elif [ "$(hook_echo 'a\\c\n\x41')" = 'a\\c\n\x41' ] && [ "$(hook_echo '-n')" = '-n' ] && [ "$(hook_echo '-e \\')" = '-e \\' ]; then
+    hook_line() { hook_echo "$1"; }
+else
+    hook_line() { return 1; }
+fi
+
+# copy <file> without the HMG-API block to stdout: every other line as it is (a last line
+# with no newline gets one)
 hook_strip() {
     _in=0
     while IFS= read -r _l || [ -n "$_l" ]; do
@@ -79,13 +109,22 @@ hook_strip() {
             "$HOOK_BEGIN"*) _in=1; continue ;;
             "$HOOK_END"*) _in=0; continue ;;
         esac
-        [ $_in = 1 ] || echo "$_l"
+        [ $_in = 1 ] || hook_line "$_l" || return 1
     done < "$1"
+}
+
+# hook_same <a> <b>: the same bytes (by md5; never two empty answers taken for the same)
+hook_same() {
+    _sa=$(sum "$1"); _sb=$(sum "$2")
+    [ -n "$_sa" ] && [ "$_sa" = "$_sb" ]
 }
 
 # hook_add <file> top|end: put the block after the first line (top: the file may
 # end with "exit 0", as NEMESIS's install-recovery.sh does) or at the end. A
 # missing file is created (and marked, so hook_remove deletes it again).
+# The new file is checked before it goes in: without the block it is the file as it was (a file
+# with no block yet: its own bytes, plus a newline when its last line had none). Otherwise 1,
+# and the file is left as it is.
 hook_add() {
     _f=$ROOT$1
     _t=$_f.hmgapi-new
@@ -93,17 +132,26 @@ hook_add() {
         { echo "#!/system/bin/sh"; echo "# HMGAPI_CREATED"; hook_block; echo "exit 0"; } > "$_t" || return 1
         chmod 755 "$_t"
     else
-        hook_strip "$_f" > "$_t.body" || return 1
+        rm -f "$_t" "$_t.body" "$_t.nl" "$_t.check"
+        hook_strip "$_f" > "$_t.body" || { rm -f "$_t.body"; return 1; }
+        if ! grep -q "^$HOOK_BEGIN" "$_f"; then
+            { cat "$_f"; echo; } > "$_t.nl"
+            hook_same "$_t.body" "$_f" || hook_same "$_t.body" "$_t.nl" || { rm -f "$_t.body" "$_t.nl"; return 1; }
+            rm -f "$_t.nl"
+        fi
         if [ "$2" = top ]; then
-            _first=1
+            _first=1; _bad=
             while IFS= read -r _l || [ -n "$_l" ]; do
-                echo "$_l"
+                hook_line "$_l" || { _bad=1; break; }
                 if [ $_first = 1 ]; then hook_block; _first=0; fi
             done < "$_t.body" > "$_t"
+            [ -z "$_bad" ] || { rm -f "$_t" "$_t.body"; return 1; }
         else
-            { cat "$_t.body"; hook_block; } > "$_t"
+            { cat "$_t.body"; hook_block; } > "$_t" || { rm -f "$_t" "$_t.body"; return 1; }
         fi
-        rm -f "$_t.body"
+        hook_strip "$_t" > "$_t.check" && hook_same "$_t.check" "$_t.body" && grep -q "^$HOOK_BEGIN" "$_t" \
+            || { rm -f "$_t" "$_t.body" "$_t.check"; return 1; }
+        rm -f "$_t.body" "$_t.check"
         chmod 755 "$_t"
         [ -x "$_f" ] || chmod 644 "$_t"
     fi
@@ -112,8 +160,9 @@ hook_add() {
 
 # hook_restore <file> <backup>: the backup's own bytes back, when the file is still that
 # backup plus HMG-API's block and nothing else. hook_strip writes each line again through
-# the shell, which can change bytes (a last line with no newline gets one, and a shell's
-# echo may expand a backslash), so a stripped file is only close to stock; the backup
+# the shell, which can change bytes (a last line with no newline gets one, and releases
+# before hook_line wrote lines with a plain echo, which expanded backslashes: a file they
+# hooked still has that), so a stripped file is only close to stock; the backup
 # taken at install is stock exactly. To see that nothing else changed the file since,
 # both are stripped until another pass changes nothing, then compared: the file has been
 # through the shell more often than the backup (once per install or update, and again
