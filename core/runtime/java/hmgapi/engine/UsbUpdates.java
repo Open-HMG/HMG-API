@@ -159,7 +159,23 @@ final class UsbUpdates {
         return Engine.HMGAPI_VERSION;
     }
 
+    /**
+     * Why HMG-API can't update itself now, or null: never while an apply is unfinished or a
+     * trial is in place. The new installer would build on files and records that the next
+     * start rolls back (and its engine on a journal it may not read the same way). The
+     * catalogue's update asks this before it downloads.
+     */
+    static String pendingWhy(Engine e) {
+        if (!e.journalFile.exists()) return null;
+        return "an earlier apply isn't finished or is a trial: run `engine keep` (trial) or `engine recover` first, then update HMG-API";
+    }
+
     static int updateHmgApi(Engine e, String path, boolean force) throws Exception {
+        String pending = pendingWhy(e);
+        if (pending != null) {   // --force is for an older release, not this
+            e.out.add("refused: " + pending);
+            return 1;
+        }
         File zip = new File(path);
         if (!zip.isFile()) {
             e.out.add("no release at " + path);
