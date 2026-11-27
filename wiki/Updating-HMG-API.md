@@ -12,7 +12,7 @@ Takes about 2 minutes. Park the car and keep it on (the head unit restarts once)
 |---|---|---|
 | HMG-API Update Package (Starting with 1.0.x) | `hmgapi-<version>-update.zip` | [HMG-API UPDATE](#hmg-api-update) |
 | NEMESIS | `hmgapi-<version>-nemesis.zip` | [NEMESIS](#nemesis) |
-| NEMESIS Package | `hmgapi-<version>-nemesis-package.zip` | [NEMESIS PACKAGE](#nemesispackage) |
+| NEMESIS Package | `hmgapi-<version>-nemesis-package.zip` | [NEMESIS PACKAGE](#nemesis-package) |
 
 
 All install the same thing.
