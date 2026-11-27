@@ -9,21 +9,54 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Installing or updating from the catalogue, for the Catalogue and Updates screens: what it takes
  * first (engine catalog-plan: the mods they require, in order), the owner's OK, then the downloads
- * and installs (engine catalog-install / update). Nothing is applied here: the screen hands back
- * RESULT_OK and the main screen applies (plan first), as after a USB install.
+ * and installs (engine catalog-install / update). The owner's "Install anyway" is per mod and per
+ * reason (not listed for this head unit: --any-car=<id>; an author key that isn't on the trusted
+ * list: --any-author=<id>). Update all plans each mod on its own (update --all): the ones that can't
+ * go now are listed, the rest go. When a package turns out to need more than the plan said, the
+ * engine stops (exit 5) and the new plan is shown for a second OK. Nothing is applied here: the
+ * screen hands back RESULT_OK and the main screen applies (plan first), as after a USB install.
  */
 final class CatalogFlow {
     private CatalogFlow() {}
 
-    interface Done {
-        void installed(String output);
+    /** the engine's exit when the packages need more steps than the plan the owner saw */
+    static final int PLAN_CHANGED = 5;
 
-        void failed(String output);
+    abstract static class Done {
+        abstract void installed(String output);
+
+        abstract void failed(String output);
+
+        /**
+         * No answer in time (the install goes on by itself in the engine). The screen should hand back
+         * RESULT_OK all the same: the main screen's plan waits for the engine, then shows what changed.
+         */
+        void lost(String message) {
+            failed(message);
+        }
+    }
+
+    /** what the owner said yes to, per mod */
+    static final class Choice {
+        final Set<String> anyCar = new LinkedHashSet<String>(), anyAuthor = new LinkedHashSet<String>();
+
+        void args(List<String> c) {
+            if (!anyCar.isEmpty()) c.add("--any-car=" + join(anyCar));
+            if (!anyAuthor.isEmpty()) c.add("--any-author=" + join(anyAuthor));
+        }
+    }
+
+    static String join(Iterable<String> s) {
+        StringBuilder b = new StringBuilder();
+        for (String x : s) b.append(b.length() > 0 ? "," : "").append(x);
+        return b.toString();
     }
 
     /** JSON in an engine answer (it may print notes first) */
@@ -35,15 +68,26 @@ final class CatalogFlow {
     }
 
     /** "update": engine update (ids are installed mods), else engine catalog-install */
-    static void start(final Activity a, final List<String> ids, final boolean update, final boolean anyCar, final Done done) {
+    static void start(Activity a, List<String> ids, boolean update, Done done) {
+        plan(a, ids, update, false, new Choice(), done);
+    }
+
+    /** Update all: each installed mod with an update, planned on its own */
+    static void startAll(Activity a, Done done) {
+        plan(a, new ArrayList<String>(), true, true, new Choice(), done);
+    }
+
+    private static void plan(final Activity a, final List<String> ids, final boolean update, final boolean all, final Choice ch, final Done done) {
         final AlertDialog wait = new AlertDialog.Builder(a).setMessage("Checking what it needs…").show();
         new Ui.Job<Hmgapid.Result>() {
             @Override
             Hmgapid.Result work() throws Exception {
                 List<String> c = new ArrayList<String>(Arrays.asList("engine", "catalog-plan"));
-                c.addAll(ids);
-                if (anyCar) c.add("--any-car");
-                return Hmgapid.call(120000, c.toArray(new String[0]));
+                if (all) c.add("--all");
+                else c.addAll(ids);
+                if (update) c.add("--update");
+                ch.args(c);
+                return Hmgapid.call(180000, c.toArray(new String[0]));
             }
 
             @Override
@@ -57,13 +101,27 @@ final class CatalogFlow {
                     done.failed("Couldn't check: " + x.getMessage());
                     return;
                 }
-                confirm(a, p, ids, update, anyCar, done);
+                confirm(a, p, ids, update, all, ch, null, done);
             }
         }.start(a);
     }
 
-    private static void confirm(final Activity a, JSONObject p, final List<String> ids, final boolean update, final boolean anyCar, final Done done) {
-        StringBuilder msg = new StringBuilder();
+    /** the yes-or-no's in a plan: its own, and (update all) the left-out mods' */
+    private static List<JSONObject> overrides(JSONObject p) {
+        List<JSONObject> out = new ArrayList<JSONObject>();
+        JSONArray o = p.optJSONArray("overrides");
+        for (int i = 0; o != null && i < o.length(); i++) out.add(o.optJSONObject(i));
+        JSONArray sk = p.optJSONArray("skipped");
+        for (int i = 0; sk != null && i < sk.length(); i++) {
+            JSONArray so = sk.optJSONObject(i).optJSONArray("overrides");
+            for (int k = 0; so != null && k < so.length(); k++) out.add(so.optJSONObject(k));
+        }
+        return out;
+    }
+
+    private static void confirm(final Activity a, final JSONObject p, final List<String> ids, final boolean update, final boolean all,
+                                final Choice ch, String intro, final Done done) {
+        StringBuilder msg = new StringBuilder(intro == null ? "" : intro + "\n\n");
         JSONArray steps = p.optJSONArray("steps");
         boolean untrusted = false;
         int n = steps == null ? 0 : steps.length();
@@ -73,64 +131,122 @@ final class CatalogFlow {
             String line = "enable".equals(act) ? "Turn on " + s.optString("name")
                     : "update".equals(act) ? "Update " + s.optString("name") + " from " + s.optString("installed") + " to " + s.optString("version")
                     : "Install " + s.optString("name") + " " + s.optString("version");
+            if (s.optBoolean("turn_on")) line += ", and turn it on";
             if (s.has("for")) line += "  (needed by " + s.optString("for") + ")";
+            if (s.optBoolean("any_car")) line += "  (not listed for this head unit: your choice)";
             msg.append("•  ").append(line).append('\n');
-            if (!"enable".equals(act) && !s.optBoolean("trusted", true)) untrusted = true;
+            if ("install".equals(act) && !s.optBoolean("trusted", true)) untrusted = true;
         }
+        final List<JSONObject> ov = overrides(p);
         JSONArray probs = p.optJSONArray("problems");
+        JSONArray skipped = p.optJSONArray("skipped");
         JSONArray notes = p.optJSONArray("notes");
         if (probs != null && probs.length() > 0) {
             StringBuilder b = new StringBuilder();
             for (int i = 0; i < probs.length(); i++) b.append("•  ").append(probs.optString(i)).append('\n');
-            boolean car = false;
-            for (int i = 0; i < probs.length(); i++) car |= probs.optString(i).contains("isn't for this head unit");
-            AlertDialog.Builder d = new AlertDialog.Builder(a).setTitle("Can't install it").setMessage(b.toString().trim());
+            AlertDialog.Builder d = new AlertDialog.Builder(a).setTitle(update ? "Can't update it" : "Can't install it").setMessage(b.toString().trim());
             d.setPositiveButton("OK", null);
-            if (car && !anyCar) {
-                d.setNeutralButton("Install anyway…", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface x, int w) {
-                        new AlertDialog.Builder(a).setTitle("Install anyway?")
-                                .setMessage("Its author didn't list this head unit. It may not work here. HMG-API keeps a backup of every "
-                                        + "file it changes, and removing the mod puts them back. Install it only if you know it suits this car.")
-                                .setNegativeButton("Cancel", null)
-                                .setPositiveButton("Install anyway", new DialogInterface.OnClickListener() {
-                                    @Override
-                                    public void onClick(DialogInterface y, int ww) {
-                                        start(a, ids, update, true, done);
-                                    }
-                                }).show();
-                    }
-                });
-            }
+            if (!ov.isEmpty()) anyway(a, d, ov, ids, update, all, ch, done);
             d.show();
             return;
         }
+        if (skipped != null && skipped.length() > 0) {
+            msg.append(n > 0 ? "\nNot updated now:\n" : "None of them can be updated now:\n");
+            for (int i = 0; i < skipped.length(); i++) {
+                JSONObject s = skipped.optJSONObject(i);
+                msg.append("•  ").append(s.optString("id")).append(": ").append(s.optString("why")).append('\n');
+            }
+        }
         if (n == 0) {
-            String t = notes != null && notes.length() > 0 ? notes.optString(0) : "Nothing to install: it's installed already.";
-            new AlertDialog.Builder(a).setMessage(t).setPositiveButton("OK", null).show();
+            String t = msg.length() > 0 ? msg.toString().trim()
+                    : notes != null && notes.length() > 0 ? notes.optString(0) : "Nothing to install: it's installed already.";
+            AlertDialog.Builder d = new AlertDialog.Builder(a).setMessage(t).setPositiveButton("OK", null);
+            if (!ov.isEmpty()) anyway(a, d, ov, ids, update, all, ch, done);
+            d.show();
             return;
         }
         for (int i = 0; notes != null && i < notes.length(); i++) msg.append('\n').append(notes.optString(i)).append('\n');
         msg.append("\nDownloaded over home Wi-Fi from each mod's GitHub release, checked against the catalogue's checksum and "
-                + "the author's signature. Nothing changes on the head unit until you apply.");
+                + "the author's signature, all before the first one is installed. Nothing changes on the head unit until you apply.");
         if (untrusted) {
-            msg.append("\n\nSome of these are by authors who aren't on HMG-API's trusted author list. A mod's code runs inside "
-                    + "the head unit's apps: install mods only from authors you trust.");
+            msg.append("\n\nYou chose to install mods by authors who aren't on HMG-API's trusted author list. A mod's code runs inside "
+                    + "the head unit's apps.");
         }
-        new AlertDialog.Builder(a)
+        // what goes: the plan's own list (update all: the mods it kept), so a later check can't add any
+        final List<String> go = new ArrayList<String>();
+        JSONArray w = p.optJSONArray("wanted");
+        for (int i = 0; w != null && i < w.length(); i++) go.add(w.optString(i));
+        if (go.isEmpty()) go.addAll(ids);
+        AlertDialog.Builder d = new AlertDialog.Builder(a)
                 .setTitle(n == 1 ? (update ? "Update this mod?" : "Install this mod?") : "These " + n + " steps?")
                 .setMessage(msg.toString().trim())
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton(update ? "Update" : "Install", new DialogInterface.OnClickListener() {
                     @Override
-                    public void onClick(DialogInterface d, int w) {
-                        run(a, ids, update, anyCar, done);
+                    public void onClick(DialogInterface x, int which) {
+                        run(a, go, update, ch, done);
                     }
-                }).show();
+                });
+        if (!ov.isEmpty()) anyway(a, d, ov, ids, update, all, ch, done);
+        d.show();
     }
 
-    private static void run(final Activity a, final List<String> ids, final boolean update, final boolean anyCar, final Done done) {
+    /**
+     * "Install anyway…": the owner picks, mod by mod, what to say yes to (each with its reason), after
+     * a warning that says what each kind of yes means. Then the plan again with those.
+     */
+    private static void anyway(final Activity a, AlertDialog.Builder d, final List<JSONObject> ov, final List<String> ids, final boolean update,
+                               final boolean all, final Choice ch, final Done done) {
+        d.setNeutralButton(update ? "Update anyway…" : "Install anyway…", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface x, int which) {
+                final String[] items = new String[ov.size()];
+                final boolean[] picked = new boolean[ov.size()];
+                boolean car = false, author = false;
+                for (int i = 0; i < ov.size(); i++) {
+                    JSONObject o = ov.get(i);
+                    boolean isCar = "car".equals(o.optString("kind"));
+                    car |= isCar;
+                    author |= !isCar;
+                    items[i] = o.optString("id") + ": " + (isCar ? "not listed for this head unit (" + o.optString("why") + ")" : o.optString("why"));
+                }
+                StringBuilder warn = new StringBuilder();
+                if (car) warn.append("Not listed for this head unit: its author didn't list this car, so it may not work here. HMG-API keeps "
+                        + "a backup of every file it changes, and removing the mod puts them back. ");
+                if (author) warn.append("An author who isn't on the trusted list: the catalogue isn't signed, so HMG-API can't tell this key "
+                        + "is really the author's. A mod's code runs inside the head unit's apps: say yes only if you know and trust its author. ");
+                new AlertDialog.Builder(a).setTitle("Which ones, at your own risk?")
+                        .setMultiChoiceItems(items, picked, new DialogInterface.OnMultiChoiceClickListener() {
+                            @Override
+                            public void onClick(DialogInterface y, int i, boolean on) {
+                                picked[i] = on;
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .setPositiveButton("Next", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface y, int ww) {
+                                Choice next = new Choice();
+                                next.anyCar.addAll(ch.anyCar);
+                                next.anyAuthor.addAll(ch.anyAuthor);
+                                boolean any = false;
+                                for (int i = 0; i < ov.size(); i++) {
+                                    if (!picked[i]) continue;
+                                    any = true;
+                                    String id = ov.get(i).optString("id");
+                                    if ("car".equals(ov.get(i).optString("kind"))) next.anyCar.add(id);
+                                    else next.anyAuthor.add(id);
+                                }
+                                if (any) plan(a, ids, update, all, next, done);
+                            }
+                        }).show();
+                new AlertDialog.Builder(a).setTitle("At your own risk").setMessage(warn.toString().trim())
+                        .setPositiveButton("I understand", null).show();
+            }
+        });
+    }
+
+    private static void run(final Activity a, final List<String> ids, final boolean update, final Choice ch, final Done done) {
         final AlertDialog wait = new AlertDialog.Builder(a)
                 .setMessage("Downloading and installing… (leave the head unit on)").setCancelable(false).show();
         new Ui.Job<Hmgapid.Result>() {
@@ -138,16 +254,31 @@ final class CatalogFlow {
             Hmgapid.Result work() throws Exception {
                 List<String> c = new ArrayList<String>(Arrays.asList("engine", update ? "update" : "catalog-install"));
                 c.addAll(ids);
-                if (anyCar) c.add("--any-car");
-                return Hmgapid.call(900000, c.toArray(new String[0]));
+                ch.args(c);
+                return Hmgapid.call(1800000, c.toArray(new String[0]));
             }
 
             @Override
             void done(Hmgapid.Result r, Exception e) {
                 wait.dismiss();
-                if (e != null) done.failed("Lost contact with HMG-API: " + e.getMessage());
-                else if (r.code != 0) done.failed(MainActivity.readable(r.output));
-                else done.installed(r.output);
+                if (e != null) {
+                    done.lost("No answer from HMG-API in time (" + e.getMessage() + "). The download and install go on by themselves: "
+                            + "back on the main screen, HMG-API waits for them, then shows what changed.");
+                } else if (r.code == PLAN_CHANGED) {
+                    JSONObject q;
+                    try {
+                        q = json(r.output);
+                    } catch (Exception x) {
+                        done.failed(MainActivity.readable(r.output));
+                        return;
+                    }
+                    confirm(a, q, ids, update, false, ch, "The downloaded packages need more than the catalogue said, so nothing was "
+                            + "installed yet. This is what it takes now:", done);
+                } else if (r.code != 0) {
+                    done.failed(MainActivity.readable(r.output));
+                } else {
+                    done.installed(r.output);
+                }
             }
         }.start(a);
     }

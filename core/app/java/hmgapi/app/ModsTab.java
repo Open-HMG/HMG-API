@@ -263,7 +263,7 @@ final class ModsTab {
             Ui.button(detail, "Update to " + m.update, true, new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    CatalogFlow.start(a, java.util.Arrays.asList(m.id), true, false, new CatalogFlow.Done() {
+                    CatalogFlow.start(a, java.util.Arrays.asList(m.id), true, new CatalogFlow.Done() {
                         @Override
                         public void installed(String output) {
                             a.message("Updated " + m.name, MainActivity.readable(output));
@@ -274,6 +274,12 @@ final class ModsTab {
                         @Override
                         public void failed(String output) {
                             a.message("Not updated", output);
+                        }
+
+                        @Override
+                        void lost(String message) {
+                            a.message("Still updating", message);
+                            a.plan();   // waits for the engine, then shows what changed
                         }
                     });
                 }

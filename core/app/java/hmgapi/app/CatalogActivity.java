@@ -114,7 +114,8 @@ public class CatalogActivity extends Activity {
         JSONArray au = m.optJSONArray("authors");
         StringBuilder by = new StringBuilder();
         for (int i = 0; au != null && i < au.length(); i++) by.append(i > 0 ? ", " : "").append(au.optString(i));
-        if (by.length() > 0) Ui.text(rows, "By " + by + (m.optBoolean("trusted") ? "" : "  ·  not on HMG-API's trusted author list"), 15, false,
+        if (by.length() > 0) Ui.text(rows, "By " + by + (m.optBoolean("trusted") ? "" : "  ·  not on HMG-API's trusted author list"
+                + ("new".equals(st) ? ": installing it needs your yes" : "")), 15, false,
                 m.optBoolean("trusted") ? Color.GRAY : Ui.WARN);
         JSONArray req = m.optJSONArray("requires");
         if (req != null && req.length() > 0) {
@@ -122,7 +123,8 @@ public class CatalogActivity extends Activity {
             for (int i = 0; i < req.length(); i++) b.append(i > 0 ? ", " : "").append(req.optString(i));
             Ui.text(rows, "Needs " + b + " (installed with it if missing)", 15, false, Color.GRAY);
         }
-        if (unfit) Ui.text(rows, hmgapiUnfit ? "Can't install: " + m.optString("unfit") : "Not listed for this head unit: " + m.optString("unfit").substring(5),
+        if (unfit) Ui.text(rows, hmgapiUnfit ? "Can't install: " + m.optString("unfit") : "Not listed for this head unit: " + m.optString("unfit").substring(5)
+                + (m.optBoolean("any_car") ? " (you chose to use it here)" : ""),
                 15, false, hmgapiUnfit ? Ui.ERROR : Ui.WARN);
         if (hmgapiUnfit || "older".equals(st) || ("same".equals(st) && m.optBoolean("enabled", true))) return;
         final boolean update = "update".equals(st);
@@ -130,7 +132,7 @@ public class CatalogActivity extends Activity {
         Button b = Ui.button(rows, label, new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                CatalogFlow.start(CatalogActivity.this, Arrays.asList(m.optString("id")), update, false, new CatalogFlow.Done() {
+                CatalogFlow.start(CatalogActivity.this, Arrays.asList(m.optString("id")), update, new CatalogFlow.Done() {
                     @Override
                     public void installed(String output) {
                         installed = true;
@@ -145,6 +147,13 @@ public class CatalogActivity extends Activity {
                         new AlertDialog.Builder(CatalogActivity.this).setTitle("Not installed").setMessage(output)
                                 .setPositiveButton("OK", null).show();
                         load(false);
+                    }
+
+                    @Override
+                    void lost(String message) {
+                        installed = true;   // the main screen's plan waits for the install, then shows what changed
+                        new AlertDialog.Builder(CatalogActivity.this).setTitle("Still installing").setMessage(message)
+                                .setPositiveButton("OK", null).show();
                     }
                 });
             }

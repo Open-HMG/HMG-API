@@ -26,8 +26,10 @@
   nothing loads; `engine apply` puts them in place first and keeps the previous version in
   `/data/hmgapi/previous/`.
 - **Updates.** Mods tab → Updates (with how many) lists installed mods with a newer catalogue
-  version, and a newer HMG-API release (pre-releases only on a pre-release), with Update and
-  Update all; a mod's row in the list says "update x.y.z". HMG-API checks by itself each time
+  version, and a newer HMG-API release (on a pre-release, only that version's next ones), with
+  its release notes, Update and Update all (each mod that can go; the ones that can't are listed
+  with why). "Install anyway" is per mod and says for what: not listed for this head unit, or an
+  author who isn't on the trusted list. A mod's row in the list says "update x.y.z". HMG-API checks by itself each time
   home Wi-Fi comes up, at most every 6 hours (owner switch `no_update_check` turns that off), and
   can also download and stage the mods' plain updates then (`auto_stage_updates`, off by
   default): they wait aside until the owner applies.
