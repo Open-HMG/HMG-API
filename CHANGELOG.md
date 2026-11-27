@@ -59,6 +59,34 @@
   problem log now give the real limits (three restarts in one boot, at any time, or six
   starts in a row that don't reach the home screen), not "three failed starts in a row".
   Tested off-car only.
+- **An undone trial or a cut-off apply puts settings, live props and binds back too.** The
+  journal kept only files and the state, so a trial's `persist.*` prop (or one set by an apply
+  cut off after its settings) stayed set after "trial undone", the next apply took it for stock,
+  and `engine restore` left it set. `binds.txt` wasn't rolled back either. The journal now keeps
+  each one's value before, and `engine recover` writes them back.
+- **Stock backups are checked before every use.** They're taken as the installer takes its
+  own: copied beside, checked against the stock md5, then renamed, so a cut-off copy never sits
+  under the backup's name. An app's odex backup has its md5 recorded now. A restore, uninstall or
+  rebuild never writes a backup that isn't the recorded md5 (a short odex under a stock apk with
+  no `classes.dex` crashed that app at every launch): a NEMESIS copy with that md5 stands in, or
+  the engine stops and names the backup and the md5 it should have.
+- **Room is checked before an apply** writes anything, on `/system` and `/data`. If `/system`
+  filled up anyway, `engine recover` removes the cut-off copy first and, when there's still no
+  room, the file before its saved copy goes back, instead of failing at every start.
+- **A damaged journal, or a saved copy that's gone, no longer blocks everything.** `engine
+  recover` sets the journal aside (`state/journal.bad.json`) and says so; `engine status` and
+  `engine keep` say what's wrong instead of failing.
+- **More is refused unless `hmgapi.json overrides.allow_critical` lists it** (with a warning):
+  `dalvik.*` and `persist.sys.dalvik.*` keys in `build.prop` and as live props
+  (`"prop:<key>"`, e.g. the runtime switch `persist.sys.dalvik.vm.lib`), `framework-res.apk`,
+  `libz`, `libcrypto`, `libssl`, the ICU libraries and data file, `libgui`, `libui`, `libEGL`,
+  `libGLESv2`, `libhardware`, `libsqlite`, `libexpat`, everything in `/system/lib/hw/` and
+  `/system/lib/egl/`, and `netd`, `mediaserver`, `logwrapper` and `e2fsck`.
+- **HMG-API doesn't update itself while an apply is unfinished or a trial is in place**
+  (`engine update-hmgapi`, `--force` included): `engine keep` or `engine recover` first.
+- **A rebuilt app's Dalvik cache entry is the only one touched.** The clean-up also deleted
+  other apps' entries whose names ended the same way, and the entry filled after a restore was
+  always named `system@app@`, wrong for an app in `/system/priv-app`. Tested off-car only.
 
 ## 1.1.0-rc.10 (2026-11-25)
 

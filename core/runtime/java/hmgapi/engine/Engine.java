@@ -42,10 +42,12 @@ import java.util.TreeMap;
  * src, else puts stock back (nothing on disk changes; a restart clears it).
  *
  * Safety (the unit must always boot): /system/build.prop only takes "props"
- * changes, never to ro.* keys, and every edit must keep every other line;
- * boot-critical files (see CRITICAL) are refused unless hmgapi.json
- * overrides.allow_critical lists the path; files HMG-API's installer owns are
- * always refused. Live properties ("prop") are persist.* only: they live in
+ * changes, never to ro.*, dalvik.* or persist.sys.dalvik.* keys (CRITICAL_PROPS),
+ * and every edit must keep every other line; boot-critical files (see critical())
+ * are refused unless hmgapi.json overrides.allow_critical lists the path
+ * ("/system/build.prop:<key>" for a key, "prop:<key>" for a live property); files
+ * HMG-API's installer owns are always refused. Live properties ("prop") are
+ * persist.* only (not persist.sys.dalvik.*: the runtime switch): they live in
  * /data/property, and removing that file undoes them. A prop's "value" "" means
  * unset. "mirror": a live (non-persist) property set to the same value, for init
  * triggers such as sys.usb.config; "restart": services restarted after the
@@ -337,10 +339,8 @@ public final class Engine {
         if (!target.matches("/(sbin|system/bin)/[A-Za-z0-9._-]+")) return "target must be in /sbin or /system/bin";
         if (!svc.matches("[a-z0-9_]+")) return "service must be an init service name";
         for (String x : HMGAPI_OWNED) if (x.equals(target) || x.equals(src)) return target + " belongs to HMG-API's own install";
-        for (String x : CRITICAL) {
-            if (x.equals(target) && !allowedCritical(target)) {
-                return "the unit needs " + target + " to boot (hmgapi.json overrides.allow_critical lists it to allow, at your own risk)";
-            }
+        if (critical(target) && !allowedCritical(target)) {
+            return "the unit needs " + target + " to boot (hmgapi.json overrides.allow_critical lists it to allow, at your own risk)";
         }
         if ("/sbin/ueventd".equals(target) || "/sbin/healthd".equals(target) || target.equals("/init")) return target + " can't be swapped";
         return null;
@@ -462,9 +462,9 @@ public final class Engine {
             if ("apply".equals(cmd)) LiveState.publish(this);   // a switch with no file change still reaches running apps
             return 0;
         }
-        apply(p, trial);
-        LiveState.publish(this);
-        return 0;
+        int rc = apply(p, trial);
+        if (rc == 0) LiveState.publish(this);
+        return rc;
     }
 
     // ------------------------------------------------------------------ mods
@@ -913,10 +913,11 @@ public final class Engine {
         boolean exists;          // result exists
         String result;           // md5 of the result, or "absent"
         String stock;            // md5 of the stock original, or "absent"
-        File baseline;           // where the stock bytes come from (null = absent)
+        File baseline;           // where the stock bytes come from (null = absent); restore: what's written back
         boolean newBackup;       // baseline must be backed up at apply
         boolean app;             // rebuilt app: odex regenerated
-        File odexSrc;            // app: the stock odex its delta was built from (backed up at apply)
+        File odexSrc;            // app: the stock odex its delta was built from (backed up at apply); restore: what's written back
+        String odexStock;        // app: that odex's md5 (recorded in files.json "odex"; null in an older engine's records)
         Set<String> mods = new LinkedHashSet<String>();
         boolean restore;         // no mod wants it any more: back to stock
     }
@@ -1030,6 +1031,14 @@ public final class Engine {
                                 + " ro.* can't change, and build.prop edits aren't used for properties)");
                         continue;
                     }
+                    if (criticalProp(key) != null) {
+                        if (!allowedCritical("prop:" + key)) {
+                            problems.add(m.id + ": prop " + key + ": " + criticalProp(key) + ", so it's refused (hmgapi.json"
+                                    + " overrides.allow_critical \"prop:" + key + "\" allows it, at your own risk)");
+                            continue;
+                        }
+                        out.add("WARNING: prop " + key + " can keep the unit from booting; setting it because overrides.allow_critical lists it");
+                    }
                 }
                 if ("setting".equals(ch.type) && c.get("add") instanceof List) {
                     // a list setting (enabled_input_methods "a:b"): every mod's entries on top of the stock value
@@ -1117,10 +1126,7 @@ public final class Engine {
         List<String> skipped = new ArrayList<String>();
         for (Target t : p.targets.values()) {
             if (t.restore) {
-                Map<String, Object> f = (Map<String, Object>) files.get(t.path);
-                t.stock = (String) f.get("stock");
-                t.result = t.stock;
-                t.app = Boolean.TRUE.equals(f.get("app"));
+                restoreFrom(t, (Map<String, Object>) files.get(t.path));
                 continue;
             }
             int before = problems.size();
@@ -1152,12 +1158,87 @@ public final class Engine {
             else {   // owned before, can't be built now: back to stock
                 Target t = p.targets.get(path);
                 t.restore = true;
-                t.stock = (String) f.get("stock");
-                t.result = t.stock;
-                t.app = Boolean.TRUE.equals(f.get("app"));
+                restoreFrom(t, f);
             }
         }
         return p;
+    }
+
+    /**
+     * A file going back to stock: where its stock bytes (and an app's stock odex) come from.
+     * Each backup is checked against the md5 recorded when it was taken; a damaged one is
+     * never written back (a short odex under a stock apk with no classes.dex: the app
+     * crashes at every launch). A NEMESIS copy with the recorded md5 stands in, else the
+     * plan stops, saying which backup and what it should be.
+     */
+    void restoreFrom(Target t, Map<String, Object> f) throws IOException {
+        t.stock = (String) f.get("stock");
+        t.result = t.stock;
+        t.app = Boolean.TRUE.equals(f.get("app"));
+        if (!"absent".equals(t.stock)) {
+            t.baseline = stockCopy(t.path, t.stock);
+            if (t.baseline == null) return;
+        }
+        if (t.app) {
+            String odex = t.path.replaceAll("\\.apk$", ".odex");
+            t.odexStock = (String) f.get("odex");
+            t.odexSrc = t.odexStock != null ? stockCopy(odex, t.odexStock) : wholeOdex(odex);
+        }
+    }
+
+    /**
+     * HMG-API's backup of a stock file if it has the md5 recorded for it, else a NEMESIS copy
+     * that does (noted; a rebuild backs it up again); null, with the problem, if neither.
+     */
+    File stockCopy(String path, String md5) throws IOException {
+        File b = backup(path);
+        String have = md5(b);
+        if (have.equals(md5)) return b;
+        File nem = nemesisStock(path, Collections.singleton(md5));
+        if (nem != null) {
+            out.add("note     " + path + ": HMG-API's stock backup is " + ("absent".equals(have) ? "missing" : "damaged (" + have + ")")
+                    + "; using the stock copy NEMESIS kept (" + nem.getParentFile().getName() + "), which has the recorded md5 " + md5);
+            return nem;
+        }
+        problems.add(path + ": HMG-API's stock backup " + b.getPath().substring(root.length()) + " is "
+                + ("absent".equals(have) ? "missing" : "damaged (md5 " + have + ")") + ", not the stock file recorded (md5 " + md5
+                + "), so it can't be put back. Copy the stock file (md5 " + md5 + ") there, then try again");
+        return null;
+    }
+
+    /**
+     * An app's odex backup from before HMG-API recorded its md5: a Dalvik odex ("dey\n" and
+     * its header's opt section) must be as long as its header says; a short one (a cut-off
+     * copy) is refused. Anything else can't be told apart, so it's used as before.
+     */
+    File wholeOdex(String odex) throws IOException {
+        File b = backup(odex);
+        if (!b.isFile()) {
+            problems.add(odex + ": HMG-API's backup of the stock odex " + b.getPath().substring(root.length())
+                    + " is missing, so the stock app (which has no code of its own) can't be put back. Copy the stock odex there, then try again");
+            return null;
+        }
+        byte[] h = new byte[40];
+        InputStream in = new FileInputStream(b);
+        int n;
+        try {
+            n = in.read(h);
+        } finally {
+            in.close();
+        }
+        if (n == 40 && h[0] == 'd' && h[1] == 'e' && h[2] == 'y' && h[3] == '\n') {
+            long optOff = le32(h, 24), optLen = le32(h, 28);
+            if (b.length() < optOff + optLen) {
+                problems.add(odex + ": HMG-API's backup of the stock odex " + b.getPath().substring(root.length()) + " is cut short ("
+                        + b.length() + " bytes, its header says " + (optOff + optLen) + "), so it can't be put back. Copy the stock odex there, then try again");
+                return null;
+            }
+        }
+        return b;
+    }
+
+    static long le32(byte[] b, int at) {
+        return (b[at] & 0xffL) | (b[at + 1] & 0xffL) << 8 | (b[at + 2] & 0xffL) << 16 | (b[at + 3] & 0xffL) << 24;
     }
 
     /** live md5s taken as found this plan (Plan.rebased), for build() */
@@ -1233,13 +1314,46 @@ public final class Engine {
 
     /** Files the unit can't boot (or HMG-API can't run) without. */
     static final String[] CRITICAL = {
+        // the shell, the linker, the daemons init starts at boot that Android waits for (system_server
+        // hangs without netd or mediaserver's audio), and what init's mount_all runs on /data
         "/system/bin/linker", "/system/bin/sh", "/system/bin/mksh", "/system/bin/toolbox", "/system/bin/servicemanager",
         "/system/bin/vold", "/system/bin/surfaceflinger", "/system/bin/dexopt", "/system/bin/installd",
+        "/system/bin/netd", "/system/bin/mediaserver", "/system/bin/logwrapper", "/system/bin/e2fsck",
+        // what the zygote, system_server and surfaceflinger load
         "/system/lib/libc.so", "/system/lib/libdl.so", "/system/lib/libm.so", "/system/lib/libstdc++.so", "/system/lib/liblog.so",
         "/system/lib/libcutils.so", "/system/lib/libutils.so", "/system/lib/libbinder.so", "/system/lib/libdvm.so",
         "/system/lib/libandroid_runtime.so", "/system/lib/libnativehelper.so", "/system/lib/libselinux.so",
+        "/system/lib/libz.so", "/system/lib/libcrypto.so", "/system/lib/libssl.so", "/system/lib/libicuuc.so",
+        "/system/lib/libicui18n.so", "/system/usr/icu/icudt51l.dat", "/system/lib/libgui.so", "/system/lib/libui.so",
+        "/system/lib/libEGL.so", "/system/lib/libGLESv2.so", "/system/lib/libhardware.so", "/system/lib/libsqlite.so",
+        "/system/lib/libexpat.so",
+        "/system/framework/framework-res.apk",
         "/system/etc/init.sh", "/system/etc/mkshrc",
     };
+    /** Folders whose every file is boot-critical: the hardware modules and the GPU's EGL drivers. */
+    static final String[] CRITICAL_DIRS = { "/system/lib/hw/", "/system/lib/egl/" };
+    /** Property prefixes a mod can't set (build.prop keys, live props) without overrides.allow_critical. */
+    static final String[] CRITICAL_PROPS = { "ro.", "dalvik.", "persist.sys.dalvik." };
+
+    /** Whether the unit needs this file to boot (CRITICAL, CRITICAL_DIRS, the boot class path). */
+    static boolean critical(String path) {
+        for (String x : CRITICAL) if (x.equals(path)) return true;
+        for (String d : CRITICAL_DIRS) if (path.startsWith(d)) return true;
+        for (String j : BOOT_JARS) {
+            if (path.equals("/system/framework/" + j + ".jar") || path.equals("/system/framework/" + j + ".odex")) return true;
+        }
+        return false;
+    }
+
+    /** Why a property can keep the unit from booting, or null if it can't. */
+    static String criticalProp(String key) {
+        if (key.startsWith("ro.")) return "ro.* properties set how the firmware identifies and boots itself";
+        if (key.startsWith("dalvik.") || key.startsWith("persist.sys.dalvik.")) {
+            return "dalvik.* and persist.sys.dalvik.* properties set how Dalvik starts (persist.sys.dalvik.vm.lib picks the runtime;"
+                    + " a wrong one and no app starts)";
+        }
+        return null;
+    }
     /** Boot class path jars (and their odex): Dalvik won't start without them intact. */
     static final String[] BOOT_JARS = { "core", "conscrypt", "okhttp", "core-junit", "bouncycastle", "ext", "framework",
         "framework2", "telephony-common", "voip-common", "mms-common", "android.policy", "services", "apache-xml",
@@ -1285,11 +1399,12 @@ public final class Engine {
                 if (set instanceof Map) keys.addAll(((Map<String, Object>) set).keySet());
                 if (rm instanceof List) for (Object k : (List<Object>) rm) keys.add(String.valueOf(k));
                 for (String k : keys) {
-                    if (k.startsWith("ro.") && !allowedCritical(t.path + ":" + k)) {
-                        return t.path + ": " + ch.mod.id + " changes " + k + "; ro.* properties set how the firmware identifies and"
-                                + " boots itself, so they're refused (hmgapi.json overrides.allow_critical \"" + t.path + ":" + k
-                                + "\" allows it, at your own risk)";
+                    String why = criticalProp(k);
+                    if (why != null && !allowedCritical(t.path + ":" + k)) {
+                        return t.path + ": " + ch.mod.id + " changes " + k + "; " + why + ", so they're refused"
+                                + " (hmgapi.json overrides.allow_critical \"" + t.path + ":" + k + "\" allows it, at your own risk)";
                     }
+                    if (why != null) out.add("WARNING: " + t.path + ": " + k + " can keep the unit from booting; changing it because overrides.allow_critical lists it");
                     if (!k.matches("[A-Za-z0-9._-]+")) return t.path + ": " + ch.mod.id + ": \"" + k + "\" isn't a property name";
                 }
                 if (set instanceof Map) {
@@ -1301,11 +1416,7 @@ public final class Engine {
             }
             return null;
         }
-        boolean critical = false;
-        for (String x : CRITICAL) critical |= x.equals(t.path);
-        for (String j : BOOT_JARS) {
-            critical |= t.path.equals("/system/framework/" + j + ".jar") || t.path.equals("/system/framework/" + j + ".odex");
-        }
+        boolean critical = critical(t.path);
         if (critical && !allowedCritical(t.path)) {
             return t.path + ": the unit needs this file to boot, so mods can't change it (hmgapi.json overrides.allow_critical"
                     + " lists paths allowed anyway, at your own risk)";
@@ -1343,7 +1454,12 @@ public final class Engine {
         }
         if (owned != null) {
             t.stock = (String) owned.get("stock");
-            t.baseline = "absent".equals(t.stock) ? null : backup(t.path);
+            if (!"absent".equals(t.stock)) {
+                // rebuilt from the backup only if it's still the stock file recorded (a NEMESIS copy that is stands in)
+                t.baseline = stockCopy(t.path, t.stock);
+                if (t.baseline == null) return;
+                t.newBackup = !t.baseline.equals(backup(t.path));
+            }
         } else {
             String m = md5(live);
             if ("absent".equals(m)) {
@@ -1491,21 +1607,28 @@ public final class Engine {
                 // (lpatch only builds from the exact stock bytes, so trying each is safe)
                 String odexPath = t.path.replaceAll("\\.apk$", ".odex");
                 List<File> odexes = new ArrayList<File>();
-                if (owned != null) odexes.add(backup(odexPath));
-                else {
+                String bad = null;
+                if (owned != null) {
+                    // the live odex is HMG-API's dexopt output now, never stock. A backup that isn't the
+                    // recorded md5 is left out; NEMESIS's copies stand in (backed up again at apply)
+                    String rec = (String) owned.get("odex"), have = md5(backup(odexPath));
+                    if (rec == null || rec.equals(have)) odexes.add(backup(odexPath));
+                    else bad = "HMG-API's backup of the stock odex is " + ("absent".equals(have) ? "missing" : "damaged (" + have + ")")
+                            + ", recorded " + rec;
+                } else {
                     odexes.add(sys(odexPath));
                     odexes.add(new File(stockDir, odexPath));
-                    odexes.addAll(nemesisCopies(odexPath));
                 }
+                odexes.addAll(nemesisCopies(odexPath));
                 File dex = new File(stageDir, t.path.replace('/', '_') + ".dex");
-                String why = "no stock odex found";
+                String why = bad != null ? bad + ", and no NEMESIS copy fits" : "no stock odex found";
                 t.odexSrc = null;
                 for (String d : ch.srcs("delta")) {
                     for (File odex : odexes) {
                         if (!odex.isFile()) continue;
                         Run r = exec(lpatch, "delta", d, odex.getPath(), dex.getPath());
                         if (r.code == 0 && dex.isFile()) { t.odexSrc = odex; break; }
-                        why = r.text.trim();
+                        if (bad == null) why = r.text.trim();
                     }
                     if (t.odexSrc != null) break;
                 }
@@ -1513,6 +1636,7 @@ public final class Engine {
                     problems.add(t.path + ": " + ch.mod.id + "'s app delta doesn't fit this app's stock odex: " + why);
                     return;
                 }
+                t.odexStock = md5(t.odexSrc);   // lpatch built from it, so these are the stock bytes: recorded with the backup
                 File next = new File(work.getPath() + ".a");
                 Run r = exec(lpatch, "zipadd", work.getPath(), dex.getPath(), next.getPath());
                 if (r.code != 0 || !next.isFile()) {
@@ -1829,7 +1953,7 @@ public final class Engine {
     // ------------------------------------------------------------------ apply
 
     @SuppressWarnings("unchecked")
-    void apply(Plan p, boolean trial) throws Exception {
+    int apply(Plan p, boolean trial) throws Exception {
         Map<String, Object> files = (Map<String, Object>) p.state.get("files");
         Map<String, Object> st = (Map<String, Object>) p.state.get("settings");
         List<Target> changed = new ArrayList<Target>();
@@ -1837,8 +1961,14 @@ public final class Engine {
             // --force: also a file whose result is unchanged but which was deleted or changed outside HMG-API (#103)
             if (t.restore || !t.result.equals(p.owned(t.path)) || (p.force && !t.result.equals(md5(sys(t.path))))) changed.add(t);
         }
+        String full = room(changed);
+        if (full != null) {
+            out.add("nothing changed: " + full);
+            return 3;
+        }
 
-        // journal: what each file was before, so a lost apply or a trial can be rolled back
+        // journal: what each file was before, so a lost apply or a trial can be rolled back. Each saved
+        // copy is checked against the live file and its md5 kept, so recover never writes a short one back
         rm(prevDir);
         prevDir.mkdirs();
         List<Object> entries = new ArrayList<Object>();
@@ -1849,17 +1979,32 @@ public final class Engine {
                 File live = sys(path);
                 if (live.isFile()) {
                     File prev = new File(prevDir, path.replace('/', '_'));
-                    copy(live, prev);
+                    e.put("md5", checkedCopy(live, prev, md5(live)));
                     e.put("prev", prev.getPath());
                     e.put("mode", mode(live));
                 }
                 entries.add(e);
             }
         }
+        // settings, live props and binds as they are now: recover writes them back too (a trial's
+        // persist.* prop, or an apply cut off after the settings but before the state, stayed set and
+        // was then taken as stock by the next apply)
+        Map<String, Object> wasSet = new LinkedHashMap<String, Object>();
+        Map<String, String> before = new LinkedHashMap<String, String>();
+        for (Map.Entry<String, Object[]> e : p.settings.entrySet()) {
+            Map<String, Object> s = (Map<String, Object>) st.get(e.getKey());
+            if (s != null && String.valueOf(e.getValue()[0]).equals(String.valueOf(s.get("value")))) continue;   // not written
+            journalSetting(wasSet, before, e.getKey(), (Map<String, Object>) e.getValue()[2], s);
+        }
+        for (String k : p.settingsRestore) journalSetting(wasSet, before, k, null, (Map<String, Object>) st.get(k));
+        File bindsFile = new File(stateDir, "binds.txt"), bindsFailed = new File(stateDir, "binds.failed");
         Map<String, Object> j = new LinkedHashMap<String, Object>();
         j.put("trial", trial);
         j.put("committed", false);
         j.put("entries", entries);
+        j.put("settings", wasSet);
+        j.put("binds", bindsFile.isFile() ? read(bindsFile) : null);
+        j.put("binds_failed", bindsFailed.isFile() ? read(bindsFailed) : null);
         j.put("state", Json.parse(Json.write(p.state)));   // a copy: p.state changes below
         write(journalFile, Json.write(j));
 
@@ -1868,13 +2013,15 @@ public final class Engine {
             rm(backup(path));
             if (path.endsWith(".apk")) rm(backup(path.replaceAll("\\.apk$", ".odex")));
         }
-        // stock backups, once
+        // stock backups, as install.sh's backup() takes them: copied beside, checked against the stock md5,
+        // then renamed, so a cut-off copy never sits under the backup's name. Taken once, and again only
+        // when the one there isn't the stock file (a damaged one, replaced from a NEMESIS copy)
         for (Target t : changed) {
-            if (!t.newBackup) continue;
-            copy(t.baseline, backup(t.path));
-            if (t.app) {
-                String odex = t.path.replaceAll("\\.apk$", ".odex");
-                if (t.odexSrc != null && t.odexSrc.isFile() && !backup(odex).isFile()) copy(t.odexSrc, backup(odex));
+            if (t.restore) continue;
+            if (t.newBackup) checkedCopy(t.baseline, backup(t.path), t.stock);
+            if (t.app && t.odexSrc != null && t.odexStock != null) {
+                File ob = backup(t.path.replaceAll("\\.apk$", ".odex"));
+                if (!t.odexStock.equals(md5(ob))) checkedCopy(t.odexSrc, ob, t.odexStock);
             }
         }
 
@@ -1896,7 +2043,7 @@ public final class Engine {
             String was;
             if (s == null) {
                 s = new LinkedHashMap<String, Object>();
-                s.put("stock", settingGet(k));
+                s.put("stock", before.get(k));   // read once, for the journal
                 st.put(k, s);
                 was = s.get("stock") == null ? "" : String.valueOf(s.get("stock"));
             } else {
@@ -1923,15 +2070,17 @@ public final class Engine {
             if (!back.equals(String.valueOf(s.get("value")))) after(s, back);
             out.add("set      " + k + " back to " + s.get("stock"));
         }
+        cut("settings");
 
         // binds: hmgapid does them after the output is printed (restarting a service like adbd
         // may cut the link that asked); a new list clears earlier failures
         String bt = bindsText(p.binds);
         if (!bt.equals(currentBinds())) {
-            write(new File(stateDir, "binds.txt"), bt);
-            new File(stateDir, "binds.failed").delete();
+            write(bindsFile, bt);
+            bindsFailed.delete();
             bindsChanged = true;
         }
+        cut("binds");
 
         // state
         for (Target t : changed) {
@@ -1944,6 +2093,7 @@ public final class Engine {
             f.put("result", t.result);
             f.put("mods", new ArrayList<Object>(t.mods));
             if (t.app) f.put("app", true);
+            if (t.app && t.odexStock != null) f.put("odex", t.odexStock);
             files.put(t.path, f);
         }
         write(stateFile, Json.write(p.state));
@@ -1960,6 +2110,106 @@ public final class Engine {
         for (Target t : changed) needs.add(restart(t.path));
         if (!p.settings.isEmpty() || !p.settingsRestore.isEmpty()) needs.add("settings applied now");
         out.add("done: " + changed.size() + " file(s); " + needs);
+        return 0;
+    }
+
+    /** a setting, live prop or list setting's value before this apply, with what undoing it needs (mirror, restart) */
+    void journalSetting(Map<String, Object> was, Map<String, String> before, String k, Map<String, Object> c, Map<String, Object> s)
+            throws Exception {
+        String v = settingGet(k);
+        before.put(k, v);
+        Map<String, Object> e = new LinkedHashMap<String, Object>();
+        e.put("value", v);
+        for (String x : new String[] { "mirror", "restart" }) {
+            Object o = c != null && c.get(x) != null ? c.get(x) : s != null ? s.get(x) : null;
+            if (o != null) e.put(x, o);
+        }
+        was.put(k, e);
+    }
+
+    /**
+     * Off-car tests only (HMGAPI_TEST_CUT=<point>): the engine stops dead here, as when the
+     * unit loses power mid-apply, so recover can be tested on what that leaves.
+     */
+    void cut(String point) {
+        if (host && point.equals(env("HMGAPI_TEST_CUT", null))) {
+            System.out.flush();
+            Runtime.getRuntime().halt(137);
+        }
+    }
+
+    /**
+     * Room for this apply, checked before anything is written. On /system: each new file is
+     * written beside the old one, then renamed over it. An app's old apk and odex are freed
+     * then (the app is stopped while its files change), so only the growth counts, plus the
+     * largest old one while both are there; any other file counts whole (a running process
+     * may still map the old one until the restart). On /data: the journal's copies, new
+     * backups and the Dalvik cache. A /system that filled mid-apply left a half-done apply
+     * that recover couldn't put back either. null, or why not.
+     */
+    String room(List<Target> changed) throws IOException {
+        long sys = 0, both = 0, dat = 0;
+        for (Target t : changed) {
+            File src = t.restore ? t.baseline : t.exists ? t.stage : null;
+            long nw = src == null ? 0 : src.length(), old = sys(t.path).length();
+            for (String path : withOdex(t)) dat += sys(path).length();   // the journal's copies
+            if (t.newBackup && t.baseline != null) dat += t.baseline.length();
+            if (t.app) {
+                long odex = t.odexSrc != null ? t.odexSrc.length() : 0, oldOdex = sys(t.path.replaceAll("\\.apk$", ".odex")).length();
+                File dex = new File(stageDir, t.path.replace('/', '_') + ".dex");
+                long est = t.restore ? odex : Math.max(odex, dex.length() + dex.length() / 4);   // dexopt's odex: about the dex and a quarter
+                sys += Math.max(0, nw - old) + Math.max(0, est - oldOdex);
+                both = Math.max(both, Math.max(old, oldOdex));
+                dat += est + odex;   // the Dalvik cache copy, and the odex backup
+            } else {
+                sys += nw;
+            }
+        }
+        if (sys == 0 && dat == 0) return null;
+        long sysFree = free("system", sys(SYSTEM)), datFree = free("data", data);
+        long sysNeed = sys + both + SYSTEM_SPARE, datNeed = dat + DATA_SPARE;
+        if (sysFree < sysNeed) return "not enough room on /system: this apply needs about " + mb(sysNeed) + ", " + mb(sysFree) + " free";
+        if (datFree < datNeed) return "not enough room on /data: this apply needs about " + mb(datNeed) + ", " + mb(datFree)
+                + " free (HMG-API keeps a copy of each file it changes, and its stock backup)";
+        return null;
+    }
+
+    static final String SYSTEM = "/system";
+    static final long SYSTEM_SPARE = 512 * 1024, DATA_SPARE = 16 * 1024 * 1024;
+
+    static String mb(long n) {
+        return String.format(java.util.Locale.US, "%.1f MB", n / 1048576.0);
+    }
+
+    /**
+     * Free bytes on the filesystem holding f, as root sees it on /system (root may use its
+     * reserved blocks; the engine runs as root) and as apps do on /data (Android needs its
+     * reserve there). Off-car tests: HMGAPI_TEST_FREE="system=<bytes> data=<bytes>".
+     */
+    long free(String which, File f) {
+        if (host) {
+            for (String kv : env("HMGAPI_TEST_FREE", "").split(" ")) if (kv.startsWith(which + "=")) return Long.parseLong(kv.substring(which.length() + 1));
+        }
+        while (f != null && !f.exists()) f = f.getParentFile();
+        if (f == null) return Long.MAX_VALUE;
+        return "system".equals(which) ? f.getFreeSpace() : f.getUsableSpace();
+    }
+
+    /**
+     * Copied beside dst, checked against the md5 it must have, then renamed onto dst: a copy
+     * that fails or is cut off never leaves a short file under dst's name. Returns the md5.
+     */
+    static String checkedCopy(File src, File dst, String want) throws IOException {
+        File tmp = new File(dst.getPath() + ".hmgapi-new");
+        try {
+            copy(src, tmp);
+            String got = md5(tmp);
+            if (!got.equals(want)) throw new IOException("copy of " + src + " to " + dst + " came out " + got + ", not " + want);
+            if (!tmp.renameTo(dst)) throw new IOException("rename onto " + dst);
+            return got;
+        } finally {
+            tmp.delete();
+        }
     }
 
     List<String> withOdex(Target t) {
@@ -1975,11 +2225,11 @@ public final class Engine {
             if ("absent".equals(t.stock)) {
                 if (dst.exists() && !dst.delete()) throw new IOException("delete " + dst);
             } else {
-                put(backup(t.path), dst, "644");
+                put(t.baseline, dst, "644");   // checked against its recorded md5 in the plan (restoreFrom)
             }
             if (t.app) {
                 String odex = t.path.replaceAll("\\.apk$", ".odex");
-                if (backup(odex).isFile()) put(backup(odex), sys(odex), "644");
+                if (t.odexSrc != null) put(t.odexSrc, sys(odex), "644");
                 dalvik(t.path, sys(odex), false);
             }
             out.add("restored " + t.path);
@@ -1999,23 +2249,37 @@ public final class Engine {
         out.add("wrote    " + t.path);
     }
 
-    /** dexopt a rebuilt app and fill its Dalvik cache entry, as the 1.x package did. */
+    /**
+     * The Dalvik cache entry of an app on /system: its path without the leading /, each /
+     * an @, then @classes.dex (system@app@X.apk@classes.dex, system@priv-app@X.apk@classes.dex).
+     */
+    static String dalvikName(String apkPath) {
+        return apkPath.substring(1).replace('/', '@') + "@classes.dex";
+    }
+
+    /**
+     * dexopt a rebuilt app and fill its Dalvik cache entry, as the 1.x package did. Only this
+     * app's own entry goes (a *X.apk* glob also took MyX.apk's). Off the unit: no dexopt, and
+     * the cache under HMGAPI_ROOT when the test made one.
+     */
     void dalvik(String apkPath, File odex, boolean dexopt) throws Exception {
-        if (host) return;
-        String apk = new File(apkPath).getName();
-        exec("/system/bin/sh", "-c", "rm -f /data/dalvik-cache/*" + apk + "* /cache/dalvik-cache/*" + apk + "*");
-        if (dexopt) {
+        String name = dalvikName(apkPath);
+        File cache = new File(root + "/data/dalvik-cache/" + name);
+        cache.delete();
+        new File(root + "/cache/dalvik-cache/" + name).delete();
+        if (dexopt && !host) {
             Run r = exec("/system/bin/dexopt", "--preopt", sys(apkPath).getPath(), odex.getPath(), "m=y,u=n");
             if (r.code != 0 || !odex.isFile()) throw new IOException("dexopt " + apkPath + ": " + r.text);
             exec("/system/bin/chmod", "644", odex.getPath());
             exec("/system/bin/chown", "1000:1000", odex.getPath());
         }
-        if (odex.isFile()) {
-            File cache = new File("/data/dalvik-cache/system@app@" + apk + "@classes.dex");
+        if (odex.isFile() && cache.getParentFile().isDirectory()) {
             File tmp = new File(cache.getPath() + ".tmp");
             copy(odex, tmp);
-            exec("/system/bin/chmod", "644", tmp.getPath());
-            exec("/system/bin/chown", "1000:1000", tmp.getPath());
+            if (!host) {
+                exec("/system/bin/chmod", "644", tmp.getPath());
+                exec("/system/bin/chown", "1000:1000", tmp.getPath());
+            }
             if (!tmp.renameTo(cache)) tmp.delete();
         }
     }
@@ -2089,11 +2353,47 @@ public final class Engine {
         Set<String> on = new LinkedHashSet<String>();
         adbTcpWarning(LiveState.mods(this, on), on);
         if (journalFile.exists()) {
-            Map<String, Object> j = Json.object(read(journalFile));
-            out.add(Boolean.TRUE.equals(j.get("trial")) ? "trial apply in place: `engine keep` keeps it, the next start undoes it"
+            Map<String, Object> j = journal();
+            out.add(j == null ? "an apply didn't finish, and its journal (state/journal.json) is damaged: the next start sets it aside (`engine recover`)"
+                    : Boolean.TRUE.equals(j.get("trial")) && Boolean.TRUE.equals(j.get("committed"))
+                    ? "trial apply in place: `engine keep` keeps it, the next start undoes it"
                     : "an apply didn't finish: the next start rolls it back (`engine recover`)");
         }
         return bad == 0 ? 0 : 4;
+    }
+
+    /** the journal, or null if it can't be read or isn't whole (entries, each with a path, and the state) */
+    @SuppressWarnings("unchecked")
+    Map<String, Object> journal() {
+        try {
+            Map<String, Object> j = Json.object(read(journalFile));
+            if (!(j.get("entries") instanceof List) || !(j.get("state") instanceof Map)) return null;
+            for (Object o : (List<Object>) j.get("entries")) {
+                if (!(o instanceof Map) || !(((Map<String, Object>) o).get("path") instanceof String)) return null;
+                String path = (String) ((Map<String, Object>) o).get("path");
+                if (!systemPath(path)) return null;
+            }
+            if (j.get("settings") != null && !(j.get("settings") instanceof Map)) return null;
+            return j;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * A journal that can't be used, set aside (state/journal.bad.json, its saved copies in
+     * state/prev.bad/) so apply, restore and uninstall aren't refused for good. What it would
+     * have put back stays as it is: `engine status` shows what isn't HMG-API's result.
+     */
+    void setAside(String why) {
+        File bad = new File(stateDir, "journal.bad.json"), prevBad = new File(stateDir, "prev.bad");
+        bad.delete();
+        rm(prevBad);
+        boolean moved = journalFile.renameTo(bad);
+        if (!moved) journalFile.delete();
+        if (prevDir.exists() && !prevDir.renameTo(prevBad)) rm(prevDir);
+        out.add("journal  " + why + "; set aside as state/" + (moved ? bad.getName() : "(deleted: couldn't be moved)")
+                + (prevBad.exists() ? ", its saved copies in state/" + prevBad.getName() + "/" : ""));
     }
 
     /**
@@ -2124,7 +2424,11 @@ public final class Engine {
             out.add("no trial to keep");
             return 0;
         }
-        Map<String, Object> j = Json.object(read(journalFile));
+        Map<String, Object> j = journal();
+        if (j == null) {
+            out.add("the last apply's journal (state/journal.json) is damaged; `engine recover` sets it aside");
+            return 1;
+        }
         if (!Boolean.TRUE.equals(j.get("trial")) || !Boolean.TRUE.equals(j.get("committed"))) {
             out.add("the last apply didn't finish; it can only be rolled back (`engine recover`)");
             return 1;
@@ -2141,30 +2445,105 @@ public final class Engine {
             out.add("nothing to recover");
             return 0;
         }
-        Map<String, Object> j = Json.object(read(journalFile));
+        Map<String, Object> j = journal();
+        if (j == null) {
+            // no way to tell what it would put back; kept as it is, it refuses every apply, restore and uninstall
+            setAside("state/journal.json is damaged (an apply was cut off while writing it?), so nothing could be put back from it");
+            out.add("the files and settings that apply changed stay as they are; `engine status` shows them, and `engine apply`"
+                    + " (or apply --force) builds them again");
+            return 0;
+        }
+        // each saved copy checked before any is written: one that's gone or isn't what was saved is skipped,
+        // not written back, and not tried again at every start
+        List<String> lost = new ArrayList<String>();
+        for (Object o : (List<Object>) j.get("entries")) {
+            Map<String, Object> e = (Map<String, Object>) o;
+            Object prev = e.get("prev");
+            if (prev == null) continue;
+            File pf = new File(String.valueOf(prev));
+            String have = md5(pf);
+            if ("absent".equals(have) || (e.get("md5") != null && !have.equals(e.get("md5")))) lost.add((String) e.get("path"));
+        }
         remount("rw");
         try {
             for (Object o : (List<Object>) j.get("entries")) {
                 Map<String, Object> e = (Map<String, Object>) o;
                 String path = (String) e.get("path");
                 File dst = sys(path);
+                new File(dst.getPath() + ".hmgapi-new").delete();   // a cut-off apply's half-written copy: its room back first
+                if (lost.contains(path)) {
+                    out.add("can't put back " + path + ": its saved copy is " + ("absent".equals(md5(new File(String.valueOf(e.get("prev")))))
+                            ? "gone" : "damaged") + "; left as it is");
+                    continue;
+                }
                 Object prev = e.get("prev");
                 if (prev == null) {
                     if (dst.exists()) dst.delete();
                 } else {
-                    put(new File((String) prev), dst, e.get("mode") == null ? "644" : String.valueOf(e.get("mode")));
+                    putBack(new File((String) prev), dst, e.get("mode") == null ? "644" : String.valueOf(e.get("mode")));
                 }
-                if (path.endsWith(".odex") && !host) dalvik(path.replaceAll("\\.odex$", ".apk"), dst, false);
+                if (path.endsWith(".odex")) dalvik(path.replaceAll("\\.odex$", ".apk"), dst, false);
                 out.add("rolled back " + path);
             }
         } finally {
             remount("ro");
         }
+        recoverSettings(j);
+        if (j.containsKey("binds")) {
+            File bf = new File(stateDir, "binds.txt"), ff = new File(stateDir, "binds.failed");
+            String was = (String) j.get("binds"), now = bf.isFile() ? read(bf) : null;
+            if (!eq(was, now)) {
+                if (was == null) bf.delete();
+                else write(bf, was);
+                bindsChanged = true;
+                out.add("rolled back binds");
+            }
+            String wasFailed = (String) j.get("binds_failed");
+            if (wasFailed == null) ff.delete();
+            else write(ff, wasFailed);
+        }
         write(stateFile, Json.write(j.get("state")));
-        journalFile.delete();
-        rm(prevDir);
-        out.add(Boolean.TRUE.equals(j.get("trial")) ? "trial undone" : "unfinished apply rolled back");
+        if (lost.isEmpty()) {
+            journalFile.delete();
+            rm(prevDir);
+        } else {
+            setAside(lost.size() + " file(s) couldn't be put back");
+            out.add("`engine status` shows them (CHANGED); `engine apply --force` builds them again");
+        }
+        out.add(Boolean.TRUE.equals(j.get("trial")) && Boolean.TRUE.equals(j.get("committed")) ? "trial undone" : "unfinished apply rolled back");
         return 0;
+    }
+
+    /** the settings and live props an apply changed, back to what the journal says they were */
+    @SuppressWarnings("unchecked")
+    void recoverSettings(Map<String, Object> j) throws Exception {
+        Object so = j.get("settings");
+        if (!(so instanceof Map)) return;   // a journal from an older engine: files only
+        for (Map.Entry<String, Object> e : ((Map<String, Object>) so).entrySet()) {
+            String k = e.getKey();
+            if (!(e.getValue() instanceof Map)) continue;
+            Map<String, Object> s = (Map<String, Object>) e.getValue();
+            String was = s.get("value") == null ? null : String.valueOf(s.get("value"));
+            String now = settingGet(k);
+            if (eq(was == null || was.isEmpty() ? null : was, now == null || now.isEmpty() ? null : now)) continue;
+            settingPut(k, was);
+            after(s, was == null ? "" : was);
+            out.add("rolled back setting " + k + " = " + (was == null ? "(unset)" : was));
+        }
+    }
+
+    /**
+     * put() for recover. A /system that filled up mid-apply may have no room for the copy
+     * beside the file (put writes there, then renames): then the file goes first and its
+     * saved copy takes its place. The saved copy and the journal stay until recover finishes,
+     * so a cut here is put right at the next start.
+     */
+    void putBack(File src, File dst, String mode) throws Exception {
+        if (dst.isFile() && free("system", dst.getParentFile()) < src.length() + SYSTEM_SPARE) {
+            if (!dst.delete()) throw new IOException("delete " + dst);
+            out.add("room     /system is short of room: " + dst.getPath().substring(root.length()) + " removed before its saved copy goes back");
+        }
+        put(src, dst, mode);
     }
 
     /**
