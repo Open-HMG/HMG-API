@@ -98,10 +98,25 @@ public final class WifiApTest {
             WifiAp.crc(conf);
             if ("54931C7F".equals(Engine.read(crc)) || Engine.read(crc).length() != 8) throw new AssertionError("crc: not updated after an edit");
             if (WifiAp.crc(new java.io.File(d, "none")) == 0) throw new AssertionError("crc: no networks file is not ok");
+            // homewifi-test.sh's chown fails for a path with "chownfail" in it
+            java.io.File bad = new java.io.File(d, "chownfail");
+            bad.mkdir();
+            java.io.File badConf = new java.io.File(bad, "wpa_supplicant.conf");
+            java.nio.file.Files.write(badConf.toPath(), template.getBytes("US-ASCII"));
+            boolean threw = false;
+            try {
+                WifiAp.crc(badConf);
+            } catch (java.io.IOException x) {
+                threw = x.getMessage().contains("chown");
+            }
+            if (!threw) throw new AssertionError("crc: a chown that fails is an error that names it");
+            String[] left = bad.list();
+            if (left.length != 1) throw new AssertionError("crc: after a failure only the networks file, got " + java.util.Arrays.toString(left));
         } finally {
             System.setOut(was);
         }
         System.out.println("ok    WifiAp crc: the car's checksum, 8 upper-case digits, written only when it changed");
+        System.out.println("ok    WifiAp crc: a chown that fails is said, nothing left behind");
     }
 
     public static void main(String[] args) throws Exception {
