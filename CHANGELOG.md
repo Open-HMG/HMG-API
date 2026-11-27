@@ -19,11 +19,18 @@
   (`mangle POSTROUTING`, `HMGAPI_HOMECELL`: nothing marked for home Wi-Fi leaves on `rmnet`),
   and table 95 holds an unreachable default while home Wi-Fi is down, so marked traffic never
   falls through to mobile data. IPv6, and everything with home Wi-Fi off, stays refused as before.
+  The keeper builds the home Wi-Fi rules (the post-reroute block, the mark, masquerade, table 95
+  and the fwmark rule) before the IPv4 home REJECTs leave, and fills the cellular chain before
+  OUTPUT jumps to it; its check also looks for the DROP inside `HMGAPI_HOMECELL`. Home Wi-Fi off
+  and the uninstaller take table 95's unreachable default out.
 - **Mods' services can look names up on home Wi-Fi** (Ioniq 5 US 260507). Their resolver
   (`ANDROID_DNS_MODE=local`) has no servers in the service's process and asks 127.0.0.1;
   HMG-API's redirect to home Wi-Fi's DNS server kept that source address, so no query left the
   unit. While home Wi-Fi is up, `route_localnet` is on for `wlan0` (the queries are
-  masqueraded) and only the answers may come back in for 127.x (`HMGAPI_HOMELO`).
+  masqueraded) and, for 127.x on `wlan0`, only the DNS server's answers (its address, port 53)
+  get in (`HMGAPI_HOMELO`). The guard is checked on every pass, not only when the lease changes,
+  and put back first in INPUT after the stock firewall reloads; `route_localnet` is on only
+  while it's there.
 
 ## 1.1.0-rc.10 (2026-11-25)
 
