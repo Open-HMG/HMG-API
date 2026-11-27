@@ -3,10 +3,11 @@
   "authors": {
     "7251ce71-a146-8a1e-958b-dbffc6af7359": {
       "name": "VysseCodes",
-      "projects": "HMG-API, its example mods, wireless CarPlay + Android Auto, ADB, adbd, NEMESIS in the app menu",
+      "projects": "HMG-API, its example mods, wireless CarPlay + Android Auto, phone turn-by-turn, ADB, adbd, NEMESIS in the app menu",
       "repos": [
         "https://github.com/Open-HMG/HMG-API",
         "https://github.com/Open-HMG/hmgapi-wireless-cp-aa",
+        "https://github.com/Open-HMG/hmgapi-projection-tbt",
         "https://github.com/Open-HMG/hmgapi-adb",
         "https://github.com/Open-HMG/hmgapi-adbd",
         "https://github.com/Open-HMG/hmgapi-nemesis-shortcut"
