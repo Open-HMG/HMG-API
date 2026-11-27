@@ -312,7 +312,7 @@ REMOUNTED=
 
 # hooks on at the next restart (the zygote wrapper's boot guard counts from 0)
 echo 0 > "$D/hook/starts"
-rm -f "$D/hook/boot" "$D/hook/disable"
+rm -f "$D/hook/boot" "$D/hook/tripped" "$D/hook/disable"
 : > "$D/hook/enable"
 
 # what's installed, for uninstall.sh and the app

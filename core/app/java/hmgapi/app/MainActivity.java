@@ -187,7 +187,7 @@ public class MainActivity extends Activity {
     void refreshStatus() {
         final int run = ++statusRun;   // an older check finishing later doesn't add its pill too
         pills.removeAllViews();
-        hooksPill();
+        hooksPill(run);
         if (restartNeeded()) Ui.pill(pills, "Restart needed", Ui.WARN);
         if (planning) return;   // back from Updates: plan() asks already (two at once only wait on each other)
         new Ui.Job<Boolean>() {
@@ -206,15 +206,87 @@ public class MainActivity extends Activity {
         }.start(this);
     }
 
-    private void hooksPill() {
+    private void hooksPill(int run) {
         try {
             JSONObject map = new JSONObject(HmgApiStatus.json).optJSONObject("map");
             if (map == null || !map.optBoolean("on")) Ui.pill(pills, "Hooks off for this car", Ui.WARN);
             else Ui.pill(pills, "Hooks on" + (map.optBoolean("checked_here") || "verified".equals(map.optString("status"))
                     ? " (map checked)" : ""), Ui.ACCENT);
         } catch (Exception e) {
-            Ui.pill(pills, "Hooks not running", Ui.ERROR);
+            whyNotRunning(run, Ui.pill(pills, "Hooks not running", Ui.ERROR));
         }
+    }
+
+    /**
+     * Hooks not running: the boot guard says whether it turned them off and why (engine
+     * boot-guard). Tapping the pill shows that, with a reset (then a restart) when it tripped.
+     */
+    private void whyNotRunning(final int run, final TextView pill) {
+        new Ui.Job<Hmgapid.Result>() {
+            @Override
+            Hmgapid.Result work() throws Exception {
+                return Hmgapid.call("engine", "boot-guard");
+            }
+
+            @Override
+            void done(Hmgapid.Result r, Exception e) {
+                if (run != statusRun || e != null || r.code != 0) return;
+                final String out = r.output.trim();
+                final boolean tripped = out.contains("boot guard: tripped");
+                TextView p = pill;
+                if (tripped) {
+                    pills.removeView(pill);
+                    p = Ui.pill(pills, "Hooks off: boot guard", Ui.ERROR);
+                }
+                p.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        bootGuard(out, tripped);
+                    }
+                });
+            }
+        }.start(this);
+    }
+
+    private void bootGuard(String out, boolean tripped) {
+        String why = null;
+        StringBuilder counts = new StringBuilder();
+        for (String l : out.split("\n")) {
+            if (l.startsWith("why: ")) why = l.substring(5);
+            else if (l.startsWith("starts ") || l.startsWith("hook/disable")) counts.append(l).append('\n');
+        }
+        AlertDialog.Builder d = new AlertDialog.Builder(this).setTitle(tripped ? "HMG-API's boot guard turned its hooks off" : "Hooks not running");
+        if (tripped) {
+            d.setMessage((why != null ? why + "\n\n" : "")
+                    + "Mods with code don't run until you reset it. Turn off or remove the mod you added or changed last, "
+                    + "then reset: hooks are back on after the restart. If Android fails again, the guard turns them off again.\n\n"
+                    + counts.toString().trim())
+                    .setNegativeButton("Not now", null)
+                    .setPositiveButton("Reset and restart", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface di, int which) {
+                            resetBootGuard();
+                        }
+                    });
+        } else {
+            d.setMessage("The boot guard didn't turn them off.\n\n" + counts.toString().trim()).setPositiveButton("OK", null);
+        }
+        d.show();
+    }
+
+    private void resetBootGuard() {
+        new Ui.Job<Hmgapid.Result>() {
+            @Override
+            Hmgapid.Result work() throws Exception {
+                return Hmgapid.call("engine", "boot-guard", "reset");
+            }
+
+            @Override
+            void done(Hmgapid.Result r, Exception e) {
+                if (e == null && r.code == 0) restart();
+                else message("Couldn't reset the boot guard", e != null ? Hmgapid.unreachable(e) : r.output.trim());
+            }
+        }.start(this);
     }
 
     /** the boot this process runs in (to the 10 s): a restart flag is only for the boot it was set in */

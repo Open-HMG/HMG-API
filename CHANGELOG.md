@@ -39,6 +39,26 @@
   methods (class, name, shorty, flags, argument count, native function), the primitive types
   and an array's length; on a mismatch it logs which one and leaves hooks off, so the unit runs
   stock instead of crashing each app as it starts. Not yet tested on a car.
+- **The boot guard now catches late crashes and hangs, and fails closed.** Its watcher used
+  to reset both counts once the zygote had been up 120 s, so a mod crashing Android later
+  (a phone connecting, CarPlay starting) restarted it again and again with hooks on every
+  time, and a hang (a mod's `zygoteInit`, a home screen that crash-loops) was never counted.
+  Now a start counts as good only once Android booted: a `system_server` and a launcher
+  (`com.android.launcher3`) forked by that zygote, the launcher up 30 s, and
+  `sys.boot_completed` 1. Only then does `hook/starts` go back to 0; `hook/boot` (every start
+  in one kernel boot) is never reset within that boot. A zygote with no `system_server` after
+  120 s (a normal one forks it within 3 s) is stopped, so that restart counts. When a limit
+  is reached the wrapper writes `hook/tripped`, and hooks stay off through restarts until the
+  owner resets the guard. The counters fail closed: a read or write error, or a count that
+  isn't a number, means no hooks for that start (it used to mean hooks on, start 1), and each
+  count is written to a `.tmp` file, fsynced and renamed over the old one.
+- **The app says why its hooks are off.** "Hooks not running" becomes "Hooks off: boot
+  guard" when the guard tripped; tapping it says which limit was reached and offers **Reset
+  and restart** (before, only a reinstall or adb reset it). New engine command
+  `boot-guard [reset]`, also in the problem log. The Settings text, Troubleshooting page and
+  problem log now give the real limits (three restarts in one boot, at any time, or six
+  starts in a row that don't reach the home screen), not "three failed starts in a row".
+  Tested off-car only.
 
 ## 1.1.0-rc.10 (2026-11-25)
 
