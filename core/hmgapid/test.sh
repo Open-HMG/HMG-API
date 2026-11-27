@@ -127,7 +127,7 @@ check "app: remount refused" "13" "$(code app remount rw)"
 check "app: reboot with no gear reading refused" "76" "$(code app reboot)"
 has "... and says how to go on" "reboot --gear-unknown-ok" "$(run app reboot)"
 check "app: reboot --gear-unknown-ok allowed" "0" "$(code app reboot --gear-unknown-ok)"
-check "app: reboot with another argument refused" "2" "$(code app reboot --now)"
+check "app: reboot with another argument refused (not an op it may use)" "13" "$(code app reboot --now)"
 check "app: engine allowed" "0" "$(code app engine status)"
 
 # --- anyone else
