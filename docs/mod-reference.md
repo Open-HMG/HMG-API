@@ -370,7 +370,9 @@ table 95 (home Wi-Fi's default; an unreachable default while home Wi-Fi is down)
 to `wlan0`'s address; anything marked never leaves on `rmnet` (checked after the reroute,
 `mangle POSTROUTING`). A service's own lookups (its resolver asks 127.0.0.1:53) are redirected
 to home Wi-Fi's DNS server. A root service may also mark its own sockets (`SO_MARK` 0x2951) so
-their route is table 95's from the start.
+their route is table 95's from the start; it should bind them to `wlan0` too (`SO_BINDTODEVICE`)
+and give up if either is refused, as HMG-API's own downloads do: with the mark alone, a socket
+uses the main table (mobile data) until the network keeper's fwmark rule is in.
 
 - Check before a download: `HmgApi.homeWifiUp()`, or `HmgApi.homeWifi()`
   (`{"state": "up", "rssi": -61, "freq": 2437}`; `state` up, waiting (the car is on),
