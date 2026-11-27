@@ -179,7 +179,7 @@ check "install" 0 $rc
 has "... through HMG-API's engine" "installed demo 1.0.0" "$out"
 check "... and applied" on "$(prop persist.demo)"
 check "... its file added" yes "$([ -f $R/system/etc/permissions/demo.xml ] && echo yes)"
-check "... engine install (from NEMESIS: no sync) then apply" "engine install $R/data/nemesis/apps/hmgapi.demo/mod/package.zip --from-nemesis engine apply" "$(tr '\n' ' ' < $T/calls | sed 's/ $//')"
+check "... engine install (from NEMESIS: no sync) then apply" "engine install $R/data/nemesis/apps/hmgapi.demo/mod/package.zip --from-nemesis engine apply --gear-unknown-ok" "$(tr '\n' ' ' < $T/calls | sed 's/ $//')"
 check "mod in HMG-API" "demo " "$(mods)"
 
 # ---- update: NEMESIS runs the old preuninstall first, with the new package staged

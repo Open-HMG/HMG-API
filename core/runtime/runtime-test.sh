@@ -44,7 +44,7 @@ check "publish runs" 0 $rc
 check "apps.txt: enabled mods' apps" "dev.example.cam cam
 dev.example.game game" "$(cat $D/state/apps.txt)"
 check "services.txt: hmgapid's lines" "cam recorder system boot yes jar svc/cam.jar dev.example.cam.Main --quiet dir=/storage
-cam watch app:dev.example.cam android no script svc/watch.sh -" "$(grep -v -e '^hmgapi log ' -e '^hmgapi net ' $D/state/services.txt)"
+cam watch app:dev.example.cam android no script svc/watch.sh -" "$(grep -v -e '^hmgapi log ' -e '^hmgapi net ' -e '^hmgapi vehicle ' $D/state/services.txt)"
 has "the network keeper runs while mods are on (it keeps them off cellular)" "hmgapi net root boot yes script" "$(cat $D/state/services.txt)"
 check "usb.txt" "cam Dashcam" "$(cat $D/state/usb.txt)"
 has "missing apk reported" "game: app dev.example.gone: no app/Gone.apk in the mod" "$out"
@@ -134,7 +134,7 @@ has "an app only one mod may own" "left out: zz: app dev.example.cam is already 
 rm -r "$D/mods/zz"
 
 # vehicle readings and the driving restriction
-check "no readings: no vehicle service" "" "$(grep '^hmgapi vehicle ' $D/state/services.txt)"
+check "no readings: the vehicle service still runs (the gear check)" "hmgapi vehicle root android yes jar /system/framework/hmgapi-hook.jar hmgapi.vehicle.Hub" "$(grep '^hmgapi vehicle ' $D/state/services.txt)"
 check "HMG-API's log keeper always runs" "hmgapi log root boot yes jar /system/framework/hmgapi-hook.jar hmgapi.engine.LogKeeper" "$(grep '^hmgapi log ' $D/state/services.txt)"
 mkdir -p "$D/mods/tube/app"
 echo t > "$D/mods/tube/app/T.apk"
@@ -169,11 +169,11 @@ eng plan
 has "plan: a command with its guard" "vehicle  may charge_door (gear in P; once every 5 s) [tube]" "$out"
 has "plan: the startup notice says it needs the owner" "vehicle  may startup_notice (only if the owner allowed it" "$out"
 
-# the owner's MICOM watch keeps the vehicle service running without any mod
+# the owner's MICOM watch: the vehicle service runs without any mod (it always does: the gear check)
 rm -r "$D/mods/tube"; mkdir -p "$D/mods/tube/app"; echo t > "$D/mods/tube/app/T.apk"
 printf '{"id": "tube", "version": "1.0.0", "apps": [{"apk": "app/T.apk", "package": "dev.example.tube"}]}\n' > "$D/mods/tube/mod.json"
 eng publish-state
-check "no readings, no watch: no vehicle service" "" "$(grep '^hmgapi vehicle ' $D/state/services.txt)"
+check "no readings, no watch: the vehicle service still runs (the gear check)" "hmgapi vehicle root android yes jar /system/framework/hmgapi-hook.jar hmgapi.vehicle.Hub" "$(grep '^hmgapi vehicle ' $D/state/services.txt)"
 echo all > "$D/state/micom-watch.txt"
 eng publish-state
 check "MICOM watch on: the vehicle service runs" "hmgapi vehicle root android yes jar /system/framework/hmgapi-hook.jar hmgapi.vehicle.Hub" "$(grep '^hmgapi vehicle ' $D/state/services.txt)"
@@ -315,5 +315,5 @@ rm -r "$D/mods/grid" "$D/settings/hmgapi.json"
 touch "$D/mods/tube/.disabled"
 eng publish-state
 check "mod off: no readings" "" "$(cat $D/state/vehicle.txt)"
-check "... and no vehicle service" "" "$(grep '^hmgapi vehicle ' $D/state/services.txt)"
+check "... and the vehicle service only once (the gear check)" "1" "$(grep -c '^hmgapi vehicle ' $D/state/services.txt)"
 exit $fail

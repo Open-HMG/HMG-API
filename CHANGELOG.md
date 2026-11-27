@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased
+
+- **Restarts, applies and installs only start with the car in P.** A restart takes the reverse
+  camera's picture away for about a minute (Android shows it on these units), and on 2026-11-27 a
+  NEMESIS install (no HMG-API) cut off by a shift into reverse left a unit that didn't start.
+  `hmgapid reboot` (every restart: the app's buttons, the boot steps), `engine apply` and
+  `engine restore` when they change files on `/system` (and so may stop system apps for the
+  swap), `engine update-hmgapi`, and `install.sh`/`uninstall.sh` (every install route) read
+  `gear.park` first. Not in P: refused (exit 75), nothing changed, no override. No reading (the
+  car's map has no gear point, or the vehicle service isn't up yet): `hmgapid reboot` and the
+  engine refuse (exit 76) unless told `--gear-unknown-ok`, which the app passes once the owner
+  says the car is in P; the USB, NEMESIS and adb routes, with no one to ask, warn and go on. The
+  app tells the owner to stay in P until it's done, as does the USB installer's toast.
+- **HMG-API's vehicle service always runs**, not only while a mod reads the car, so every car
+  with a gear point in its map gives the reading the checks above need.
+- **The restart after a boot-time rollback waits for the car to be parked**, in the background
+  (the boot never waits): HMG-API's parked state, or in P with the car off (in P for two minutes
+  when the power status can't be read). Until then the app shows Restart needed; with no gear
+  reading for 10 minutes there's no restart, and the app's Restart asks the owner.
+- **A cut-off install or apply leaves less behind.** `install.sh`, `uninstall.sh` and the USB
+  installer ignore a closed output pipe and hang-ups (a screen that closed under them, an adb
+  that dropped), and sync each file before renaming it into place, so a reset right after never
+  leaves an empty `app_process`. The engine writes down the apps it stops (`state/held.txt`)
+  before `pm disable`, which lasts across restarts; an apply cut off before it turned them on
+  again has them turned on by the next start's `engine recover`. The USB installer's restart
+  waits while the car isn't in P. Tested off-car only: what shifting into reverse does to a
+  running install on a car is still to be checked (`docs/car-test.md`).
+
 ## 1.1.0-rc.10 (2026-11-25)
 
 - **No owner-facing way to force an unknown `app_process`, for now.** An empty `HMGAPI/FORCE`

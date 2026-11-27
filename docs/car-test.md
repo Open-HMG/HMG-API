@@ -294,6 +294,39 @@ adb shell "while true; do hmgapid service-log hmgapi vehicle; sleep 5; done" | g
 3. Optional, at the very end: `./hmgapi-adb.sh uninstall`, then `adb reboot`: the
    unit is stock (the menu has no HMG-API tile; CarPlay/AA wired as stock).
 
+## 10b. Only in P, and what reverse does to a running install
+
+Car on, foot on the brake, somewhere you can shift to R safely. Log capture running
+(`carlog.sh`, plus `adb shell logcat -v time` for the activity manager).
+
+1. The gear checks (fast, nothing changes):
+   - In D (or N): `adb shell hmgapid reboot` → exit 75, "not restarting: the car isn't
+     in P". `adb shell hmgapid engine apply` with a change pending → exit 75, nothing
+     changed (`engine status`). The app's Restart unit and Apply say "Shift to P first".
+   - In P: `adb shell hmgapid vehicle gear.park` → `gear.park 1`; Restart works.
+2. Is there a kernel early camera? Power the unit on (cold, not QuickBoot) and shift to
+   R at once: a camera picture before Android's boot animation ends is the kernel's
+   (`earlycamlog.sh` on the unit hints at one). Note how long the picture is missing
+   after an `hmgapid reboot` in P, then shifting to R: the "about a minute" HMG-API
+   warns of.
+3. **Not tested yet: what reverse does to a running install.** Run each in P, then
+   shift to R a few seconds in, and back to P. For each, write down: does the camera
+   cover the screen; does the screen that started it close (Engineering Mode's OTA
+   screen, NEMESIS Manager, the HMG-API app); does the activity manager kill its process
+   (`am_kill`, `am_proc_died` in the log); does the head unit reset; and does the
+   install finish (its log ends with "installed", `engine status` clean, no
+   `state/journal.json`, no `state/held.txt`).
+   - The app's Apply with a mod that changes an app (so apps are held).
+   - The USB stick route (Engineering Mode > USB Copy > DSP > Update OTA), an update over
+     an installed HMG-API: with the vehicle service running it refuses out of P, so
+     start it in P and shift during "installing".
+   - NEMESIS Manager's install of an HMG-API mod package.
+   HMG-API's own steps are built to survive a closed screen (the engine runs under
+   hmgapid, and the installers ignore a closed pipe or hang-up) and a reset (each file
+   synced, then renamed; a cut-off apply rolled back at the next start, its held apps
+   turned on again). NEMESIS's own installs are not HMG-API's: report what you see to
+   NEMESIS too.
+
 ## Results
 
 Copy this and fill it in:

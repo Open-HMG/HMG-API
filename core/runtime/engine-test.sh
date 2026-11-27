@@ -136,6 +136,52 @@ check "disable modb" 0 $rc
 check "library without modb" "$(md5 $T/lib.a)" "$(md5 $R/system/lib/libtest.so)"
 check "modb's prop gone" "" "$(grep persist.modb $R/system/build.prop || true)"
 
+# ---- only in P (Gear): a change to /system starts only with the car in P; no reading: the owner's go-ahead
+printf '#!/bin/sh\n[ "$*" = "vehicle gear.park" ] || exit 0\ncat "%s/gear.out"\ncase "$(cat "%s/gear.out")" in gear.park*) exit 0 ;; esac\nexit 69\n' "$T" "$T" > $T/hmgapid
+chmod +x $T/hmgapid
+export HMGAPI_HMGAPID=$T/hmgapid
+rm $R/data/hmgapi/mods/modb/.disabled
+LIB_NOW=$(md5 $R/system/lib/libtest.so)
+echo "gear.park 0" > $T/gear.out
+eng apply
+check "not in P: apply refused" 75 $rc
+has "... saying why" "refused: the car isn't in P, and the apply only starts in P" "$out"
+check "... nothing changed" "$LIB_NOW" "$(md5 $R/system/lib/libtest.so)"
+check "... no journal" no "$([ -e $R/data/hmgapi/state/journal.json ] && echo yes || echo no)"
+eng apply --gear-unknown-ok
+check "not in P: refused even with the override" 75 $rc
+eng plan
+check "a plan needs no P" 0 $rc
+echo "the vehicle service isn't running (yet)" > $T/gear.out
+eng apply
+check "no gear reading: apply refused" 76 $rc
+has "... naming the owner's go-ahead" "then go on anyway (--gear-unknown-ok)" "$out"
+check "... nothing changed" "$LIB_NOW" "$(md5 $R/system/lib/libtest.so)"
+echo "gear.park -" > $T/gear.out
+eng apply
+check "the car didn't answer: refused the same" 76 $rc
+eng apply --gear-unknown-ok
+check "no gear reading, with the owner's go-ahead: applied" 0 $rc
+has "... with the warning" "warning: the gear can't be read on this car" "$out"
+check "... modb back in" "$(md5 $T/lib.ab)" "$(md5 $R/system/lib/libtest.so)"
+touch $R/data/hmgapi/mods/modb/.disabled
+echo "gear.park 1" > $T/gear.out
+eng apply
+check "in P: applied" 0 $rc
+has "... the owner told to stay in P" "keep the car in P until the apply is done" "$out"
+check "... modb out again" "$(md5 $T/lib.a)" "$(md5 $R/system/lib/libtest.so)"
+echo "gear.park 0" > $T/gear.out
+eng apply
+check "nothing to change on /system: no gear needed" "0" "$rc"
+# apps an apply stopped while their files changed (pm disable lasts across restarts): an apply
+# cut off before it let them go leaves the list, and recover (the next start) turns them on
+printf 'dev.example.gpm\ndev.example.dipo\n' > $R/data/hmgapi/state/held.txt
+eng recover
+has "recover: the apps a cut-off apply stopped turned on again" "enabled  dev.example.gpm (stopped by an apply that was cut off)" "$out"
+has "... each" "enabled  dev.example.dipo" "$out"
+check "... the list gone" no "$([ -e $R/data/hmgapi/state/held.txt ] && echo yes || echo no)"
+unset HMGAPI_HMGAPID
+
 # ---- trial: undone by recover, or kept
 echo '{"extra": true}' > $R/data/hmgapi/settings/moda.json
 BP_BEFORE=$(md5 $R/system/build.prop)
