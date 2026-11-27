@@ -423,6 +423,10 @@ final class Catalog {
             best.put("download", zip);
             best.put("sums", sums);
             best.put("page", String.valueOf(rel.get("html_url")));
+            String body = rel.get("body") instanceof String ? ((String) rel.get("body")).trim() : "";   // the release notes, for the app
+            if (body.length() > 6000) body = body.substring(0, 6000) + "\n…";
+            if (!body.isEmpty()) best.put("notes", body);
+            else best.remove("notes");
             bv = v;
         }
         if (best == null) return null;
