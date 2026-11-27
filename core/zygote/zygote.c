@@ -30,8 +30,15 @@
  * install-recovery.sh). hmgapid is single-instance (its socket bind): a second
  * start, here or from the boot hook, just exits.
  * Every start writes one line to the kernel log (tag "hmgapi-hook").
- * If the exec fails there is nothing left to fall back to, so this file stays
- * as small as possible.
+ * If the exec fails (the stock copy lost or damaged on /system: a copy that never
+ * reached storage before a power loss), the install's backup of the stock binary,
+ * /data/hmgapi/stock/system/bin/app_process (its md5 checked against stock.txt when
+ * it was taken), is run instead, so Android still starts and an install or
+ * uninstall can put /system right. It's mode 600 (the install's umask 077), so it's
+ * made 700 first; it must start like an ELF binary. Where SELinux refuses an exec
+ * from /data (an Enforcing unit) that fails too, and this returns 127 as before.
+ * Beyond that there is nothing left to fall back to, so this file stays as small
+ * as possible.
  *
  * Builds freestanding for ARM (no libc, raw syscalls). AGPL-3.0-or-later.
  */
@@ -42,6 +49,9 @@ typedef unsigned long ul;
 #endif
 #ifndef KMSG
 #define KMSG "/dev/kmsg"
+#endif
+#ifndef STOCKBAK
+#define STOCKBAK "/data/hmgapi/stock/system/bin/app_process"
 #endif
 #ifndef HOOKDIR
 #define HOOKDIR "/data/hmgapi/hook"
@@ -79,6 +89,7 @@ static long xgetpid(void) { return sys3(20, 0, 0, 0); }
 static void xexit(int c) { sys3(1, c, 0, 0); for (;;) ; }
 static void xsleep(long s) { long ts[2] = { s, 0 }; sys3(162, (long)ts, 0, 0); }
 static void xunlink(const char *p) { sys3(10, (long)p, 0, 0); }
+static long xchmod(const char *p, long mode) { return sys3(15, (long)p, mode, 0); }
 #define O_RDONLY 0
 #define O_WRONLY 1
 #define O_WR 0x241   /* O_WRONLY|O_CREAT|O_TRUNC */
@@ -87,6 +98,14 @@ static ul slen(const char *s) { ul n = 0; while (s[n]) n++; return n; }
 static int seq(const char *a, const char *b) { while (*a && *a == *b) a++, b++; return *a == *b; }
 static int spre(const char *s, const char *p) { while (*p && *s == *p) s++, p++; return !*p; }
 static int exists(const char *p) { long fd = xopen(p, O_RDONLY, 0); if (fd < 0) return 0; xclose(fd); return 1; }
+static int is_elf(const char *p)
+{
+    char m[4]; long fd = xopen(p, O_RDONLY, 0), n;
+    if (fd < 0) return 0;
+    n = xread(fd, m, 4);
+    xclose(fd);
+    return n == 4 && m[0] == 0x7f && m[1] == 'E' && m[2] == 'L' && m[3] == 'F';
+}
 
 static char line[160];
 static ul lpos;
@@ -266,6 +285,13 @@ int main(int argc, char **argv, char **envp)
     if (zygote && !reexec && exists(HMGAPID)) start_hmgapid(envp);
     rc = xexecve(STOCK, argv, env);
     put("<3>hmgapi-hook: exec " STOCK " failed, errno ");
+    putn(-rc);
+    if (!is_elf(STOCKBAK)) { put(", and no stock backup"); flush(); return 127; }
+    put(", exec " STOCKBAK " (the stock backup)");
+    flush();
+    xchmod(STOCKBAK, 0700);
+    rc = xexecve(STOCKBAK, argv, env);
+    put("<3>hmgapi-hook: exec " STOCKBAK " failed, errno ");
     putn(-rc);
     flush();
     (void)slen;

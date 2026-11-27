@@ -17,7 +17,7 @@ chmod +x "$T/stock"
 mkdir -p "$T/hook"
 echo 5e1d0c34-aaaa-4bbb-8ccc-000000000001 > "$T/boot_id"   # one kernel boot, until a test changes it
 . ../../tools/env.sh
-clang $ARM_STATIC -DGUARD_DELAY=1 -DSTOCK="\"$T/stock\"" -DKMSG="\"$T/kmsg\"" -DHOOKDIR="\"$T/hook\"" -DHOOKLIB="\"$T/lib.so\"" -DHMGAPID="\"$T/hmgapid\"" -DBOOTID="\"$T/boot_id\"" \
+clang $ARM_STATIC -DGUARD_DELAY=1 -DSTOCK="\"$T/stock\"" -DSTOCKBAK="\"$T/stockbak\"" -DKMSG="\"$T/kmsg\"" -DHOOKDIR="\"$T/hook\"" -DHOOKLIB="\"$T/lib.so\"" -DHMGAPID="\"$T/hmgapid\"" -DBOOTID="\"$T/boot_id\"" \
   -o "$T/wrap" zygote.c
 fail=0
 check() {  # name, expected-substring, actual
@@ -106,8 +106,32 @@ echo 0 > "$T/hook/starts"
 sleep 2
 check "watcher: no reset after zygote died" "1" "$(cat "$T/hook/starts")"
 
+# the stock copy lost or damaged: the install's stock backup runs instead (mode 600, made 700)
+# the backup: an ARM binary standing in for stock (the wrapper built again, running the script
+# that prints its arguments)
+cp "$T/stock" "$T/stock.sh"
+clang $ARM_STATIC -DSTOCK="\"$T/stock.sh\"" -DSTOCKBAK="\"$T/none\"" -DKMSG="\"$T/kmsg.bak\"" -DHOOKDIR="\"$T/hook\"" -DHOOKLIB="\"$T/lib.so\"" -DHMGAPID="\"$T/hmgapid\"" -DBOOTID="\"$T/boot_id\"" \
+  -o "$T/stockbak" zygote.c
+chmod 600 "$T/stockbak"
+mv "$T/stock" "$T/stock.away"; printf 'short' > "$T/stock"; chmod 755 "$T/stock"   # cut short: no binary, not a script
+: > "$T/kmsg"; out=$(LD_PRELOAD=old.so "$T/wrap" -Xzygote --zygote 2>/dev/null)
+check "damaged stock copy: the stock backup runs, with the same arguments" "ARGS:-Xzygote --zygote" "$out"
+check "... logged, with the errno" "failed, errno 8, exec $T/stockbak (the stock backup)" "$(cat "$T/kmsg")"
+check "... the backup made executable (it's 600 after the install)" "-rwx------" "$(ls -l "$T/stockbak" | cut -c1-10)"
 rm "$T/stock"
+: > "$T/kmsg"; out=$(LD_PRELOAD=old.so "$T/wrap" --zygote 2>/dev/null)
+check "stock copy gone: the stock backup runs" "ARGS:--zygote" "$out"
+printf 'not an ELF' > "$T/stockbak"
+: > "$T/kmsg"; set +e; "$T/wrap" --zygote 2>/dev/null; rc=$?; set -e
+check "backup isn't a binary: not run, exits 127" "127" "$rc"
+check "... logged" "failed, errno 2, and no stock backup" "$(cat "$T/kmsg")"
+rm "$T/stockbak"
 : > "$T/kmsg"; set +e; "$T/wrap" --zygote 2>/dev/null; rc=$?; set -e
 check "exec failure exits 127" "127" "$rc"
-check "exec failure logged" "failed, errno 2" "$(cat "$T/kmsg")"
+check "exec failure logged" "failed, errno 2, and no stock backup" "$(cat "$T/kmsg")"
+{ printf '\177ELF'; printf 'garbage'; } > "$T/stockbak"; chmod 600 "$T/stockbak"
+: > "$T/kmsg"; set +e; "$T/wrap" --zygote 2>/dev/null; rc=$?; set -e
+check "a backup that won't exec either: exits 127" "127" "$rc"
+check "... both failures logged" "2" "$(grep -c 'failed, errno' "$T/kmsg")"
+check "... the backup's with its errno" "exec $T/stockbak failed, errno" "$(cat "$T/kmsg")"
 exit $fail
