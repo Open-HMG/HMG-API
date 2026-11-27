@@ -85,6 +85,8 @@ three repositories, and what owners are told. Rules are [releasing.md](releasing
 - [ ] Wrong order on purpose: `projection-tbt` next to 2.2.x shows the conflict and Wireless
       comes back once it's 3.0.
 - [ ] `projection-tbt` alone, wired phone. Wireless 3.0 alone: the car's navigation keeps the cluster.
+- [ ] Turn-by-turn settings changed in Wireless 2.x are the same in `projection-tbt` after its
+      first start (its one-time take-over, `WirelessImport`).
 - [ ] CarPlay after the Bluetooth-to-Wi-Fi handover: route guidance keeps coming (the two mods'
       agreement, Wireless `docs/tbt-contract.md`).
 - [ ] The HMG-API app installing both from one stick: which goes first, and what the owner
@@ -133,8 +135,8 @@ three repositories, and what owners are told. Rules are [releasing.md](releasing
 | Where | Text |
 |---|---|
 | Wireless `mod.json` description (its catalogue entry, the Community mods page) | From 3.0, turn-by-turn is its own mod; update this one first, then install that one |
-| `projection-tbt` `mod.json` description | Part of Wireless until 3.0; update Wireless to 3.0 first, then install this one |
-| Wireless README, "Updating from 2.x" | the order, why (the conflict), settings set again, `egmp-aa-ev`, going back |
+| `projection-tbt` `mod.json` description | Part of Wireless until 3.0; update Wireless to 3.0 first (next to 2.x it turns Wireless off) |
+| Wireless README, "Updating from 2.x" | the order, why (the conflict), settings taken over by `projection-tbt` once, `egmp-aa-ev`, going back |
 | Turn-by-turn README, "Updating from the Wireless mod 2.x" | the same, from this side; wired-only cars install it alone |
 | Both first release notes | the order, what to test, going back (remove `projection-tbt` first) |
 | Wiki: Home, Installing HMG-API (NEMESIS packages table) | turn-by-turn listed on its own; `projection-tbt`'s NEMESIS conflicts |
