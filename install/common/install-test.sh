@@ -124,6 +124,43 @@ has "update over itself" "HMG-API's wrapper is in place" "$out"
 check "update keeps the stock copy" "$(md5sum < $T/real)" "$(md5sum < $R/system/bin/app_process.hmgapi-stock)"
 check "update keeps one boot hook" 1 "$(grep -c 'HMGAPI_HOOK begin' $R/system/etc/install-recovery.sh)"
 check "update keeps the owner's settings" '{"updates": true}' "$(cat $R/data/hmgapi/settings/hmgapi.json)"
+has "... checks the stock copy by md5" "app_process.hmgapi-stock: stock (" "$out"
+
+# an update checks the stock copy by the md5 of the whole file, as a new install checks
+# app_process: one that only starts like a binary (cut short, zero-filled, changed) comes back
+# from the stock backup, and with no stock backup it's refused, nothing changed
+K=$R/system/bin/app_process.hmgapi-stock; KB=$R/data/hmgapi/stock/system/bin/app_process
+dd if=$T/real of=$T/bad.short bs=1024 count=2 2>/dev/null                  # cut short: still starts with ELF
+dd if=/dev/zero of=$T/bad.zero bs=1 count=$(($(wc -c < $T/real))) 2>/dev/null   # zero-filled, the same size
+{ cat $T/real; echo x; } > $T/bad.elf                                      # ELF, the wrong md5
+for bad in short zero elf; do
+    cp $T/bad.$bad $K
+    run $P/install.sh $P
+    check "update, stock copy $bad: works" 0 $rc
+    has "... said: put back from the stock backup" "app_process.hmgapi-stock md5 $(md5sum < $T/bad.$bad | cut -c1-32) isn't a known stock build (a copy cut short or damaged?): putting it back from the stock backup (" "$out"
+    check "... the stock copy is stock again" "$(md5sum < $T/real)" "$(md5sum < $K)"
+    check "... the backup kept" "$(md5sum < $T/real)" "$(md5sum < $KB)"
+    check "... the wrapper in place" "$(md5sum < $P/app_process)" "$(md5sum < $R/system/bin/app_process)"
+done
+mv $KB $T/bak.away
+for bad in short zero elf; do
+    cp $T/bad.$bad $K; B4=$(tree)
+    run $P/install.sh $P
+    check "update, stock copy $bad, no stock backup: refused" 1 $rc
+    has "... said" "app_process.hmgapi-stock, the stock copy HMG-API's wrapper runs, has md5 $(md5sum < $T/bad.$bad | cut -c1-32), which isn't a known stock build (it may have been cut short or damaged), and there's no stock backup to put it back from, so nothing was changed." "$out"
+    check "... names no way to force it" "" "$(echo "$out" | grep -i force || true)"
+    check "... /system unchanged" "$B4" "$(tree)"
+done
+cp $T/bad.short $T/bak.bad; mv $T/bak.bad $KB; cp $T/bad.elf $K   # a backup that isn't stock either
+run $P/install.sh $P
+check "update, stock copy and backup both unknown: refused" 1 $rc
+cp $T/bad.elf $KB   # a forced install of a build stock.txt doesn't know: both copies the same
+export HMGAPI_FORCE=1; run $P/install.sh $P; unset HMGAPI_FORCE
+check "... HMGAPI_FORCE=1 (maintainers, over adb): goes on" 0 $rc
+has "... with a warning" "WARNING: app_process.hmgapi-stock md5 $(md5sum < $T/bad.elf | cut -c1-32) isn't a known stock build" "$out"
+mv $T/bak.away $KB; cp $T/real $K
+run $P/install.sh $P
+check "stock copy and backup stock again: update works" "0|$(md5sum < $T/real)" "$rc|$(md5sum < $K)"
 
 # the app's install with Android up (stand-ins for pm and the rest)
 rm -f $R/data/hmgapi/public/HmgApi.apk; calls >/dev/null
