@@ -132,6 +132,6 @@ check "exec failure logged" "failed, errno 2, and no stock backup" "$(cat "$T/km
 { printf '\177ELF'; printf 'garbage'; } > "$T/stockbak"; chmod 600 "$T/stockbak"
 : > "$T/kmsg"; set +e; "$T/wrap" --zygote 2>/dev/null; rc=$?; set -e
 check "a backup that won't exec either: exits 127" "127" "$rc"
-check "... both failures logged" "2" "$(grep -c 'failed, errno' "$T/kmsg")"
-check "... the backup's with its errno" "exec $T/stockbak failed, errno" "$(cat "$T/kmsg")"
+# (each log line goes to the start of $T/kmsg, a plain file here, so only the last is left)
+check "... the backup's failure logged, with its errno" "exec $T/stockbak failed, errno" "$(cat "$T/kmsg")"
 exit $fail
