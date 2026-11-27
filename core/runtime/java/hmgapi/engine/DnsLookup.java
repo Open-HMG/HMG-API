@@ -1,55 +1,58 @@
 package hmgapi.engine;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Method;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
 /**
- * A host's IPv4 addresses, asked of home Wi-Fi's own DNS server (dhcp.wlan0.dns1) over UDP, for the
- * engine's downloads (NativeFetch). Not the system resolver: the engine runs as root outside netd's
- * per-app setup, where lookups would go to the car's carrier DNS on mobile data. wifi.sh routes
- * wlan0's DNS servers through wlan0, so this query goes out on home Wi-Fi or not at all.
+ * A host's IPv4 addresses, asked of home Wi-Fi's own DNS server, for the engine's downloads
+ * (NativeFetch). Not the system resolver: the engine runs as root outside netd's per-app setup,
+ * where lookups would go to the car's carrier DNS on mobile data. The server is the one in
+ * wifi.sh's lease (/data/hmgapi/wifi/lease, "<gateway> <dns>"), which is there only while home
+ * Wi-Fi's route is up (dhcp.wlan0.dns1 can be left from an earlier join), and the query goes
+ * through an Asker: on the unit the fetch library's socket, marked for home Wi-Fi and bound to
+ * wlan0, so it goes out on home Wi-Fi or not at all.
  */
 final class DnsLookup {
     private DnsLookup() {}
 
     static final int TRIES = 3, TIMEOUT_MS = 3000;
+    static final String LEASE = "/data/hmgapi/wifi/lease";
 
-    /** the server: home Wi-Fi's DHCP DNS, or its gateway; null when home Wi-Fi gave neither */
-    static String server(Engine e) {
-        for (String p : new String[] {"dhcp.wlan0.dns1", "dhcp.wlan0.gateway"}) {
-            String v = e.getprop(p);
-            if (v != null && v.matches("\\d{1,3}(\\.\\d{1,3}){3}")) return v;
+    /** one query's exchange: the answer's bytes, or an IOException */
+    interface Asker {
+        byte[] ask(String server, byte[] query) throws IOException;
+    }
+
+    /** the server: home Wi-Fi's DNS from wifi.sh's lease (its gateway when the lease has none); null while home Wi-Fi's route isn't up */
+    static String server(String root) {
+        String[] f;
+        try {
+            f = Engine.read(new File(root + LEASE)).trim().split("\\s+");
+        } catch (IOException x) {
+            return null;
+        }
+        for (int i = f.length - 1; i >= 0; i--) {
+            if (f[i].matches("\\d{1,3}(\\.\\d{1,3}){3}")) return f[i];
         }
         return null;
     }
 
     /** host's A records (dotted), first answer first; empty if none */
-    static List<String> lookup(String server, String host) throws IOException {
+    static List<String> lookup(String server, String host, Asker asker) throws IOException {
         Random rnd = new Random();
         IOException last = null;
         for (int t = 0; t < TRIES; t++) {
             int id = rnd.nextInt(0x10000);
             byte[] q = query(id, host);
-            DatagramSocket s = new DatagramSocket();
             try {
-                s.setSoTimeout(TIMEOUT_MS);
-                s.connect(InetAddress.getByAddress(dotted(server)), 53);
-                s.send(new DatagramPacket(q, q.length));
-                byte[] r = new byte[1500];
-                DatagramPacket p = new DatagramPacket(r, r.length);
-                s.receive(p);
-                return answers(r, p.getLength(), id);
+                byte[] r = asker.ask(server, q);
+                return answers(r, r.length, id);
             } catch (IOException e) {
                 last = e;
-            } finally {
-                s.close();
             }
         }
         throw last != null ? last : new IOException("no answer");
@@ -103,12 +106,5 @@ final class DnsLookup {
 
     private static int u16(byte[] r, int off) {
         return ((r[off] & 0xff) << 8) | (r[off + 1] & 0xff);
-    }
-
-    private static byte[] dotted(String a) {
-        String[] p = a.split("\\.");
-        byte[] b = new byte[4];
-        for (int i = 0; i < 4; i++) b[i] = (byte) Integer.parseInt(p[i]);
-        return b;
     }
 }
