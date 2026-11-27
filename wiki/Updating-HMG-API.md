@@ -2,18 +2,31 @@
 
 Takes about 2 minutes. Park the car and keep it on (the head unit restarts once).
 
+**READ THE RELEASE NOTE OF THE VERSION YOU'RE INSTALLING BEFORE PROCEEDING**
+
+**AT YOUR OWN RISK**
+
 **Which download?** Get it from the [Releases](https://github.com/Open-HMG/HMG-API/releases) page:
 
 | You have | Use | Steps |
 |---|---|---|
-| HMG-API Update Package (Starting with 1.0.x) | `hmgapi-<version>-update.zip` | [HMG-API UPDATE](#hmg-update) |
-| NEMESIS | `hmgapi-<version>-nemesis.zip` | [NEMESIS](#nemesisupdate) |
-| NEMESIS Package | `hmgapi-<version>-nemesis-package.zip` | [NEMESIS UPDATE PACKAGE](#nemesisupdatepackage) |
+| HMG-API Update Package (Starting with 1.0.x) | `hmgapi-<version>-update.zip` | [HMG-API UPDATE](#hmg-api-update) |
+| NEMESIS | `hmgapi-<version>-nemesis.zip` | [NEMESIS](#nemesis) |
+| NEMESIS Package | `hmgapi-<version>-nemesis-package.zip` | [NEMESIS PACKAGE](#nemesispackage) |
 
 
 All install the same thing.
 
 ## HMG-API UPDATE
+
+If you have HMG-API 1.0.x or earlier only
+1. Create a folder named `HMGAPO/updates` on the root of the USB stick.
+2. Copy the file `hmgapi-<version>-update.zip`in that folder.
+3. Connect the USB to the car and open the **HMG-API** app.
+4. Click on **Check USB updates**.
+5. Scroll to **HMG-API**, click **Update**.
+6. HMG-API will close. Wait a minute.
+7. Open HMG-API and click **Restart Head Unit**.
 
 ## NEMESIS
 
@@ -26,7 +39,7 @@ Needs NEMESIS 1.16 or newer (update NEMESIS first if Manager has no Package Stor
    stick's list: HMG-API and the mods it comes with. Update **HMG-API**.
 3. Restart the head unit when it says so, and take the stick out.
 
-## NEMESIS UPDATE PACKAGE
+## NEMESIS PACKAGE
 
 Information comming soon
 
