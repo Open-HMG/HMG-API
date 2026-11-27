@@ -11,6 +11,34 @@
   copy is made. The uninstall was already safe (stock goes back over existing files, then
   `sync`). The same gap in NEMESIS 1.17's `app_process.real` was reported to NEMESIS.
   Tested off-car only.
+- **The boot hook keeps the boot scripts' other lines as they are.** Putting HMG-API's block
+  into NEMESIS's `install-recovery.sh` and the stock `qb_runtime.sh` (every install, and
+  `hook-check.sh` at boot) wrote each line again with `echo`, which expands backslashes in the
+  unit's mksh as in dash: `\\` became `\`, and a `\c` ended the output there, so a line like
+  `V="x\cY"; echo ok` lost its closing quote and joined the next one, and the script stopped
+  running. Lines are now written with mksh's `print -r` (in a shell without it, as the
+  off-car tests' dash, with `echo` and every backslash doubled), checked on a test line when
+  the script starts, and the new file is checked before it goes in: without the block it must
+  be the file as it was, or the file is left alone. Tested off-car only (dash and macOS `sh`;
+  CI also runs the checks in mksh), not yet on a car.
+- **An update checks the stock copy by md5.** A new install checks `app_process` against
+  `stock.txt`, but an update only checked that `app_process.hmgapi-stock` started like a
+  binary, so a copy cut short, zero-filled or otherwise damaged passed, and the next start had
+  no zygote. The catalogue's `engine update hmgapi` runs the same installer. Now a stock copy
+  that isn't a known build comes back from the stock backup when that is one, and with no
+  stock backup the update is refused with nothing changed, as a new install is
+  (`HMGAPI_FORCE=1` stays for maintainers). Tested off-car only.
+- **The zygote wrapper falls back to the stock backup.** When the stock copy won't run (lost
+  or damaged on `/system`), the wrapper runs the install's backup of the stock binary,
+  `/data/hmgapi/stock/system/bin/app_process` (made executable first, and only if it starts
+  like an ELF binary), so Android still starts and an install or uninstall can put `/system`
+  right. Where SELinux refuses an exec from `/data` (an Enforcing unit) it exits as before.
+  Not yet tested on a car.
+- **Hooks stay off on a Dalvik other than the EV6's.** The hook runtime's struct offsets come
+  from the EV6's libdvm. Before the first hook it now reads them back from Bridge's own
+  methods (class, name, shorty, flags, argument count, native function), the primitive types
+  and an array's length; on a mismatch it logs which one and leaves hooks off, so the unit runs
+  stock instead of crashing each app as it starts. Not yet tested on a car.
 
 ## 1.1.0-rc.10 (2026-11-25)
 
