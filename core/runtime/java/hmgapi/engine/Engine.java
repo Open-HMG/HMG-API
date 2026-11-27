@@ -146,7 +146,7 @@ public final class Engine {
     static java.io.RandomAccessFile lockFile;   // held open (the lock goes with the process)
 
     boolean lock(String cmd) throws IOException, InterruptedException {
-        if ("status".equals(cmd) || "map".equals(cmd) || "problem".equals(cmd) || "1".equals(env(LOCKED_ENV, null))) return true;
+        if ("status".equals(cmd) || "map".equals(cmd) || "problem".equals(cmd) || "boot-guard".equals(cmd) || "1".equals(env(LOCKED_ENV, null))) return true;
         File f = new File(stateDir, "engine.lock");
         java.io.RandomAccessFile raf = new java.io.RandomAccessFile(f, "rw");
         long wait = Long.parseLong(env("HMGAPI_LOCK_WAIT", "900")) * 1000000000L, start = System.nanoTime();
@@ -374,6 +374,7 @@ public final class Engine {
         if ("map-car".equals(cmd)) return MapProbe.run(this, args);
         if ("report".equals(cmd)) return Report.run(this, args.length > 1 && "--usb".equals(args[1]));
         if ("problem".equals(cmd)) return ProblemLog.run(this, args);
+        if ("boot-guard".equals(cmd)) return BootGuard.run(this, args);
         if ("usb-scan".equals(cmd)) return UsbUpdates.scan(this);
         if ("publish-state".equals(cmd)) return LiveState.publish(this);
         if ("apps".equals(cmd)) return ModApps.sync(this);
@@ -437,7 +438,7 @@ public final class Engine {
             if (!map.runnable) out.add("hooks are off on this car (" + map.reason + "): mods apply without their hooks");
         }
         if (!restoreAll && !"plan".equals(cmd) && !"apply".equals(cmd)) {
-            out.add("usage: engine plan | apply [--trial] | keep | restore | status | recover | firmware-reset | install <zip|dir> | remove <id> | nemesis-sync | map | map-car [--local [--if-needed] | --write | --forget] | verify-map | report [--usb] | usb-scan | update-hmgapi <zip> | publish-state | apps");
+            out.add("usage: engine plan | apply [--trial] | keep | restore | status | recover | firmware-reset | install <zip|dir> | remove <id> | nemesis-sync | map | map-car [--local [--if-needed] | --write | --forget] | verify-map | report [--usb] | boot-guard [reset] | usb-scan | update-hmgapi <zip> | publish-state | apps");
             return 2;
         }
         Plan p = plan(restoreAll, force);

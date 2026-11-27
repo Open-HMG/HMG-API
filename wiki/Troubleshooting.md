@@ -45,16 +45,30 @@ The first time a mod uses a car command, HMG-API asks you on screen. If you said
 
 ## The head unit restarted over and over
 
-When Android fails to start three times during one boot with HMG-API's hooks (a
-hook crashing the system), or the head unit restarts six times in a row less than
-two minutes after starting, HMG-API turns its hooks off by itself so the head unit
-starts normally, and the app says the hooks aren't running. Turn off or remove the
-mod you added last, then reset the counter and restart: reinstall HMG-API from the
-app (Check USB updates, Reinstall HMG-API), or over adb:
+HMG-API's boot guard turns its hooks off by itself, so the head unit starts
+normally without them, when either happens:
+
+- Android has to start again three times in one boot of the head unit with
+  HMG-API's hooks: it crashed or hung each time. Any time counts, not only while
+  it starts: a phone connecting, CarPlay starting, an hour into a drive.
+- Six starts in a row with the hooks don't get to the home screen (the head unit
+  restarted or was switched off before, or it hung on a black screen).
+
+A start counts as good once the home screen has been up for 30 seconds. A hang
+before Android gets going (no system server after two minutes) is stopped and
+counts as a failed start.
+
+The hooks then stay off, through restarts, until you reset the guard. The app
+says "Hooks off: boot guard" at the top; tap it to see which limit was reached.
+Turn off or remove the mod you added or changed last, then tap **Reset and
+restart**. Reinstalling HMG-API resets it too, or over adb:
 
 ```
-adb shell "hmgapid sh 'echo 0 > /data/hmgapi/hook/starts; rm -f /data/hmgapi/hook/boot'"
+adb shell hmgapid engine boot-guard reset
 ```
+
+and restart the head unit. If Android fails again, the guard turns the hooks off
+again; a [Car Report](Car-Report) helps find which mod.
 
 ## A mod isn't doing anything
 
