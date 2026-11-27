@@ -121,7 +121,7 @@ final class Mods {
      */
     @SuppressWarnings("unchecked")
     static synchronized void lateLoad(String id, LoadedApp app, Map<String, Object> state, java.util.Set<String> trail) {
-        if (loaders.containsKey(id) || !trail.add(id)) return;
+        if (Bridge.modsOff || loaders.containsKey(id) || !trail.add(id)) return;   // never in a protected process
         Map<String, Object> mods = (Map<String, Object>) state.get("mods");
         Map<String, Object> s = (Map<String, Object>) mods.get(id);
         if (s == null || !Boolean.TRUE.equals(s.get("enabled")) || !Boolean.TRUE.equals(s.get("live"))) return;
@@ -439,6 +439,7 @@ final class Mods {
     }
 
     static void appLoaded(LoadedApp app) {
+        if (Bridge.modsOff) return;   // a protected process (hmgapi.engine.Protected): no mod's appLoaded
         try {
             if (app.context != null) DexCacheCleanup.reconcile(app.context.getDir("hmgapi-dex", 0), installedIds);
         } catch (Exception ignored) {

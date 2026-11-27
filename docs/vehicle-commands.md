@@ -39,7 +39,7 @@ Conditioning: whether the car's own navigation overrides it while routing.
 | 3 | Steering wheel heat on/off | `VRManager.set_StrgWhlHeated_Cmd_AVN(int)` (`IVRService` 16) | Cold-start Heat | on/off only |
 | 4 | Battery conditioning | `HEVManager.setBattCondEvStation(int,int)`, `setBattCondRouteDis(int)`, `setBattCondRemainTime(int)` (`IHEVService` 62/65/66) | Launchpad (manual), EGMP (automatic) | one shared state; a manual stop wins; logged with the mod |
 | 5 | Ambient light colour and brightness | `VehicleInfoManager.setSMLConfiguration(int,int)`, `setSMLRGB(byte[],byte[],byte[])` (`ISystemService` 77/78) | Ambient Sound | a lease: one holder; the owner's colour back when it ends |
-| 6 | Parking guide lines on/off | `PgsManager.requestGuideLineState(int)` (`IPgsService` 33; read: 59) | Rear Dashcam | restore the previous state; only while the camera is the mod's |
+| 6 | Parking guide lines on/off | `PgsManager.requestGuideLineState(int)` (`IPgsService` 33; read: 59) | Rear Dashcam | restore the previous state (kept on disk: back after a restart or the mod's removal, and at uninstall); only while the camera is the mod's |
 | 7 | Startup notice dismiss | `IMicomFactoryService.hideConsentScreen()` (`com.hkmc.factory` 82) | Factory82 | see below: needs your call |
 
 Reads used alongside them (not commands, no review needed beyond mapping): gear in

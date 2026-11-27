@@ -76,6 +76,8 @@ public final class Hub {
     // ---- car events (EventRun, Parking): state/events.txt, the owner's rule in settings/park_rule
 
     static final String STATE = "/data/hmgapi/state/";
+    /** the guide lines' stock state while a mod has changed them (Commands.Car.linesKept) */
+    static final String LINES_STOCK = STATE + hmgapi.engine.Vehicle.LINES_STOCK;
     static final String PARK_RULE = "/data/hmgapi/settings/park_rule";
     static final String ACTION = "hmgapi.intent.action.CAR_EVENT";
     static final Parking parking = new Parking();
@@ -314,12 +316,21 @@ public final class Hub {
         if (!Points.ready()) {
             System.out.println("vehicle: no good hook map for this car; every reading answers -");
         }
+        if (args.length > 0 && "restore-lines".equals(args[0])) {
+            // the uninstaller (Android up): the guide lines' stock state back, if a mod changed them
+            commands = new Commands(new CarServices());
+            commands.start();
+            boolean done = commands.linesPending == 0;
+            System.out.println(done ? "vehicle: guide lines: nothing left to restore" : "vehicle: guide lines: not restored (" + LINES_STOCK + " kept)");
+            System.exit(done ? 0 : 1);
+        }
         try {
             hcan = new dalvik.system.PathClassLoader(HCAN_JAR, Hub.class.getClassLoader());
         } catch (Throwable t) {
             System.out.println("vehicle: no " + HCAN_JAR + ": " + t);
         }
         commands = new Commands(new CarServices());
+        commands.start();   // guide lines a mod held when this service or the unit last stopped: back to stock
         final MicomWatch watch = new MicomWatch();
         checkSession();
         callbacks.ensure();
@@ -734,6 +745,35 @@ public final class Hub {
         public int guideLines() { return num(call(get("pgs"), "framework.pgs_service.guide_lines")); }
 
         public void setGuideLines(int state) { run(get("pgs"), "framework.pgs_service.request_guide_lines", state); }
+
+        public int linesKept() {
+            try {
+                String[] w = hmgapi.engine.Engine.read(new java.io.File(LINES_STOCK)).trim().split(" ");
+                return Integer.parseInt(w[0]);
+            } catch (Exception e) {
+                return 0;   // none kept (or unreadable: nothing to put back)
+            }
+        }
+
+        public void keepLines(int state, String mod) {
+            java.io.File f = new java.io.File(LINES_STOCK), tmp = new java.io.File(LINES_STOCK + ".tmp");
+            if (state == 0) {
+                f.delete();
+                return;
+            }
+            try {
+                java.io.FileOutputStream o = new java.io.FileOutputStream(tmp);
+                try {
+                    o.write((state + " " + (mod == null ? "-" : mod) + "\n").getBytes("UTF-8"));
+                    o.getFD().sync();
+                } finally {
+                    o.close();
+                }
+                if (!tmp.renameTo(f)) System.out.println("vehicle: can't keep the guide lines' stock state in " + LINES_STOCK);
+            } catch (Exception e) {
+                System.out.println("vehicle: can't keep the guide lines' stock state: " + e);
+            }
+        }
 
         private final java.util.concurrent.atomic.AtomicInteger noticeGen = new java.util.concurrent.atomic.AtomicInteger();
 
