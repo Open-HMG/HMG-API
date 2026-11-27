@@ -12,7 +12,11 @@ UNIT_SH=${UNIT_SH:-$(command -v mksh || command -v bash)}
 CP=$(mktemp -d)
 sh tools/engine-classes.sh "$CP"
 javac --release 8 -cp "$CP" -d "$CP" core/runtime/test/hmgapi/engine/WifiApTest.java
-java -cp "$CP" hmgapi.engine.WifiApTest
+# WifiAp.crc's chown system:wifi: a stand-in that fails only for a "chownfail" path (the test's failure case)
+CB=$(mktemp -d)
+printf '#!/bin/sh\ncase "$*" in *chownfail*) echo "chown: not permitted" >&2; exit 1 ;; esac\nexit 0\n' > "$CB/chown"; chmod +x "$CB/chown"
+PATH=$CB:$PATH java -cp "$CP" hmgapi.engine.WifiApTest
+rm -rf "$CB"
 T=$(mktemp -d)
 cleanup() { r=$?; [ $r != 0 ] && [ -z "$done" ] && echo "FAIL  stopped (exit $r) after: ${last:-the start}"; [ -f "$T/fake/fw/wpa.sleep" ] && kill "$(cat "$T/fake/fw/wpa.sleep")" 2>/dev/null || true; rm -rf "$T" "$CP"; }
 trap cleanup EXIT
@@ -209,7 +213,9 @@ case "$3 $4" in
         fi ;;
     "client on") : > "$FW/client"; echo running > "$FW/props/init.svc.wpa_supplicant"; echo "client on" ;;
     "client off") rm -f "$FW/client"; echo stopped > "$FW/props/init.svc.wpa_supplicant"; echo "client off" ;;
-    "crc "*) echo crc >> "$FW/crc.log"; echo 01234567 ;;
+    "crc "*) echo crc >> "$FW/crc.log"
+        [ -f "$FW/crc.fail" ] && { echo "checksum not written: chown system:wifi: exit 1"; exit 1; }
+        echo 01234567 ;;
 esac
 S
 printf '#!/bin/sh\n:\n' > "$F/bin/chown"
@@ -271,18 +277,33 @@ check "forget" "forgotten: Cafe" "$(verb forget Cafe)"
 check "... gone, the others kept" "Cascadia
 Willows" "$(verb saved | sort)"
 check "seen: nothing before home Wi-Fi was on" "" "$(verb seen)"
+: > "$F/fw/crc.fail"
+out=$(HMGAPI_WIFI_PSK= verb join Cafe)
+has "join: a checksum that can't be written is said" "the car's Wi-Fi checksum not updated, so its Wi-Fi client may not start: checksum not written: chown" "$out"
+has "... the network still saved" "saved: Cafe" "$out"
+verb forget Cafe >/dev/null; rm "$F/fw/crc.fail"
 mv "$NET" "$NET.keep"; mkdir -p "$X/system/etc/wifi"; printf 'update_config=1\nctrl_interface=wlan0\npmf=1\n' > "$X/system/etc/wifi/wpa_supplicant.conf"
-HMGAPI_WIFI_PSK=first-net-key verb join First >/dev/null
+# put_net's chown says whether a config was already there: join writes nothing of its own before put_net
+printf '#!/bin/sh\n[ -n "$NETCHK" ] && { [ -e "$NETCHK" ] && echo there || echo none; } >> "$FW/net.before"\nexit 0\n' > "$F/bin/chown"
+: > "$F/fw/net.before"
+NETCHK=$NET HMGAPI_WIFI_PSK=first-net-key verb join First >/dev/null
+check "join with no config yet: no config of ours before put_net" none "$(cat "$F/fw/net.before")"
+printf '#!/bin/sh\n:\n' > "$F/bin/chown"
 has "join with no config yet: started from the car's template" "pmf=1" "$(cat "$NET")"
 has "... with the network" 'ssid="First"' "$(cat "$NET")"
+check "... the template's lines first, as the car's library writes them" "update_config=1" "$(sed -n 1p "$NET")"
+check "... Android's mode" "-rw-rw----" "$(ls -l "$NET" | cut -c1-10)"
 mv "$NET.keep" "$NET"
 
 # parked: the hotspot off, the car's client on
 echo "wpa_state=SCANNING" > "$F/fw/wpa.status"
 : > "$F/fw/apps.log"
+: > "$F/fw/crc.fail"
 log=$(wk)
+rm "$F/fw/crc.fail"
 has "parked: switched at once" "the car off: the hotspot off, the car's Wi-Fi client on" "$log"
 has "... the checksum checked before the client goes on" crc "$(cat "$F/fw/crc.log")"
+has "... a checksum that can't be written: in the keeper's log, not just \"searching\"" "the car's Wi-Fi checksum not updated" "$log"
 check "... the hotspot off" no "$([ -f "$F/fw/ap" ] && echo yes || echo no)"
 has "... through Android's Wi-Fi service" "hmgapi.engine.WifiAp client on" "$(cat "$F/fw/apps.log")"
 check "... looking" searching "$(state)"

@@ -8,7 +8,10 @@
   never started ("Wi-Fi will not be enabled") and home Wi-Fi stayed "searching". Adding or
   forgetting a network now updates it, and it's checked before each switch to home Wi-Fi.
   A first network no longer needs `printf` (not on the unit): the config starts from the car's
-  own template.
+  own template, and the whole text is built before the one write that sets Android's owner and
+  mode. A checksum that can't be written (its `chown` or `chmod` failing) is said in the
+  keeper's log and in the answer to adding or forgetting a network, instead of home Wi-Fi only
+  staying "searching".
 
 ## 1.1.0-rc.10 (2026-11-25)
 

@@ -91,7 +91,8 @@ public final class WifiAp {
      * wpa_supplicant_crc32.conf next to the networks file: the file's CRC-32, 8 upper-case hex
      * digits, no newline. If it doesn't match (any edit not made through Android's Wi-Fi settings),
      * the library logs "Wi-Fi will not be enabled" and the client never starts. Written only when
-     * it differs, owned as the library makes it (system:wifi 660). Prints the checksum.
+     * it differs, owned as the library makes it (system:wifi 660); a chown or chmod that fails is an
+     * error and leaves the old file as it was. Prints the checksum.
      */
     static int crc(java.io.File conf) throws Exception {
         if (!conf.isFile()) {
@@ -111,12 +112,27 @@ public final class WifiAp {
             } finally {
                 o.close();
             }
-            Engine.child(new ProcessBuilder("chown", "system:wifi", t.getPath())).start().waitFor();
-            Engine.child(new ProcessBuilder("chmod", "660", t.getPath())).start().waitFor();
-            if (!t.renameTo(f)) throw new java.io.IOException("can't write " + f);
+            try {
+                run("chown", "system:wifi", t.getPath());
+                run("chmod", "660", t.getPath());
+                if (!t.renameTo(f)) throw new java.io.IOException("can't write " + f);
+            } finally {
+                t.delete();   // gone already once renamed
+            }
         }
         System.out.println(want);
         return 0;
+    }
+
+    /** a tool the checksum file needs (chown, chmod): its failure, with what it said, is an IOException */
+    private static void run(String... cmd) throws Exception {
+        Process p = Engine.child(new ProcessBuilder(cmd).redirectErrorStream(true)).start();
+        String said = new String(Engine.readAll(p.getInputStream()), "UTF-8").trim();
+        int rc = p.waitFor();
+        if (rc == 0) return;
+        StringBuilder b = new StringBuilder();
+        for (String c : cmd) b.append(b.length() == 0 ? "" : " ").append(c);
+        throw new java.io.IOException(b + ": exit " + rc + (said.length() == 0 ? "" : " (" + said + ")"));
     }
 
     /**
@@ -125,7 +141,16 @@ public final class WifiAp {
      */
     public static void main(String[] args) throws Exception {
         String v = args.length > 0 ? args[0] : "";
-        if ("crc".equals(v) && args.length == 2) System.exit(crc(new java.io.File(args[1])));
+        if ("crc".equals(v) && args.length == 2) {
+            int rc;
+            try {
+                rc = crc(new java.io.File(args[1]));
+            } catch (Exception x) {   // one line for the keeper's log, not a stack trace
+                System.out.println("checksum not written: " + x.getMessage());
+                rc = 1;
+            }
+            System.exit(rc);
+        }
         boolean client = "client".equals(v) && args.length == 2 && ("on".equals(args[1]) || "off".equals(args[1]));
         boolean ensure = "ensure-projection".equals(v) && args.length == 1;
         if (!(("restart".equals(v) || "stop".equals(v)) && args.length == 1) && !("start".equals(v) && args.length == 2) && !client && !ensure) {
