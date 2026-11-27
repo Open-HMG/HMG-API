@@ -8,7 +8,10 @@
   never started ("Wi-Fi will not be enabled") and home Wi-Fi stayed "searching". Adding or
   forgetting a network now updates it, and it's checked before each switch to home Wi-Fi.
   A first network no longer needs `printf` (not on the unit): the config starts from the car's
-  own template.
+  own template, and the whole text is built before the one write that sets Android's owner and
+  mode. A checksum that can't be written (its `chown` or `chmod` failing) is said in the
+  keeper's log and in the answer to adding or forgetting a network, instead of home Wi-Fi only
+  staying "searching".
 - **Mods' connections over home Wi-Fi are no longer refused** (Ioniq 5 US 260507). The block
   that keeps mods off mobile data was in `filter OUTPUT`, where `-o` is the route a packet had
   before HMG-API's mark moved it to home Wi-Fi: every connection that started on the main
