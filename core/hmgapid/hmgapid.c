@@ -1141,18 +1141,21 @@ static void svc_log_window(struct svc *v, long now, int force)
 static void svc_log_out(struct svc *v, const char *b, ul n, long now)
 {
     svc_log_window(v, now, 0);
-    if (v->dropped || v->win_bytes + (long)n > LOG_RATE) {
-        if (!v->dropped) {
-            line_t l; l.n = 0; l.b[0] = 0;
-            lput(&l, "\n[hmgapid] more than "); lnum(&l, LOG_RATE / 1024); lput(&l, " KB of output in "); lnum(&l, LOG_WINDOW);
-            lput(&l, " s: the rest is left out until the next "); lnum(&l, LOG_WINDOW); lput(&l, " s\n");
-            svc_log_put(v, l.b, l.n);
-        }
-        v->dropped += n;
-        return;
+    if (!v->dropped && v->win_bytes < LOG_RATE) {   /* what fits in this window's budget */
+        ul room = (ul)(LOG_RATE - v->win_bytes), k = n < room ? n : room;
+        v->win_bytes += (long)k;
+        svc_log_put(v, b, k);
+        b += k;
+        n -= k;
     }
-    v->win_bytes += (long)n;
-    svc_log_put(v, b, n);
+    if (n == 0) return;
+    if (!v->dropped) {
+        line_t l; l.n = 0; l.b[0] = 0;
+        lput(&l, "\n[hmgapid] more than "); lnum(&l, LOG_RATE / 1024); lput(&l, " KB of output in "); lnum(&l, LOG_WINDOW);
+        lput(&l, " s: the rest is left out until the next "); lnum(&l, LOG_WINDOW); lput(&l, " s\n");
+        svc_log_put(v, l.b, l.n);
+    }
+    v->dropped += n;
 }
 
 static void svc_out_close(struct svc *v, long now)

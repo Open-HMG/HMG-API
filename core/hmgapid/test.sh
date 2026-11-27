@@ -234,16 +234,18 @@ check "bad names refused" 2 "$(code root service-restart ../x loop)"
 
 # --- service logs while the service runs, priority, safe mode: a daemon of its own with small
 # limits (a looping echo under hmgapid wrote 885 MB in 8 s when the log was only checked at start)
-build logs "$ME" "" "-DLOG_MAX=16384 -DLOG_RATE=65536 -DLOG_WINDOW=3"
+build logs "$ME" "" "-DLOG_MAX=16384 -DLOG_RATE=16384 -DLOG_WINDOW=3"   # rate = cap, as on the unit
 L=$T/logs/root
 mkdir -p "$L/mods/spam/bin" "$L/state"
 printf 'while :; do echo 0123456789012345678901234567890123456789; done\n' > "$L/mods/spam/bin/spam.sh"
 printf 'i=0; while [ $i -lt 100 ]; do echo line $i; i=$((i+1)); done; exec '"$SLEEP"' 60\n' > "$L/mods/spam/bin/quiet.sh"
+printf 'i=0; while [ $i -lt 1000 ]; do echo 0123456789012345678901234567890123456789; i=$((i+1)); done; exec '"$SLEEP"' 60\n' > "$L/mods/spam/bin/burst.sh"
 printf 'exec '"$SLEEP"' 60\n' > "$L/state/net.sh"
 printf 'spam quiet normal\n' > "$L/state/service-priority.txt"
 cat > "$L/state/services.txt" <<EOS
 spam spam root boot yes script bin/spam.sh -
 spam quiet root boot yes script bin/quiet.sh -
+spam burst root boot yes script bin/burst.sh -
 hmgapi net root boot yes script $L/state/net.sh - 1a2b
 EOS
 # logs grown before the cap (older releases): emptied when the service starts, not kept as .1
@@ -259,9 +261,11 @@ check "a service logging in a loop keeps running" running "$(lst spam spam)"
 size=$(cat "$L/logs/spam/spam.log" "$L/logs/spam/spam.log.1" 2>/dev/null | wc -c | tr -d ' ')
 check "... its log stays capped while it runs (log + .1)" yes "$([ "$size" -gt 0 ] && [ "$size" -le $((2 * 16384 + 512)) ] && echo yes || echo "no ($size bytes)")"
 check "... rotated to .1" yes "$([ -s "$L/logs/spam/spam.log.1" ] && echo yes || echo no)"
-has "... says what it leaves out" "the rest is left out until the next 3 s" "$(cat "$L/logs/spam/spam.log" "$L/logs/spam/spam.log.1" 2>/dev/null)"
-waitfor 'grep -q "service output left out" "$L/hmgapid.log"' || true
-has "... and how much, once the window ends" "KB of output left out" "$(cat "$L/logs/spam/spam.log" "$L/logs/spam/spam.log.1" 2>/dev/null)"
+# a burst (40 KB at once, then quiet): what's left out is said, and how much once its window ends
+has "a burst: says what it leaves out" "the rest is left out until the next 3 s" "$(cat "$L/logs/spam/burst.log" 2>/dev/null)"
+waitfor 'grep -q "KB of output left out" "$L/logs/spam/burst.log"' || true
+has "... and how much, once the window ends" "KB of output left out" "$(cat "$L/logs/spam/burst.log" 2>/dev/null)"
+check "... still running" running "$(lst spam burst)"
 has "... in hmgapid's log too" "service output left out (KB)" "$(cat "$L/hmgapid.log")"
 has "a quiet service's log is whole" "line 99" "$(run logs service-log spam quiet)"
 has "... an old oversized log emptied, saying so" "[hmgapid] this log was 3 MB: emptied" "$(head -1 "$L/logs/spam/quiet.log")"
@@ -273,7 +277,7 @@ check "HMG-API's own: normal" 0 "$(nice_of "$(lpid hmgapi net)")"
 spid=$(lpid spam spam)
 echo owner > "$L/SAFE"
 waitfor '[ -z "$(lst spam spam)" ]' || true
-check "safe mode: a mod's service stops" "" "$(lst spam spam)"
+check "safe mode: a mod's service stops" "" "$(lst spam spam)$(lst spam burst)"
 check "... all of them" "" "$(lst spam quiet)"
 check "... its processes end" no "$(kill -0 "$spid" 2>/dev/null && echo yes || echo no)"
 check "... HMG-API's own keep running" running "$(lst hmgapi net)"
