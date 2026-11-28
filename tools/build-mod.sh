@@ -1,11 +1,18 @@
 #!/bin/sh
 # Build one mod folder: hooks.jar from src/ (against HMG-API's runtime, compile only),
-# the app APK from app/ (with hmgapi-client.jar inside), and the mod's *.json.
+# the app APK from app/ (with hmgapi-client.jar inside), and the mod's *.json, then the
+# mod's own build step, an executable <mod dir>/build.sh, if it has one.
 # build.sh mods runs it for every mod in this repo; in the mod SDK it's bin/build-mod.sh.
 #   build-mod.sh <mod dir> <out dir> [work dir]
 # Puts mod.json etc., hooks.jar and the APK (at the mod's first "apps" entry) in <out dir>;
 # the compiled classes stay in <work dir>/classes (default: a temp dir) for mods that
-# require this one (HMGAPI_MOD_CP).
+# require this one (HMGAPI_MOD_CP). The mod's id is mod.json's "id" (the folder can have
+# any name). mkmodpkg.sh packages the mod folder with <out dir> on top.
+# <mod dir>/build.sh is run last, as sh <mod dir>/build.sh <out dir> (an absolute path),
+# from the directory this script was run in, with HMGAPI_CP, HMGAPI_CLIENT, HMGAPI_MOD_CP,
+# ANDROID_JAR, D8 and BT (build-tools) set, and HMGAPI_SDK in the mod SDK. What it writes
+# in <out dir> goes into the package (a service jar, a binary); it can replace what the
+# steps above put there.
 # Env: HMGAPI_CP      the runtime to compile against (default: the SDK's lib/hmgapi-runtime.jar
 #                     and lib/hmgapi-runtime-stubs.jar, beside this script)
 #      HMGAPI_CLIENT  hmgapi-client.jar (default: the SDK's lib/hmgapi-client.jar)
@@ -23,8 +30,12 @@ CP=${HMGAPI_CP:-$LIB/hmgapi-runtime.jar:$LIB/hmgapi-runtime-stubs.jar}
 CLIENT=${HMGAPI_CLIENT:-$LIB/hmgapi-client.jar}
 W=$3
 if [ -z "$W" ]; then W=$(mktemp -d); trap 'rm -rf "$W"' EXIT; fi
-id=$(basename "$M")
+[ -f "$M/mod.json" ] || { echo "build-mod: no $M/mod.json"; exit 1; }
+id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("id") or "")' "$M/mod.json") \
+    || { echo "build-mod: $M/mod.json isn't valid JSON"; exit 1; }
+[ -n "$id" ] || { echo "build-mod: no \"id\" in $M/mod.json"; exit 1; }
 mkdir -p "$O"
+O=$(cd "$O" && pwd)
 cp "$M"/*.json "$O/"
 deps=${HMGAPI_MOD_CP:+$HMGAPI_MOD_CP:}
 if [ -d "$M/src" ]; then
@@ -62,5 +73,14 @@ if [ -f "$M/app/AndroidManifest.xml" ]; then
     "$BT/apksigner" sign --ks "$K" --ks-pass pass:example --min-sdk-version 9 \
         --v2-signing-enabled false --v3-signing-enabled false --out "$O/$apk" "$A/aligned.apk" 2>/dev/null
     echo "mod $id: app $apk"
+fi
+# build.sh: the mod's own build step (a service jar, native code, files made from others)
+if [ -x "$M/build.sh" ]; then
+    if [ -f "$LIB/hmgapi-runtime.jar" ]; then HMGAPI_SDK=$(cd "$HERE/.." && pwd); export HMGAPI_SDK; fi
+    HMGAPI_CP=$CP HMGAPI_CLIENT=$CLIENT HMGAPI_MOD_CP=$HMGAPI_MOD_CP ANDROID_JAR=$ANDROID_JAR D8=$D8 BT=$BT \
+        sh "$M/build.sh" "$O" || { echo "build-mod: $M/build.sh $O failed"; exit 1; }
+    echo "mod $id: $M/build.sh"
+elif [ -f "$M/build.sh" ]; then
+    echo "build-mod: $M/build.sh isn't executable, so it isn't run (chmod +x, and git update-index --chmod=+x)" >&2
 fi
 echo "mod $id"

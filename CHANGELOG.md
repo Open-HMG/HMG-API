@@ -622,6 +622,24 @@ NEMESIS in the app menu.
   isn't loaded, and the app shows why. This also keeps such a mod from winning a
   conflict it then can't use.
 
+### For mod authors
+
+- **Mod SDK and mod workflow:** `build-mod.sh` now runs a mod's own build step, an
+  executable `build.sh` in its folder, after building `hooks.jar` and the app: what it
+  writes in the build folder (a service's jar, a native binary) goes into the package, and
+  the mod's tests see it too. `mkmodpkg.sh` packages that build (from `HMGAPI_MOD_BUILD`,
+  or building it itself) instead of running `build.sh` again. A mod's folder needn't be
+  named by its id any more: `build-mod.sh` and the reusable mod workflow take the id from
+  `mod.json` (the workflow refuses two folders with one id, and an id the engine would
+  refuse). Mods without a `build.sh` package as before.
+  **For an existing `build.sh`:** it used to get the package's folder (a copy of the whole
+  mod folder); now it gets the build folder, with only the mod's `*.json`, `hooks.jar` and
+  APK in it. One that only adds files (hmgapi-adbd) works as it is, but now needs its tools
+  (hmgapi-adbd: the NDK) for `build-mod.sh` too. One that changed the folder's files in
+  place (a script, an asset) must now write its changed copy to the same path in the build
+  folder, where it replaces the folder's file in the package. (docs/mod-reference.md,
+  "Building a mod outside this repo")
+
 ## 1.1.0-rc.2 (2026-11-15)
 
 The second release candidate: fixes from a review of rc.1, nothing new in HMG-API itself.
