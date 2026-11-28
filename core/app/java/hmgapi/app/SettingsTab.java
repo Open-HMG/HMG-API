@@ -2,7 +2,6 @@ package hmgapi.app;
 
 import android.app.AlertDialog;
 import android.content.DialogInterface;
-import android.content.Intent;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.Switch;
@@ -16,12 +15,13 @@ import java.io.FileInputStream;
 
 /**
  * HMG-API's own settings, by category: Vehicle (the owner's switches for mods'
- * commands), Updates, Phone projection (what mods set), Hook map (this car's map,
- * checks, mapping it from its own files), About. The switches are kept by hmgapid
+ * commands), Home Wi-Fi, Phone projection (what mods set), Hook map (this car's map,
+ * checks, mapping it from its own files), About. Updates (the catalogue's, USB, the car's own
+ * over-the-air ones) are the Updates tab's. The switches are kept by hmgapid
  * (allow <name>).
  */
 final class SettingsTab {
-    static final String[] CATS = { "Vehicle", "Updates", "Home Wi-Fi", "Phone projection", "Hook map", "About" };
+    static final String[] CATS = { "Vehicle", "Home Wi-Fi", "Phone projection", "Hook map", "About" };
     final MainActivity a;
     LinearLayout cats, page;
     static int current;   // the category shown last, kept while the app runs
@@ -46,6 +46,7 @@ final class SettingsTab {
     }
 
     void show(int n) {
+        if (n < 0 || n >= CATS.length) n = 0;
         current = n;
         cats.removeAllViews();
         for (int i = 0; i < CATS.length; i++) {
@@ -62,11 +63,11 @@ final class SettingsTab {
         }
         page.removeAllViews();
         Ui.text(page, CATS[n], 28, true, Ui.TEXT);
-        if (n == 0) vehicle();
-        else if (n == 1) updates();
-        else if (n == 2) homeWifi();
-        else if (n == 3) projection();
-        else if (n == 4) hookMap();
+        String c = CATS[n];
+        if ("Vehicle".equals(c)) vehicle();
+        else if ("Home Wi-Fi".equals(c)) homeWifi();
+        else if ("Phone projection".equals(c)) projection();
+        else if ("Hook map".equals(c)) hookMap();
         else about();
     }
 
@@ -181,30 +182,6 @@ final class SettingsTab {
 
     void homeWifi() {
         new HomeWifiPage(a, page).show(this);
-    }
-
-    void updates() {
-        if (!hooksOn()) {
-            Ui.text(page, "HMG-API's hooks aren't running on this car (see Hook map), so it isn't blocking over-the-air updates: "
-                    + "the car can download and install them. The car's own switch is what counts until the hooks run: Settings > "
-                    + "General > Install Infotainment System Updates Automatically.", 16, true, Ui.TEXT);
-        }
-        owner("Over-the-air updates", "Off (the default): HMG-API blocks the car's own update downloads, so an update can't "
-                + "replace what HMG-API and your mods depend on. USB and dealer updates still work. Takes effect at the next restart.",
-                "Allow over-the-air updates", "ota_updates", false, new Runnable() {
-                    @Override
-                    public void run() {
-                        a.needRestart();
-                    }
-                });
-        Ui.text(page, "Updates from USB", 21, true, Ui.TEXT);
-        Ui.text(page, "HMG-API releases and mod packages (zips) in HMGAPI/updates/ on a USB stick.", 16, false, Ui.GREY);
-        Ui.button(page, "Check the USB stick", new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                a.startActivityForResult(new Intent(a, UpdatesActivity.class), MainActivity.UPDATES);
-            }
-        });
     }
 
     void projection() {

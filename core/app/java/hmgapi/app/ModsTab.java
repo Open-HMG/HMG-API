@@ -144,7 +144,7 @@ final class ModsTab {
                 }
                 mods = r;
                 if (r.isEmpty()) {
-                    Ui.text(list, "  No mods installed. Get them in the Catalogue tab (over home Wi-Fi), or put mod packages in "
+                    Ui.text(list, "  No mods installed. Get some in the Catalogue tab (over home Wi-Fi), or put mod packages in "
                             + "HMGAPI/updates/ on a USB stick and use Check USB updates.", 17, false, Ui.GREY);
                     return;
                 }

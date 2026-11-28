@@ -81,6 +81,34 @@ final class UpdatesTab {
         Ui.allowSwitch(a, stage, "auto_stage_updates", false, null);
         Ui.text(list, "Only plain updates are downloaded by themselves: one that needs another mod installed or turned on waits for your "
                 + "Update. Nothing downloaded runs before you apply. HMG-API itself is only ever updated when you tap its Update.", 15, false, Color.GRAY);
+
+        Ui.line(list);
+        Ui.text(list, "Updates from USB", 21, true, Ui.GREEN);
+        Ui.text(list, "HMG-API releases and mod packages (zips) in HMGAPI/updates/ on a USB stick: for a car with no home Wi-Fi, "
+                + "or a mod that isn't in the catalogue.", 15, false, Color.GRAY);
+        Ui.button(list, "Check the USB stick", new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                a.startActivityForResult(new android.content.Intent(a, UpdatesActivity.class), MainActivity.UPDATES);
+            }
+        });
+
+        Ui.line(list);
+        Ui.text(list, "The car's own updates", 21, true, Ui.GREEN);
+        if (!SettingsTab.hooksOn()) {
+            Ui.text(list, "HMG-API's hooks aren't running on this car (Settings > Hook map), so it isn't blocking over-the-air updates: "
+                    + "the car can download and install them. The car's own switch is what counts until the hooks run: Settings > "
+                    + "General > Install Infotainment System Updates Automatically.", 15, true, Ui.TEXT);
+        }
+        Ui.text(list, "Off (the default): HMG-API blocks the car's own over-the-air update downloads, so an update can't replace what "
+                + "HMG-API and your mods depend on. USB and dealer updates still work. Takes effect at the next restart.", 15, false, Color.GRAY);
+        Switch ota = Ui.switchRow(list, "Allow over-the-air updates");
+        Ui.allowSwitch(a, ota, "ota_updates", false, new Runnable() {
+            @Override
+            public void run() {
+                a.needRestart();
+            }
+        });
         load(false);
         return root;
     }
