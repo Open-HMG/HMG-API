@@ -275,6 +275,12 @@ elif [ -n "$RESCUE" ]; then
     mv "$KEEP.hmgapi-new" "$KEEP" || fail "keep stock app_process"
     log "app_process.hmgapi-stock: back from the stock backup ($RBAK)"
 fi
+# on storage before anything runs it: a new file's data can stay in memory for up to ~30 s
+# (the kernel's writeback; a rename onto a new name doesn't force it out, a rename over an
+# existing file does). The wrapper below goes over app_process (or .real) and so reaches
+# storage at once; a hard reset (Reset pinhole, power loss) before this sync could then leave
+# the wrapper running an empty stock copy: no zygote, and no stock app_process left on /system
+sync
 # the last word before the wrapper goes in: it runs app_process.hmgapi-stock, which must be a
 # stock binary, or no zygote starts
 [ -f "$KEEP" ] && ! not_stock "$KEEP" || fail "app_process.hmgapi-stock isn't a stock binary, so the wrapper wasn't written (HMG-API's other files are, harmless without it). Please send this line to the HMG-API maintainers."
