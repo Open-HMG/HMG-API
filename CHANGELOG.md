@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- **Home Wi-Fi joins on cars whose Wi-Fi library checks a checksum** (Ioniq 5 US 260507). The
+  stock library starts the car's Wi-Fi client only if `wpa_supplicant_crc32.conf` holds the
+  CRC-32 of `wpa_supplicant.conf`; HMG-API's saved networks didn't update it, so the client
+  never started ("Wi-Fi will not be enabled") and home Wi-Fi stayed "searching". Adding or
+  forgetting a network now updates it, and it's checked before each switch to home Wi-Fi.
+  A first network no longer needs `printf` (not on the unit): the config starts from the car's
+  own template, and the whole text is built before the one write that sets Android's owner and
+  mode. A checksum that can't be written (its `chown` or `chmod` failing) is said in the
+  keeper's log and in the answer to adding or forgetting a network, instead of home Wi-Fi only
+  staying "searching".
+
 ## 1.1.0-rc.10 (2026-11-25)
 
 - **No owner-facing way to force an unknown `app_process`, for now.** An empty `HMGAPI/FORCE`
