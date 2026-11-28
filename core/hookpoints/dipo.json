@@ -409,6 +409,27 @@
         "ret": "com.daudio.app.dipo.telechips.CarPlayReturn"
       },
       "about": "advertises CarPlay again (Bonjour), as DiPO does after a session it didn't end itself: the phone can come back"
+    },
+    {
+      "id": "dipo.service",
+      "kind": "class",
+      "find": {
+        "name": "com.daudio.app.dipo.service.DipoService"
+      },
+      "about": "DiPO's main service (DipoService)"
+    },
+    {
+      "id": "dipo.service.reset_usb",
+      "kind": "method",
+      "of": "dipo.service",
+      "find": {
+        "params": [],
+        "ret": "void",
+        "strings": [
+          "resetUSB() isIap2Connected:"
+        ]
+      },
+      "about": "resetUSB(): power-cycles the USB port through the micom (requestVBusOffOn), about 6 s into a CarPlay session start; part of the wired handshake, and it drops a USB Wi-Fi adapter on that port"
     }
   ]
 }
