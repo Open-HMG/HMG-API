@@ -323,4 +323,17 @@ final class CatalogFlow {
             }
         }.start(a);
     }
+
+    /** an install or update done (staged, not applied): what it did, and applying it now (the main screen's plan, then its OK) */
+    static void applyNow(final MainActivity a, String title, String text) {
+        new AlertDialog.Builder(a).setTitle(title)
+                .setMessage(text + "\n\nNothing on the head unit changes until the changes are applied.")
+                .setNegativeButton("Later", null)
+                .setPositiveButton("Apply now", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        a.plan();
+                    }
+                }).show();
+    }
 }

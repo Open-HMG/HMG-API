@@ -145,8 +145,7 @@ final class ModsTab {
                 }
                 mods = r;
                 if (r.isEmpty()) {
-                    drawStore();
-                    Ui.text(list, "  No mods installed. Get mods from the catalogue (over home Wi-Fi), or put mod packages in "
+                    Ui.text(list, "  No mods installed. Get them in the Catalogue tab (over home Wi-Fi), or put mod packages in "
                             + "HMGAPI/updates/ on a USB stick and use Check USB updates.", 17, false, Ui.GREY);
                     return;
                 }
@@ -157,28 +156,8 @@ final class ModsTab {
         }.start(a);
     }
 
-    /** the catalogue's two ways in, at the top of the list: Get mods, and Updates (with how many) */
-    void drawStore() {
-        LinearLayout b = Ui.row(a);
-        b.setPadding(Ui.dp(a, 12), Ui.dp(a, 8), Ui.dp(a, 12), Ui.dp(a, 4));
-        Ui.button(b, "Get mods", new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                a.startActivityForResult(new android.content.Intent(a, CatalogActivity.class), MainActivity.UPDATES);
-            }
-        });
-        Ui.button(b, updates > 0 ? "Updates (" + updates + ")" : "Updates", updates > 0, new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                a.startActivityForResult(new android.content.Intent(a, ModUpdatesActivity.class), MainActivity.UPDATES);
-            }
-        });
-        list.addView(b);
-    }
-
     void drawList() {
         list.removeAllViews();
-        drawStore();
         for (final Mod m : mods) {
             LinearLayout row = Ui.row(a);
             row.setPadding(Ui.dp(a, 18), Ui.dp(a, 10), Ui.dp(a, 12), Ui.dp(a, 10));
@@ -251,7 +230,7 @@ final class ModsTab {
                 Ui.button(detail, "Make a Car Report", new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        a.show(2);
+                        a.show(MainActivity.REPORT);
                     }
                 });
             }
