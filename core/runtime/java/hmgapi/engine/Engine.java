@@ -478,7 +478,14 @@ public final class Engine {
             if ("apply".equals(cmd)) LiveState.publish(this);   // a switch with no file change still reaches running apps
             return 0;
         }
-        apply(p, trial);
+        // a staged update stays in mods/ only if the apply that takes it goes through: its code loads
+        // from there at boot, and must never run on the /system files of the version before it
+        try {
+            apply(p, trial);
+        } catch (Throwable x) {
+            Catalog.stagedBack(this, staged);
+            throw x;
+        }
         LiveState.publish(this);
         return 0;
     }
