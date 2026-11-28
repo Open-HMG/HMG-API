@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A root service can read its own settings** (`HmgApi.settings()`, `saveSettings()`): the
+  daemon sees such a service as root, so the client names its mod (`HMGAPI_MOD`).
 - **A failed apply is rolled back at once.** When a rename, a dexopt, a remount or a copy
   failed part-way, /system stayed half-applied (one library new, the next stock, an app's
   odex deleted) until the next start, and every other engine command was refused. Now the
