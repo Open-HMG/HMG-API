@@ -32,7 +32,8 @@ if [ -x $ROOT/system/xbin/nemesis ]; then (sleep 120; $H engine nemesis-sync) </
 # car (state/local-map.json): only when the map, the catalogue or the stock files changed since,
 # so after an HMG-API install or update. Used from the next start. The owner's switch skips it.
 if [ -d $D/maps ] && [ ! -f $D/settings/allow/no_local_points ]; then (sleep 90; $H engine map-car --local --if-needed) </dev/null >$D/map-local.log 2>&1 & fi
-if [ -f $D/state/journal.json ]; then
+# a journal, or staged updates an apply put in mods/ (state/staged-swap.json) before it was cut off
+if [ -f $D/state/journal.json ] || [ -f $D/state/staged-swap.json ]; then
     # Restart only after a recover that finished (it takes the journal away). One that
     # failed part-way has "rolled back" in its log too and keeps the journal: restarting
     # on that would come straight back here, at every start. It's tried again at the

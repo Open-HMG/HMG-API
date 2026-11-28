@@ -1609,8 +1609,54 @@ final class Catalog {
      * this HMG-API) and put in place, the version it replaces kept in /data/hmgapi/previous/<id>.
      * Returns the ids put in place (stagedBack undoes them if the apply doesn't go ahead).
      */
+    /**
+     * The staged updates an apply put in mods/ (each one's previous version in previous/<id>), kept in
+     * state/staged-swap.json from before the first is moved until the apply is final: a cut-off apply
+     * or a trial that's undone puts them back (engine recover), as it does the /system files.
+     */
+    static File swapFile(Engine e) {
+        return new File(e.stateDir, "staged-swap.json");
+    }
+
+    @SuppressWarnings("unchecked")
+    static List<String> swapped(Engine e) {
+        List<String> ids = new ArrayList<String>();
+        try {
+            if (!swapFile(e).isFile()) return ids;
+            Object l = Json.object(Engine.read(swapFile(e))).get("ids");
+            for (Object o : l instanceof List ? (List<Object>) l : new ArrayList<Object>()) if (String.valueOf(o).matches(ID)) ids.add(String.valueOf(o));
+        } catch (Exception x) {
+            // unreadable: as if none (mods/ and previous/ stay as they are)
+        }
+        return ids;
+    }
+
+    static void recordSwap(Engine e, List<String> ids) throws IOException {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("ids", ids);
+        writeWhole(swapFile(e), Json.write(m), false);
+    }
+
+    /** the apply that took them is final (not a trial, or a trial kept): nothing to put back any more */
+    static void stagedDone(Engine e) {
+        swapFile(e).delete();
+    }
+
+    /** engine recover: staged updates a cut-off apply or an undone trial left in mods/ go back to pending/ */
+    static void stagedRecover(Engine e) {
+        List<String> ids = swapped(e);
+        if (ids.isEmpty()) {
+            swapFile(e).delete();
+            return;
+        }
+        stagedBack(e, ids);
+        for (String id : ids) e.out.add("rolled back the staged update of " + id + " (its previous version is installed again)");
+    }
+
     static List<String> stagedIn(Engine e) throws Exception {
         List<String> done = new ArrayList<String>();
+        Catalog c = new Catalog(e);
+        c.load();
         File[] ps = new File(e.data, "pending").listFiles();
         if (ps != null) Arrays.sort(ps);
         for (File p : ps == null ? new File[0] : ps) {
@@ -1624,6 +1670,7 @@ final class Catalog {
             if (want == null) why = "it isn't a mod";
             else if (have == null) why = id + " was removed since";
             else if (!"update".equals(status(have, want))) why = "the installed " + have + " is as new";
+            else if (c.withdrawn(id, want) != null) why = "HMG-API's maintainers withdrew it since (" + c.withdrawn(id, want) + ")";
             else {
                 Packages.Verdict v = Packages.check(e, p, Packages.installedUuid(inst), false, false);
                 if (v.code != 0) why = v.reason;
@@ -1636,6 +1683,8 @@ final class Catalog {
             File prev = new File(e.data, "previous/" + id);
             Engine.rm(prev);
             prev.getParentFile().mkdirs();
+            done.add(id);
+            recordSwap(e, done);   // before the move: a cut-off apply finds it and puts it back
             boolean off = new File(inst, ".disabled").exists();
             if (!inst.renameTo(prev)) throw new IOException("can't move the installed " + id + " aside");
             if (!p.renameTo(inst)) {
@@ -1645,8 +1694,8 @@ final class Catalog {
             if (off) new File(inst, ".disabled").createNewFile();
             e.chmodTree(inst);
             e.out.add("update   " + id + " " + have + " -> " + want + " (staged by the automatic check; " + have + " kept in /data/hmgapi/previous/" + id + ")");
-            done.add(id);
         }
+        if (done.isEmpty()) swapFile(e).delete();
         return done;
     }
 
@@ -1654,6 +1703,12 @@ final class Catalog {
     static void stagedBack(Engine e, List<String> ids) {
         for (String id : ids) {
             File inst = new File(e.data, "mods/" + id), prev = new File(e.data, "previous/" + id), pend = new File(e.data, "pending/" + id);
+            if (!prev.isDirectory() && !inst.isDirectory() && pend.isDirectory()) continue;   // cut off before its move: still staged
+            if (!prev.isDirectory() && inst.isDirectory() && pend.isDirectory()) continue;    // cut off before its move: the old one is still in mods/
+            if (prev.isDirectory() && !inst.isDirectory() && pend.isDirectory()) {   // cut off between the moves: the old one back
+                if (!prev.renameTo(inst)) e.out.add("couldn't put " + id + "'s previous version back: it's in /data/hmgapi/previous/" + id);
+                continue;
+            }
             Engine.rm(pend);
             if (!prev.isDirectory() || !inst.renameTo(pend) || !prev.renameTo(inst)) {
                 e.out.add("couldn't put " + id + "'s previous version back: the staged one stays installed");
@@ -1662,5 +1717,6 @@ final class Catalog {
             new File(pend, ".disabled").delete();
         }
         if (!ids.isEmpty()) e.out.add("the staged updates (" + join(ids, ", ") + ") stay staged until an apply goes through");
+        swapFile(e).delete();
     }
 }
