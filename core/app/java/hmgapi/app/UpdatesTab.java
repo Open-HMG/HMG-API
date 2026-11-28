@@ -42,7 +42,8 @@ final class UpdatesTab {
         LinearLayout list = Ui.scrolling(root, 1, LinearLayout.LayoutParams.MATCH_PARENT);
         list.setPadding(Ui.dp(a, 32), Ui.dp(a, 16), Ui.dp(a, 32), Ui.dp(a, 24));
         Ui.text(list, "Updates", 30, true, Ui.GREEN);
-        Ui.text(list, "Newer versions of your mods from HMG-API's catalogue, and of HMG-API itself. HMG-API checks each time "
+        Ui.text(list, "Newer versions of your mods from HMG-API's catalogue (or, for a mod it doesn't list, from the mod's own releases "
+                + "on GitHub), and of HMG-API itself. HMG-API checks each time "
                 + "the head unit joins your home Wi-Fi (the car off at home), and never over the car's mobile data.", 16, false, Color.GRAY);
         when = Ui.text(list, "", 15, false, Color.GRAY);
         message = Ui.text(list, "", 18, false, Ui.WARN);
@@ -141,6 +142,14 @@ final class UpdatesTab {
                 else if (n == 0) message.setText(d.optLong("checked", 0) > 0 ? "Everything is up to date." : "Not checked yet: tap Check now"
                         + (online ? "." : " (home Wi-Fi isn't connected: Connect to home Wi-Fi, in P)."));
                 else message.setText(n + (n == 1 ? " update" : " updates") + " available" + (online ? "." : " (offline: connect to install)."));
+                JSONArray wd = d.optJSONArray("withdrawn");
+                for (int i = 0; wd != null && i < wd.length(); i++) {
+                    JSONObject w = wd.optJSONObject(i);
+                    Ui.gap(rows, 14);
+                    Ui.text(rows, "Withdrawn: " + w.optString("id") + " " + w.optString("version"), 20, true, Ui.WARN);
+                    Ui.text(rows, "HMG-API's maintainers withdrew this version: " + w.optString("why") + ". Update it if there's a newer one "
+                            + "below, or turn it off in Installed mods.", 15, false, Color.GRAY);
+                }
                 if (d.has("hmgapi")) hmgapiRow(d.optJSONObject("hmgapi"), online);
                 int count = 0;
                 for (int i = 0; mods != null && i < mods.length(); i++) {
@@ -162,8 +171,13 @@ final class UpdatesTab {
     private void row(final JSONObject m, boolean online) {
         Ui.gap(rows, 14);
         Ui.text(rows, m.optString("name", m.optString("id")), 22, true, Color.WHITE);
-        Ui.text(rows, m.optString("installed") + "  →  " + m.optString("version"), 16, false, Ui.GREEN);
+        Ui.text(rows, m.optString("installed") + "  →  " + m.optString("version") + (m.optBoolean("prerelease") ? "  (pre-release)" : ""),
+                16, false, Ui.GREEN);
         if (m.optString("description").length() > 0) Ui.text(rows, m.optString("description"), 15, false, Color.GRAY);
+        if ("release".equals(m.optString("source"))) {
+            Ui.text(rows, "From " + m.optString("repo").replace("https://github.com/", "") + "'s releases on GitHub: signed by the same author as "
+                    + "the installed version, but not reviewed for HMG-API's catalogue.", 15, false, Ui.WARN);
+        }
         if (m.optBoolean("staged")) Ui.text(rows, "Downloaded by the automatic check: it goes in when you apply", 15, false, Ui.WARN);
         JSONArray req = m.optJSONArray("requires");
         if (req != null && req.length() > 0) {
@@ -171,13 +185,23 @@ final class UpdatesTab {
             for (int i = 0; i < req.length(); i++) b.append(i > 0 ? ", " : "").append(req.optString(i));
             Ui.text(rows, "Needs " + b + " (installed or updated with it if needed)", 15, false, Color.GRAY);
         }
-        Button b = Ui.button(rows, "Update", new View.OnClickListener() {
+        LinearLayout buttons = Ui.row(a);
+        Button b = Ui.button(buttons, "Update", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 update(Arrays.asList(m.optString("id")));
             }
         });
         b.setEnabled(online);
+        if (m.optString("notes").length() > 0 || m.optString("page").length() > 0) {
+            Ui.button(buttons, "Release notes", new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    notes(m.optString("name", m.optString("id")), m);
+                }
+            });
+        }
+        rows.addView(buttons);
     }
 
     /** ids null: update all */
@@ -215,7 +239,7 @@ final class UpdatesTab {
             Ui.button(rows, "Release notes", new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    notes(h);
+                    notes("HMG-API", h);
                 }
             });
         }
@@ -240,7 +264,7 @@ final class UpdatesTab {
     }
 
     /** the release's notes (the engine keeps them from GitHub: the head unit may have no browser), and its page */
-    private void notes(JSONObject h) {
+    private void notes(String what, JSONObject h) {
         final String page = h.optString("page");
         String text = h.optString("notes").length() > 0 ? h.optString("notes").replace("\r", "") : "No notes with this release.";
         android.widget.ScrollView sv = new android.widget.ScrollView(a);
@@ -251,7 +275,7 @@ final class UpdatesTab {
         int pad = Ui.dp(a, 16);
         t.setPadding(pad, pad, pad, pad);
         sv.addView(t);
-        AlertDialog.Builder d = new AlertDialog.Builder(a).setTitle("HMG-API " + h.optString("version")).setView(sv)
+        AlertDialog.Builder d = new AlertDialog.Builder(a).setTitle(what + " " + h.optString("version")).setView(sv)
                 .setPositiveButton("OK", null);
         final android.content.Intent open = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(page));
         if (page.startsWith("https://") && open.resolveActivity(a.getPackageManager()) != null) {

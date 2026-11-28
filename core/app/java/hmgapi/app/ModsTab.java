@@ -30,7 +30,10 @@ final class ModsTab {
 
     static final class Mod {
         String id, name, version = "", description = "", authors = "", license = "", state, error;
-        String update;   // a newer version in the catalogue (public/updates.json), or null
+        String update;   // a newer version in the catalogue or the mod's releases (public/updates.json), or null
+        String updateRepo;   // the update is from this repo's releases (not the catalogue), or null
+        String source = "", repo, choice, withdrawn;   // where its updates come from (catalogue, releases, off); a maintainer's withdrawal
+        boolean listed;
         List<String> requires = new ArrayList<String>();
         boolean enabled, hasCode;
         List<String> services = new ArrayList<String>();
@@ -91,6 +94,8 @@ final class ModsTab {
                 }
                 updates = up == null ? 0 : up.optInt("count");
                 JSONArray ups = up == null ? null : up.optJSONArray("mods");
+                JSONObject srcs = up == null ? null : up.optJSONObject("sources");
+                JSONArray wds = up == null ? null : up.optJSONArray("withdrawn");
                 for (String line : Hmgapid.call("mods").output.split("\n")) {
                     String[] w = line.split("\t");
                     if (w.length < 2) continue;
@@ -128,7 +133,20 @@ final class ModsTab {
                     }
                     for (int i = 0; ups != null && i < ups.length(); i++) {
                         JSONObject u = ups.getJSONObject(i);
-                        if (m.id.equals(u.optString("id")) && m.version.equals(u.optString("installed"))) m.update = u.optString("version");
+                        if (!m.id.equals(u.optString("id")) || !m.version.equals(u.optString("installed"))) continue;
+                        m.update = u.optString("version");
+                        if ("release".equals(u.optString("source"))) m.updateRepo = u.optString("repo").replace("https://github.com/", "");
+                    }
+                    JSONObject src = srcs == null ? null : srcs.optJSONObject(m.id);
+                    if (src != null) {
+                        m.source = src.optString("source");
+                        m.repo = src.has("repo") ? src.optString("repo") : null;
+                        m.choice = src.has("choice") ? src.optString("choice") : null;
+                        m.listed = src.optBoolean("listed");
+                    }
+                    for (int i = 0; wds != null && i < wds.length(); i++) {
+                        JSONObject wo = wds.getJSONObject(i);
+                        if (m.id.equals(wo.optString("id")) && m.version.equals(wo.optString("version"))) m.withdrawn = wo.optString("why");
                     }
                     out.add(m);
                 }
@@ -237,8 +255,16 @@ final class ModsTab {
             Ui.pill(detail, m.label(), m.color());
         }
         if (!m.description.isEmpty()) Ui.text(detail, m.description, 16, false, Ui.GREY);
+        if (m.withdrawn != null) {
+            TextView box = Ui.text(detail, "Withdrawn\nHMG-API's maintainers withdrew " + m.name + " " + m.version + ": " + m.withdrawn
+                    + ". Update it, or turn it off until there's a fixed version.", 17, false, Ui.TEXT);
+            box.setBackground(Ui.box(a, 0xff3a3320, Ui.WARN, 10));
+            int p = Ui.dp(a, 14);
+            box.setPadding(p, p, p, p);
+        }
         if (m.update != null) {
-            Ui.text(detail, "Version " + m.update + " is in the catalogue.", 17, false, Ui.GREEN);
+            Ui.text(detail, m.updateRepo != null ? "Version " + m.update + " is in " + m.updateRepo + "'s releases (signed by the same author; "
+                    + "not reviewed for the catalogue)." : "Version " + m.update + " is in the catalogue.", 17, false, Ui.GREEN);
             Ui.button(detail, "Update to " + m.update, true, new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -265,6 +291,7 @@ final class ModsTab {
             });
         }
         if (!m.requires.isEmpty()) Ui.text(detail, "Needs " + join(m.requires.toArray(new String[0])).replace("  ·  ", ", "), 15, false, Ui.GREY);
+        if (m.listed || m.repo != null) updatesFrom(m);
 
         Ui.line(detail);
         Ui.text(detail, "Settings", 21, true, Ui.GREEN);
@@ -311,6 +338,45 @@ final class ModsTab {
             @Override
             public void onClick(View v) {
                 confirmRemove(m);
+            }
+        });
+    }
+
+    /** where the mod's updates come from: the catalogue, its own GitHub releases, or nowhere (engine update-source) */
+    void updatesFrom(final Mod m) {
+        Ui.line(detail);
+        Ui.text(detail, "Updates", 21, true, Ui.GREEN);
+        String repo = m.repo == null ? null : m.repo.replace("https://github.com/", "");
+        Ui.text(detail, "catalogue".equals(m.source) ? "From HMG-API's catalogue." + (repo != null ? " Its own releases (" + repo + ") can be followed instead, "
+                + "for example to test a new version before it's listed." : "")
+                : "releases".equals(m.source) ? "From " + repo + "'s releases on GitHub" + (m.listed ? ", instead of the catalogue." : ": it isn't in "
+                + "the catalogue.") + " Only a release signed with the same author key as the installed version is offered."
+                : "Off: HMG-API doesn't check for updates of " + m.name + ".", 16, false, Ui.GREY);
+        LinearLayout row = Ui.row(a);
+        if (m.listed && !"catalogue".equals(m.source)) source(row, m, "From the catalogue", "catalogue");
+        if (repo != null && !"releases".equals(m.source)) source(row, m, "From its releases", "releases");
+        if (!"off".equals(m.source)) source(row, m, "Don't check", "off");
+        if (m.choice != null) source(row, m, "Default", "default");
+        detail.addView(row);
+    }
+
+    private void source(LinearLayout row, final Mod m, String label, final String to) {
+        Ui.button(row, label, new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                new Ui.Job<Hmgapid.Result>() {
+                    @Override
+                    Hmgapid.Result work() throws Exception {
+                        return Hmgapid.call("engine", "update-source", m.id, to);
+                    }
+
+                    @Override
+                    void done(Hmgapid.Result r, Exception e) {
+                        if (e != null || r.code != 0) a.message("Not changed", e != null ? e.getMessage() : MainActivity.readable(r.output));
+                        else android.widget.Toast.makeText(a, MainActivity.readable(r.output).trim(), android.widget.Toast.LENGTH_LONG).show();
+                        load();
+                    }
+                }.start(a);
             }
         });
     }
