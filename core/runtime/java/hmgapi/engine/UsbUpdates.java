@@ -181,6 +181,9 @@ final class UsbUpdates {
                         : "HMG-API " + r.version + " is older than the installed " + installedVersion(e) + " (--force installs it anyway)"));
                 return 3;
             }
+            // the installer changes /system: only in P (Gear; install.sh checks again, lib.sh gear_gate)
+            int g = Gear.check(e, "the update", e.gearUnknownOk);
+            if (g != 0) return g;
             e.out.add("HMG-API " + r.version + " (" + r.status + "), signed with the release key; running its installer");
             ProcessBuilder pb = Engine.child(new ProcessBuilder("/system/bin/sh", new File(dir, "install.sh").getPath(), dir.getPath()));
             if (e.host) {

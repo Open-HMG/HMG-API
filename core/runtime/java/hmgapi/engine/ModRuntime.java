@@ -40,8 +40,8 @@ import java.util.Set;
  * true): started again when it exits. usb: folders on a stick the mod's app and
  * services can ask about (hmgapid `usb`), and that the launcher announces
  * (hmgapi.intent.action.USB_FOLDER to the mod's apps). vehicle read: the readings
- * (Vehicle.READINGS) the mod's app and services may ask hmgapid for; while any
- * enabled mod has some, hmgapid runs HMG-API's vehicle service. not_while_driving:
+ * (Vehicle.READINGS) the mod's app and services may ask hmgapid for, answered by
+ * HMG-API's vehicle service (always run: the gear check, Gear). not_while_driving:
  * the mod's own apps that follow the car's driving restriction (hook.Driving).
  * provides.panel: app widgets (AppWidgetProvider) of the mod's own apps, shown in
  * the right-hand split-screen panel (hook.Panel). input: button bindings (Keys),
@@ -406,7 +406,7 @@ final class ModRuntime {
         return Projection.settle(asks, pkgs, ov instanceof Map ? (Map<String, Object>) ov : null, notes);
     }
 
-    /** HMG-API's own vehicle service (hmgapi.vehicle.Hub), run by hmgapid while a mod reads the car */
+    /** HMG-API's own vehicle service (hmgapi.vehicle.Hub), always run by hmgapid (the gear check, mods' readings) */
     static final String VEHICLE_SERVICE = "hmgapi vehicle root android yes jar /system/framework/hmgapi-hook.jar hmgapi.vehicle.Hub";
     /** HMG-API's log keeper (hmgapi.engine.LogKeeper): always on, logs/hmgapi/log.log for the app's Logs and the Car Report */
     static final String LOG_SERVICE = "hmgapi log root boot yes jar /system/framework/hmgapi-hook.jar hmgapi.engine.LogKeeper";
@@ -440,8 +440,10 @@ final class ModRuntime {
             for (String c : d.commands) cmd.append(id).append(' ').append(c).append('\n');
             for (Event x : d.events) evs.append(id).append(' ').append(x.event).append(' ').append(x.service == null ? "-" : x.service.name).append('\n');
         }
-        boolean watch = new File(e.stateDir, "micom-watch.txt").isFile();   // the owner's MICOM recorder (hmgapid micom-watch)
-        if (veh.length() > 0 || cmd.length() > 0 || evs.length() > 0 || watch || HomeWifi.on(e)) svcs.append(VEHICLE_SERVICE).append('\n');   // home Wi-Fi reads parked and power
+        // always: the gear check before a restart, an apply or an install reads gear.park through it (Gear,
+        // hmgapid reboot, lib.sh gear_gate), on a unit with no mod reading the car too; and mods' readings,
+        // commands and car events, the owner's MICOM recorder, home Wi-Fi (parked and power)
+        svcs.append(VEHICLE_SERVICE).append('\n');
         svcs.append(LOG_SERVICE).append('\n');
         e.stateDir.mkdirs();
         String net = Network.publish(e, json, on);   // the network keeper, while a mod has network asks (or some are still in)

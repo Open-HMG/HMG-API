@@ -4,6 +4,10 @@ HMG-API @VERSION@ - USB stick
 Copy everything in this folder to the top level of an empty USB stick (FAT32).
 Then pick one of these. The head unit restarts when it's done.
 
+Put the car in P first and keep it there until the head unit has restarted.
+Shifting into reverse while an install runs can cut it off half done. HMG-API
+refuses to start when it can tell the car isn't in P.
+
 A. The head unit has nothing installed yet (no NEMESIS):
    1. Plug the stick into the car's USB port.
    2. Open Engineering Mode > USB Copy > DSP > Update OTA.

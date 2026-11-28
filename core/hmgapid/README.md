@@ -11,7 +11,7 @@ hmgapid <op> [args...]    # any user: asks the daemon, prints its output, exits 
 | Caller (SO_PEERCRED) | Ops |
 |---|---|
 | root (0), shell (2000: adb) | everything: `sh <command>`, `remount rw\|ro`, plus the HMG-API ops |
-| the `hmgapi.app` uid (from `/data/system/packages.list`) | `mods`, `enable <id>`, `disable <id>`, `setting-get <id>`, `setting-set <id> <json>`, `log`, `reboot`, `allow`, `park-rule`, `services [mod]`, `service-restart\|stop\|start <mod> <name>`, `service-log <mod> <name>`, `usb [mod]`, `vehicle <reading>…` |
+| the `hmgapi.app` uid (from `/data/system/packages.list`) | `mods`, `enable <id>`, `disable <id>`, `setting-get <id>`, `setting-set <id> <json>`, `log`, `reboot [--gear-unknown-ok]` (only in P: 75 not in P; 76 no gear reading, unless told to go on), `allow`, `park-rule`, `services [mod]`, `service-restart\|stop\|start <mod> <name>`, `service-log <mod> <name>`, `usb [mod]`, `vehicle <reading>…` |
 | an enabled mod's app (its `apps`, `state/apps.txt`) or service (by session) | its own mod only: `whoami`, `setting-get`, `setting-set <json>`, `services`, `service-restart\|stop\|start <name>`, `service-log <name>`, `usb`, `vehicle <reading>…` (the readings its mod.json lists) |
 | anyone else | `ping`, `version` |
 

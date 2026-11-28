@@ -108,31 +108,123 @@ echo 999999 > "$D/state/hook-check.pid"
 HC > /dev/null
 check "hook-check: a stale lock (after a restart) doesn't stop it" "1" "$(grep -c 'HMGAPI_HOOK begin' "$T/system/etc/install-recovery.sh")"
 
-# boot.sh: an apply that was cut off (or a trial) is rolled back, then one restart. A
-# recover that fails part-way keeps its journal, so restarting on it would loop.
-mkdir -p "$T/system/bin"
+# gear_gate: an install or uninstall only starts in P (a running hmgapid's reading); with no
+# reading, a warning and on
+printf '#!/bin/sh\n[ "$*" = "vehicle gear.park" ] || exit 2\ncat "%s/gear.out" 2>/dev/null || { echo "the vehicle service isn'"'"'t running (yet)"; exit 69; }\n' "$T" > "$T/gear-hmgapid"
+chmod +x "$T/gear-hmgapid"
+G() { set +e; out=$(env ROOT="$T" LOG="$T/gear.log" HMGAPI_HMGAPID="$T/gear-hmgapid" $SH -c ". $PWD/lib.sh; gear_gate 'the install'; echo went on" 2>&1); rc=$?; set -e; }
+echo "gear.park 1" > "$T/gear.out"; G
+check "gear_gate: in P: on, the owner told to stay in P" "0|in P: keep the car in P until the install is done
+went on" "$rc|$out"
+echo "gear.park 0" > "$T/gear.out"; G
+check "gear_gate: not in P: stops with 75, before anything" "75|0" "$rc|$(echo "$out" | grep -c 'went on')"
+check "... says why" "1" "$(echo "$out" | grep -c "FAIL: the car isn't in P, and the install only starts in P")"
+echo "gear.park -" > "$T/gear.out"; G
+check "gear_gate: the car didn't answer: a warning, and on" "0|1|1" "$rc|$(echo "$out" | grep -c '^warning: the gear can')|$(echo "$out" | grep -c 'went on')"
+rm -f "$T/gear.out"; G
+check "gear_gate: no vehicle service: a warning, and on" "0|1" "$rc|$(echo "$out" | grep -c 'went on')"
+set +e; out=$(env ROOT="$T" LOG="$T/gear.log" HMGAPI_HMGAPID="$T/missing" $SH -c ". $PWD/lib.sh; gear_gate 'the install'; echo went on" 2>&1); rc=$?; set -e
+check "gear_gate: no hmgapid (a first install): a warning, and on" "0|1" "$rc|$(echo "$out" | grep -c 'went on')"
+check "... in install.log too" "yes" "$(grep -q 'keep it in P until the install is done' "$T/gear.log" && echo yes || echo no)"
+set +e; out=$(env ROOT="$T" LOG="$T/gear.log" $SH -c ". $PWD/lib.sh; gear_gate 'the install'; echo went on" 2>&1); rc=$?; set -e
+check "gear_gate: off-car with no stand-in: no check" "0|went on" "$rc|$out"
+
+# boot.sh: an apply that was cut off (or a trial) is rolled back, then one restart, in the
+# background once the car is parked (never holding the boot). A recover that fails part-way
+# keeps its journal, so restarting on it would loop.
+mkdir -p "$T/system/bin" "$D/public"
 cat > "$T/system/bin/hmgapid" <<EOF
 #!/bin/sh
 echo "\$*" >> "$T/hmgapid.calls"
+case "\$1" in
+    vehicle) cat "$T/vehicle.out" 2>/dev/null || echo "the vehicle service isn't running (yet)"; exit 0 ;;
+    reboot) exit \$(cat "$T/reboot.rc" 2>/dev/null || echo 0) ;;
+esac
 [ "\$1 \$2" = "engine recover" ] || exit 0
 cat "$T/recover.out"
 exit \$(cat "$T/recover.rc")
 EOF
 chmod +x "$T/system/bin/hmgapid"
-BOOT() { rm -f "$T/hmgapid.calls"; : > "$D/state/journal.json"; printf '%s\n' "$1" > "$T/recover.out"; echo "$2" > "$T/recover.rc"; env ROOT="$T" $SH "$PWD/boot.sh" > "$T/boot.out" 2>&1; wait; }
+# the car: gear.park, power, parked (what hmgapid's vehicle reading answers)
+car() { printf 'gear.park %s\npower %s\nparked %s\n' "$1" "$2" "$3" > "$T/vehicle.out"; }
+BOOT() { rm -f "$T/hmgapid.calls"; : > "$D/state/journal.json"; printf '%s\n' "$1" > "$T/recover.out"; echo "$2" > "$T/recover.rc"
+         env ROOT="$T" HMGAPI_PARK_POLL=1 HMGAPI_PARK_TRIES=${TRIES:-60} HMGAPI_PARK_HOLD=${HOLD:-120} $SH "$PWD/boot.sh" > "$T/boot.out" 2>&1; }
 calls() { [ ! -f "$T/hmgapid.calls" ] || tr '\n' '|' < "$T/hmgapid.calls"; }
+# the calls but the readings
+once() { [ ! -f "$T/hmgapid.calls" ] || grep -v '^vehicle' "$T/hmgapid.calls" | tr '\n' '|'; }
+# until the background wait has restarted or given up (15 s at most)
+settled() {
+    i=0
+    while [ $i -lt 30 ]; do
+        grep -q 'restarting$' "$T/boot.out" 2>/dev/null && grep -q '^reboot' "$T/hmgapid.calls" 2>/dev/null && return
+        grep -q 'not restarting' "$T/boot.out" 2>/dev/null && return
+        sleep 0.5; i=$((i + 1))
+    done
+}
+
+car 1 logic_on 0
 BOOT "rolled back /system/app/A.apk
 unfinished apply rolled back" 0
-check "boot: an unfinished apply rolled back: one restart" "engine recover|reboot|" "$(calls)"
+settled
+check "boot: an unfinished apply rolled back: one restart, with the car off in P" "engine recover|reboot|" "$(once)"
+check "... after reading the car" "vehicle gear.park power parked" "$(grep -m1 '^vehicle' "$T/hmgapid.calls")"
+check "... the app told a restart is coming" "yes" "$([ -f "$D/public/restart-needed" ] && echo yes || echo no)"
 BOOT "trial undone" 0
-check "boot: a waiting trial undone: one restart" "engine recover|reboot|" "$(calls)"
+settled
+check "boot: a waiting trial undone: one restart" "engine recover|reboot|" "$(once)"
+
+# driving (not in P): boot.sh ends at once, and the restart waits
+car 0 on 0
+t0=$(date +%s)
+BOOT "unfinished apply rolled back" 0
+check "boot: driving: boot.sh doesn't wait for the car" "yes" "$([ $(( $(date +%s) - t0 )) -lt 3 ] && echo yes || echo no)"
+sleep 2
+check "... no restart while not in P" "engine recover|" "$(once)"
+# just switched on, in P: the driver may reverse next, so still no restart
+car 1 on 0
+sleep 2
+check "... none in P with the car on either" "engine recover|" "$(once)"
+car 1 on 1
+settled
+check "... the restart once HMG-API's parked state is on" "engine recover|reboot|" "$(once)"
+
+# hmgapid refuses (shifted out of P in between): waits again, then restarts
+car 1 logic_on 0
+echo 75 > "$T/reboot.rc"
+BOOT "unfinished apply rolled back" 0
+i=0; while [ $i -lt 20 ] && ! grep -q "didn't restart" "$T/boot.out"; do sleep 0.5; i=$((i + 1)); done
+echo 0 > "$T/reboot.rc"
+i=0; while [ $i -lt 20 ] && [ "$(grep -c '^reboot' "$T/hmgapid.calls")" -lt 2 ]; do sleep 0.5; i=$((i + 1)); done
+check "boot: hmgapid's reboot refused: tried again" "2" "$(grep -c '^reboot' "$T/hmgapid.calls")"
+sleep 1
+
+# no power status: in P for HMGAPI_PARK_HOLD seconds in a row
+car 1 - 0
+HOLD=2 BOOT "unfinished apply rolled back" 0
+settled
+check "boot: no power status: a restart once in P for a while" "engine recover|reboot|" "$(once)"
+
+# no gear reading at all: no restart, and the app asks the owner
+rm -f "$T/vehicle.out"
+TRIES=2 BOOT "unfinished apply rolled back" 0
+settled
+check "boot: no gear reading: no restart" "engine recover|" "$(once)"
+check "... the notice left for the app" "1" "$(grep -c 'left to the owner' "$D/public/restart-needed" 2>/dev/null)"
+rm -f "$D/state/journal.json"
+env ROOT="$T" $SH "$PWD/boot.sh" > /dev/null 2>&1
+check "... gone at the next start" "no" "$([ -f "$D/public/restart-needed" ] && echo yes || echo no)"
+
 BOOT "nothing to recover" 0
-check "boot: nothing rolled back: no restart" "engine recover|" "$(calls)"
+check "boot: nothing rolled back: no restart" "engine recover|" "$(once)"
 BOOT "rolled back /system/app/A.apk
 engine error: java.io.IOException: No space left on device" 1
-check "boot: recover failed part-way (journal kept): no restart, or it would restart at every start" "engine recover|" "$(calls)"
+check "boot: recover failed part-way (journal kept): no restart, or it would restart at every start" "engine recover|" "$(once)"
 check "... and boot.log says so" "1" "$(grep -c "recover didn't finish" "$T/boot.out")"
 rm -f "$D/state/journal.json"; rm -f "$T/hmgapid.calls"
 env ROOT="$T" $SH "$PWD/boot.sh" > /dev/null 2>&1; wait
 check "boot: no journal: recover isn't run" "" "$(calls)"
+echo dev.example.gpm > "$D/state/held.txt"; printf 'enabled  dev.example.gpm (stopped by an apply that was cut off)\nnothing to recover\n' > "$T/recover.out"; echo 0 > "$T/recover.rc"
+env ROOT="$T" $SH "$PWD/boot.sh" > /dev/null 2>&1
+check "boot: apps a cut-off apply stopped, no journal: recover turns them on, no restart" "engine recover|" "$(calls)"
+rm -f "$D/state/held.txt"
 exit $fail

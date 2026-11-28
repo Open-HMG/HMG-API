@@ -123,7 +123,11 @@ check "app: mods" "0" "$(code app mods)"
 check "app: setting-set" "0" "$(code app setting-set x '{}')"
 check "app: sh refused" "13" "$(code app sh 'echo no')"
 check "app: remount refused" "13" "$(code app remount rw)"
-check "app: reboot allowed" "0" "$(code app reboot)"
+# a restart only in P (op_reboot): no vehicle service here, so no gear reading
+check "app: reboot with no gear reading refused" "76" "$(code app reboot)"
+has "... and says how to go on" "reboot --gear-unknown-ok" "$(run app reboot)"
+check "app: reboot --gear-unknown-ok allowed" "0" "$(code app reboot --gear-unknown-ok)"
+check "app: reboot with another argument refused (not an op it may use)" "13" "$(code app reboot --now)"
 check "app: engine allowed" "0" "$(code app engine status)"
 
 # --- anyone else
@@ -246,18 +250,19 @@ cp "$T/mod/root/state/usb.txt" "$S/state/usb.txt"
 check "root: every mod's" "demo /storage/usb1/Dashcam other /storage/usb0/Other" "$(run root usb | sort | tr '\n' ' ' | sed 's/ $//')"
 # --- vehicle readings: relayed to HMG-API's vehicle service, only what the mod declared
 check "vehicle: service not running" 69 "$(code root vehicle speed)"
-python3 - "hmgapi-vehicle-test-$$" "$T/vehicle.req" <<'PY' &
-import socket, sys
+python3 - "hmgapi-vehicle-test-$$" "$T/vehicle.req" "$T/gear" <<'PY' &
+import os, socket, sys
 s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 s.bind("\0" + sys.argv[1]); s.listen(4); s.settimeout(30)
 held = []
-for _ in range(6):
+for _ in range(9):
     try: c, _ = s.accept()
     except socket.timeout: break
     line = c.makefile().readline()
     open(sys.argv[2], "a").write(line)
     if line.startswith("do "): c.sendall(("ok %s\n" % line.strip()).encode()); c.close(); continue
-    c.sendall("".join("%s 42\n" % n for n in line.split()[1:]).encode())
+    gear = open(sys.argv[3]).read().strip() if os.path.exists(sys.argv[3]) else "42"
+    c.sendall("".join("%s %s\n" % (n, gear if n == "gear.park" else "42") for n in line.split()[1:]).encode())
     if "speed.held" in line: held.append(c); continue   # the car's service: its close never reached hmgapid (#145)
     c.close()
 PY
@@ -271,6 +276,12 @@ check "vehicle: bad name refused" 2 "$(code mod vehicle 'speed;x')"
 check "vehicle: root reads any" "hv.soc 42" "$(run root vehicle hv.soc)"
 check "vehicle: a whole answer with the connection left open is still ok (#145)" "0 speed.held 42" "$(set +e; o=$(run root vehicle speed.held); echo "$? $o")"
 check "vehicle: other app refused" 13 "$(code other vehicle speed)"
+# the restart's gear check, through the same service
+echo 1 > "$T/gear"
+check "reboot: in P, restarts" "0 restarting" "$(set +e; o=$(run app reboot); echo "$? $o")"
+echo 0 > "$T/gear"
+check "reboot: not in P, refused" 75 "$(code app reboot)"
+check "reboot: not in P, refused even with the override" 75 "$(code app reboot --gear-unknown-ok)"
 printf 'demo charge_door\n' > "$T/mod/root/state/commands.txt"
 check "vehicle-do: a declared command passed on with the mod" "ok do demo charge_door open" "$(run mod vehicle-do charge_door open)"
 check "vehicle-do: undeclared refused" 13 "$(code mod vehicle-do wheel_heat on)"
@@ -306,7 +317,7 @@ check "park-rule: a mod's app can't" 13 "$(code mod park-rule closed)"
 check "park-rule: the HMG-API app can" closed "$(run app park-rule closed)"
 check "park-rule: back to door" door "$(run root park-rule door)"
 kill $VP 2>/dev/null || true; wait $VP 2>/dev/null || true
-check "vehicle: nothing reached the service for refused asks" 5 "$(wc -l < "$T/vehicle.req" | tr -d ' ')"
+check "vehicle: nothing reached the service for refused asks (5, and the 3 restarts' gear)" 8 "$(wc -l < "$T/vehicle.req" | tr -d ' ')"
 
 : > "$T/mod/root/state/apps.txt"
 check "mod turned off: its app is anyone again" 13 "$(code mod whoami)"

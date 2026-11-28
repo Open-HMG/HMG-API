@@ -18,8 +18,9 @@ import java.util.Map;
 /**
  * HMG-API's vehicle service: answers readings (hmgapi.engine.Vehicle) for hmgapid,
  * which has already checked that the asking mod declared them, and commands
- * (Commands, with their guards). Run by hmgapid as a core service while an enabled
- * mod declares readings or commands; listens on the abstract socket @hmgapi-vehicle
+ * (Commands, with their guards). Run by hmgapid as a core service, always: HMG-API's
+ * gear check before a restart, an apply or an install reads gear.park here (engine.Gear,
+ * hmgapid reboot), with or without a mod that reads the car; listens on the abstract socket @hmgapi-vehicle
  * and serves only root (hmgapid).
  *
  *   request:  "read <name> [<name>...]\n"

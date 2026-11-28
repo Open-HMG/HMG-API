@@ -38,7 +38,7 @@ fi
 "$H" engine remove "$ID" --from-nemesis || { echo "HMG-API didn't remove $ID (see above): nothing changed, the package stays"; exit 1; }
 # Removed from HMG-API either way now, so the package goes even when the apply fails:
 # the HMG-API app shows the pending change and its problem.
-if ! "$H" engine apply; then
+if ! "$H" engine apply --gear-unknown-ok; then   # only in P (postinstall.sh says why)
     echo "WARNING: $ID is removed from HMG-API, but its files aren't back to stock yet (see above): open the HMG-API app and tap Apply changes"
     exit 0
 fi

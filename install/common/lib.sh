@@ -62,6 +62,29 @@ fail() {
     exit 1
 }
 
+# gear_gate <what>: an install or uninstall only starts in P (the engine's Gear, hmgapid reboot):
+# shifting into reverse while one runs can cut it off half done (2026-11-27: a NEMESIS install,
+# no HMG-API, cut off that way left a unit that didn't start). Read through a running hmgapid
+# (`vehicle gear.park`, HMG-API's vehicle service). Not in P: exit 75, nothing changed, no
+# override. No reading (no hmgapid yet, as on a first install, or its vehicle service isn't up):
+# a warning to keep the car in P, and on: these routes (USB stick, NEMESIS, adb) have no one to
+# ask, and the owner who started it is the override. HMGAPI_HMGAPID: a stand-in, for off-car
+# tests (with ROOT and none, no check).
+gear_gate() {
+    local what=$1 h=${HMGAPI_HMGAPID:-} g=
+    if [ -z "$h" ]; then
+        [ -n "$ROOT" ] && return 0
+        h=/system/bin/hmgapid
+    fi
+    [ -x "$h" ] && set -- $("$h" vehicle gear.park 2>/dev/null) && [ "$1" = gear.park ] && g=$2
+    case "$g" in
+        1) log "in P: keep the car in P until $what is done" ;;
+        0) log "FAIL: the car isn't in P, and $what only starts in P (shifting into reverse while it runs can cut it off half done). Shift to P, stay there, and start again. Nothing was changed."
+           exit 75 ;;
+        *) log "warning: the gear can't be read, so HMG-API can't check that the car is in P: keep it in P until $what is done" ;;
+    esac
+}
+
 # The boot hook: `hmgapid boot`, which returns at once (the boot script goes straight on
 # to NEMESIS's start) and, detached, starts hmgapid and runs /data/hmgapi/boot.sh
 # (HMG-API's boot steps) once per boot.
@@ -107,6 +130,7 @@ hook_add() {
         chmod 755 "$_t"
         [ -x "$_f" ] || chmod 644 "$_t"
     fi
+    sync   # whole on disk before it replaces the boot script
     mv "$_t" "$_f"
 }
 
@@ -147,6 +171,7 @@ hook_restore() {
     chmod 755 "$_f.hmgapi-new"
     [ -x "$_f" ] || chmod 644 "$_f.hmgapi-new"
     [ "$(sum "$_f.hmgapi-new")" = "$(sum "$_b")" ] || { rm -f "$_f.hmgapi-new"; return 1; }
+    sync
     mv "$_f.hmgapi-new" "$_f"
 }
 
@@ -162,5 +187,6 @@ hook_remove() {
     hook_strip "$_f" > "$_f.hmgapi-new" || return 1
     chmod 755 "$_f.hmgapi-new"
     [ -x "$_f" ] || chmod 644 "$_f.hmgapi-new"
+    sync
     mv "$_f.hmgapi-new" "$_f"
 }

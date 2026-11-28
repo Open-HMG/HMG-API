@@ -182,7 +182,7 @@ set +e; o=$(env -u HMGAPI_NEMESIS_SYNC PATH="$T/bin:$PATH" $R/system/xbin/nemesi
 check "NEMESIS uninstall of a listed mod: done" 0 $r
 check "... HMG-API removed the mod" "" "$(mods)"
 check "... and put its change back" stock "$(grep '^persist.demo=' $R/system/build.prop | cut -d= -f2)"
-check "... through engine remove --from-nemesis and apply (no sync from inside NEMESIS)" "remove demo --from-nemesis|apply" "$(ecalls | sed 's/^engine //' | tr '\n' '|' | sed 's/|$//')"
+check "... through engine remove --from-nemesis and apply (no sync from inside NEMESIS)" "remove demo --from-nemesis|apply --gear-unknown-ok" "$(ecalls | sed 's/^engine //' | tr '\n' '|' | sed 's/|$//')"
 check "... NEMESIS lists only HMG-API" "hmgapi " "$(listed)"
 
 # ---- HMG-API's own listing: another version is re-listed; a NEMESIS uninstall uninstalls only if installed

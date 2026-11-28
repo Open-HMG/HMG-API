@@ -77,7 +77,7 @@ public class MainActivity extends Activity {
         Ui.button(actions, "Restart unit", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                confirmRestart();
+                Park.confirmRestart(MainActivity.this);
             }
         });
         top.addView(actions);
@@ -223,6 +223,8 @@ public class MainActivity extends Activity {
     }
 
     boolean restartNeeded() {
+        // boot.sh rolled a cut-off apply back and waits for the car to be parked to restart, or left it to the owner
+        if (new java.io.File("/data/hmgapi/public/restart-needed").isFile()) return true;
         return getSharedPreferences("hmgapi", MODE_PRIVATE).getLong("restart_boot", -1) == boot();
     }
 
@@ -273,25 +275,38 @@ public class MainActivity extends Activity {
                             : "Everything is applied.");
                     return;
                 }
-                new AlertDialog.Builder(MainActivity.this).setTitle("Apply these changes?").setMessage(shown)
+                final boolean files = filesChange(r.output);
+                new AlertDialog.Builder(MainActivity.this).setTitle("Apply these changes?")
+                        .setMessage(files ? shown + "\n\nThis changes system files, so it only starts with the car in P. " + Park.STAY : shown)
                         .setNegativeButton("Cancel", null)
                         .setPositiveButton("Apply", new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface d, int which) {
-                                apply();
+                                if (!files) {
+                                    apply(false);
+                                    return;
+                                }
+                                Park.then(MainActivity.this, APPLYING, new Park.Go() {
+                                    @Override
+                                    public void go(boolean unknownOk) {
+                                        apply(unknownOk);
+                                    }
+                                });
                             }
                         }).show();
             }
         }.start(this);
     }
 
-    private void apply() {
+    static final String APPLYING = "Applying changes to system files";
+
+    private void apply(final boolean unknownOk) {
         final AlertDialog wait = new AlertDialog.Builder(this)
                 .setMessage("Applying… (rebuilding apps can take a few minutes; leave the head unit on)").setCancelable(false).show();
         new Ui.Job<Hmgapid.Result>() {
             @Override
             Hmgapid.Result work() throws Exception {
-                return Hmgapid.call(900000, "engine", "apply");
+                return Hmgapid.call(900000, Park.with(unknownOk, "engine", "apply"));
             }
 
             @Override
@@ -301,6 +316,13 @@ public class MainActivity extends Activity {
                     message("Lost contact while applying", e.getMessage() + ". The apply finishes on its own; open HMG-API again to check.");
                     return;
                 }
+                // the car left P since the check (or gives no reading): nothing was changed
+                if (Park.refused(MainActivity.this, r, APPLYING, new Park.Go() {
+                    @Override
+                    public void go(boolean ok) {
+                        apply(ok);
+                    }
+                })) return;
                 boolean restart = restartNeeded() || r.output.contains("restart the head unit");
                 if (r.output.contains("restart the head unit")) needRestart();
                 AlertDialog.Builder d = new AlertDialog.Builder(MainActivity.this)
@@ -327,6 +349,14 @@ public class MainActivity extends Activity {
         new AlertDialog.Builder(this).setTitle(title).setMessage(text).setPositiveButton("OK", null).show();
     }
 
+    /** Does an engine plan change files on /system (only in P: hmgapi.engine.Gear)? */
+    static boolean filesChange(String out) {
+        for (String l : out.split("\n")) {
+            if (l.startsWith("change ") || l.startsWith("update ") || l.startsWith("restore ")) return true;
+        }
+        return false;
+    }
+
     /** Does an engine plan change anything? */
     static boolean changes(String out) {
         for (String l : out.split("\n")) {
@@ -347,32 +377,7 @@ public class MainActivity extends Activity {
         return b.toString().trim();
     }
 
-    private void confirmRestart() {
-        new AlertDialog.Builder(this)
-                .setTitle("Restart the head unit?")
-                .setMessage("The screen goes dark for about a minute. Don't use this while driving with navigation or a call active.")
-                .setNegativeButton("Cancel", null)
-                .setPositiveButton("Restart", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int which) {
-                        restart();
-                    }
-                })
-                .show();
-    }
-
     void restart() {
-        new Ui.Job<Hmgapid.Result>() {
-            @Override
-            Hmgapid.Result work() throws Exception {
-                return Hmgapid.call("reboot");
-            }
-
-            @Override
-            void done(Hmgapid.Result r, Exception e) {
-                if (e == null && r.code == 0) return;
-                message("Couldn't restart", e != null ? "hmgapid isn't running (" + e.getMessage() + ")" : r.output.trim());
-            }
-        }.start(this);
+        Park.restart(this);
     }
 }

@@ -490,8 +490,8 @@ Each event reaches the mod three ways, all at once:
 HMG-API waits for all three to finish (or their time to run out) before it sends the
 next event (`shutdown` doesn't wait for a `parked` still running), and at `shutdown`
 before it tells the car it's done. It only holds a shutdown up while an
-enabled mod asks for `shutdown`. The vehicle service runs while any enabled mod asks for
-an event. `hmgapid service-log hmgapi vehicle` says what it saw (power, doors) and what
+enabled mod asks for `shutdown`. The vehicle service always runs (HMG-API's own gear check
+before a restart or an install reads `gear.park` through it). `hmgapid service-log hmgapi vehicle` says what it saw (power, doors) and what
 each event did.
 
 ## Packaging

@@ -399,7 +399,7 @@ eng publish-state
 check "publish with a projection ask runs" 0 $rc
 check "the keeper's asks: the projection AP for aa, no home Wi-Fi" "projection aa" "$(cat "$D/state/wifi.txt")"
 has "the keeper runs without home Wi-Fi, from boot" "hmgapi wifi root boot yes script /data/hmgapi/state/wifi.sh" "$(cat "$D/state/services.txt")"
-hasnt "... no vehicle service for it" "hmgapi vehicle " "$(cat "$D/state/services.txt")"
+has "... the vehicle service runs anyway (the gear check)" "hmgapi vehicle " "$(cat "$D/state/services.txt")"
 eng plan
 has "the plan: the projection AP" "wifi     the projection AP up from boot, once each boot, unless a Wi-Fi client is on [aa]" "$out"
 has "the plan: the hotspot feature comes with it (the chip powered)" "com.hkmc.software.wifihotspot" "$out"

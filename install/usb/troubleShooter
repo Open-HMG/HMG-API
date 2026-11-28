@@ -11,6 +11,11 @@
 export PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin${PATH:+:$PATH}
 export LD_LIBRARY_PATH=/vendor/lib:/system/lib
 umask 077
+# Engineering Mode (the DSP agent) runs this with its output on a pipe. If that screen closes
+# while it runs (the reverse camera taking over the screen, say), the next line written would
+# end this script, and with it the install it's in the middle of: so a closed pipe or a
+# hang-up doesn't stop it (install.sh and uninstall.sh do the same, and only start in P).
+trap '' HUP PIPE INT TERM
 ROOT=${ROOT:-}
 STAGE=$ROOT/data/local/tmp/hmgapi-usb
 
@@ -24,15 +29,23 @@ toast() {
 }
 
 # restart once the DSP agent has the result; the rest runs from /data (deleting
-# /storage/upgrade cuts off this script, which lives there)
+# /storage/upgrade cuts off this script, which lives there). Not out of P: a restart takes the
+# reverse camera's picture away for about a minute, so while HMG-API's vehicle reading says
+# the car isn't in P, it waits (no reading, as on a first install: restarts as before).
 finish() {
     [ -n "$ROOT" ] && exit "$1"
     sync
     cat > /data/local/tmp/hmgapi-ota-finish.sh << 'END'
 #!/system/bin/sh
+trap '' HUP PIPE INT TERM
 sleep 8
 rm -rf /storage/upgrade/*
 sync
+while [ -x /system/bin/hmgapid ]; do
+    set -- $(/system/bin/hmgapid vehicle gear.park 2>/dev/null)
+    [ "$1 $2" = "gear.park 0" ] || break
+    sleep 5
+done
 reboot
 END
     chmod 755 /data/local/tmp/hmgapi-ota-finish.sh
@@ -59,7 +72,7 @@ if [ -f "$U/HMGAPI/UNINSTALL" ] || [ -f "$U/HMGAPI/UNINSTALL-PURGE" ]; then
         toast "HMG-API isn't installed. Nothing was changed."
         finish 1
     fi
-    toast "HMG-API: uninstalling..."
+    toast "HMG-API: uninstalling. Keep the car in P until the head unit restarts."
     PURGE=
     [ -f "$U/HMGAPI/UNINSTALL-PURGE" ] && PURGE=--purge
     sh "$ROOT/data/hmgapi/uninstall.sh" $PURGE > "$STAGE.log" 2>&1
@@ -67,6 +80,7 @@ if [ -f "$U/HMGAPI/UNINSTALL" ] || [ -f "$U/HMGAPI/UNINSTALL-PURGE" ]; then
     cp "$STAGE.log" "$U/HMGAPI/install.log" 2>/dev/null
     rm -f "$STAGE.log"
     if [ $rc = 0 ]; then toast "HMG-API uninstalled, restarting."
+    elif [ $rc = 75 ]; then toast "HMG-API: the car isn't in P, so nothing was changed. Shift to P and start the uninstall again."
     elif grep -q "isn't a known stock build" "$U/HMGAPI/install.log" 2>/dev/null; then toast "$UNKNOWN_TOAST"
     else toast "HMG-API uninstall failed: see HMGAPI/install.log on the stick."; fi
     finish $rc
@@ -77,7 +91,7 @@ if [ ! -f "$P/MANIFEST" ]; then
     toast "HMG-API: no HMGAPI/install/payload on the USB stick. Nothing was changed."
     finish 1
 fi
-toast "HMG-API $(cat "$P/VERSION" 2>/dev/null): installing..."
+toast "HMG-API $(cat "$P/VERSION" 2>/dev/null): installing. Keep the car in P until the head unit restarts."
 # from /data: the stick may be pulled, and it may not allow running files
 rm -r "$STAGE" 2>/dev/null
 mkdir -p "${STAGE%/*}" && cp -r "$P" "$STAGE" || { toast "HMG-API: can't copy from the USB stick. Nothing was changed."; finish 1; }
@@ -87,6 +101,8 @@ cp "$STAGE.log" "$U/HMGAPI/install.log" 2>/dev/null
 rm -r "$STAGE" "$STAGE.log" 2>/dev/null
 if [ $rc = 0 ]; then
     toast "HMG-API installed, restarting."
+elif [ $rc = 75 ]; then
+    toast "HMG-API: the car isn't in P, so nothing was changed. Shift to P and start the install again."
 elif grep -q "isn't a known stock build" "$U/HMGAPI/install.log" 2>/dev/null; then
     toast "$UNKNOWN_TOAST"
 else
