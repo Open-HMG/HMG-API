@@ -236,7 +236,12 @@ if [ -s "$BAK" ] && is_livepatch_script "$BAK"; then
 fi
 # ... and one that isn't the bytes it was taken from: an install that failed or was cut off while
 # copying it left a short file, which "once" would keep and an uninstall could put back. On an
-# update a known stock build stays (it is what the stock copy came from)
+# update a backup that is a known stock build stays, even when it differs from the stock copy:
+# this is about a short or damaged copy, and one of those never has a build's md5 from stock.txt,
+# so a known build is a whole stock app_process. The stock copy may also be the one stock.txt
+# doesn't know (a forced install), and then the backup is the only bytes here known to be good.
+# No order of events is known to leave the two different: a firmware install takes the stock copy
+# away with the wrapper, and the install after it takes both again.
 if [ -n "$UPDATE" ] && [ -z "$RESCUE" ]; then BSRC=$KEEP; else BSRC=$B; fi
 if [ -s "$BAK" ] && [ -z "$RESCUE" ] && [ "$(sum "$BAK")" != "$(sum "$BSRC")" ]; then
     bk=

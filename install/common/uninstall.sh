@@ -63,6 +63,10 @@ else
     # app_process.real starts no zygote. Nor a backup that isn't the bytes of the stock copy the
     # wrapper runs, unless it's a known stock build: a copy that was cut off is a short file.
     # Then the stock bytes come from that stock copy, or from a zygote file that is a stock binary.
+    # A backup that is a known stock build goes back even when it differs from the stock copy, as
+    # install.sh keeps it: its md5 says it is a whole stock app_process (a copy that was cut off has
+    # no build's md5), and a known build going back is the rule the owner already knows. No order
+    # of events is known to leave the two different.
     WRAP=$WRAPPED
     SRC=$BAK; why=
     if not_stock "$BAK"; then
