@@ -55,6 +55,11 @@
     "ret": "com.hkmc.bcm.IBCMListener",
     "static": true
   },
+  "framework.bcm_listener_stub.drive_mode": {
+    "field": "TRANSACTION_onDriveModeChanged",
+    "type": "int",
+    "static": true
+  },
   "framework.bcm_listener_stub.heating": {
     "field": "TRANSACTION_onRemoteTeleHeatingStatusChanged",
     "type": "int",
@@ -460,13 +465,38 @@
     "type": "int",
     "static": true
   },
+  "framework.hev_flag.battery_comp_power": {
+    "field": "DATC_BATTERYCOMPPWRCON_W",
+    "type": "int",
+    "static": true
+  },
   "framework.hev_flag.battery_conditioning": {
     "field": "EV_BATTERYCONDITIONING",
     "type": "int",
     "static": true
   },
+  "framework.hev_flag.climate_power": {
+    "field": "DATC_CLMTPWRCNSMPTN_W",
+    "type": "int",
+    "static": true
+  },
+  "framework.hev_flag.dc_minutes": {
+    "field": "NOT_CHAR_QUICK_REM_TIME_EV",
+    "type": "int",
+    "static": true
+  },
   "framework.hev_flag.display_soc": {
     "field": "DISPLAY_SOC",
+    "type": "int",
+    "static": true
+  },
+  "framework.hev_flag.energy_capacity": {
+    "field": "BMS_EVENERGYCAPA",
+    "type": "int",
+    "static": true
+  },
+  "framework.hev_flag.energy_map": {
+    "field": "ENERGYMAP_1000MS",
     "type": "int",
     "static": true
   },
@@ -477,6 +507,21 @@
   },
   "framework.hev_flag.odometer": {
     "field": "ODOMETER",
+    "type": "int",
+    "static": true
+  },
+  "framework.hev_flag.other_ecu_power": {
+    "field": "PWR_OTHER_ECU",
+    "type": "int",
+    "static": true
+  },
+  "framework.hev_flag.target_soc_ac": {
+    "field": "TARGET_SOC_SLOW",
+    "type": "int",
+    "static": true
+  },
+  "framework.hev_flag.target_soc_dc": {
+    "field": "TARGET_SOC_QUICK",
     "type": "int",
     "static": true
   },

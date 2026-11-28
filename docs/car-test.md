@@ -141,7 +141,18 @@ press SOS.
    - **Expect:** `hv.soc` matches the cluster's battery % (within 0.5), `odometer`
      matches the cluster (km), `battery12v.soc` a plausible %. **Note** all values and
      what the cluster shows.
-3. Ask for a reading twice within a second: same value (shared within its
+3. EV readings, car in READY:
+   ```
+   adb shell hmgapid vehicle hv.energy hv.capacity_nominal range charge.target_ac charge.target_dc charge.minutes_dc aux.climate_power aux.other_ecu_power aux.battery_conditioning_power drive_mode
+   ```
+   - **Expect:** `range` matches the cluster (km; a US car shows miles: × 1.609),
+     `charge.target_ac`/`charge.target_dc` the charge limits in the EV settings,
+     `charge.minutes_dc` the EV screen's DC estimate, `hv.capacity_nominal` 77400 on a
+     77.4 kWh pack, `hv.energy` roughly `hv.soc` % of the usable capacity.
+   - Turn climate control on, fan high: `aux.climate_power` rises. Change the drive
+     mode: `drive_mode` follows (0 default, 1 normal, 2 sport, 3 eco, 4 snow).
+     **Note** all values and what the car shows.
+4. Ask for a reading twice within a second: same value (shared within its
    freshness window), no error.
 
 ## 4. Vehicle commands (parked, one at a time)

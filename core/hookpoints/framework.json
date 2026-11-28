@@ -1031,6 +1031,94 @@
       "about": "0.1 km"
     },
     {
+      "id": "framework.hev_flag.energy_map",
+      "kind": "field",
+      "of": "framework.hev_flag",
+      "find": {
+        "name": "ENERGYMAP_1000MS",
+        "type": "int",
+        "static": true
+      },
+      "about": "usable energy left in the battery, 2 Wh steps (0xffff: not known); the same value as the cluster battery info's EV_AVLBL_ENRG"
+    },
+    {
+      "id": "framework.hev_flag.energy_capacity",
+      "kind": "field",
+      "of": "framework.hev_flag",
+      "find": {
+        "name": "BMS_EVENERGYCAPA",
+        "type": "int",
+        "static": true
+      },
+      "about": "the battery's nominal energy, 2 Wh steps (38700 on a 77.4 kWh Ioniq 5); doesn't follow wear"
+    },
+    {
+      "id": "framework.hev_flag.target_soc_ac",
+      "kind": "field",
+      "of": "framework.hev_flag",
+      "find": {
+        "name": "TARGET_SOC_SLOW",
+        "type": "int",
+        "static": true
+      },
+      "about": "AC charging target (the EV settings' charge limit), 0.5% steps"
+    },
+    {
+      "id": "framework.hev_flag.target_soc_dc",
+      "kind": "field",
+      "of": "framework.hev_flag",
+      "find": {
+        "name": "TARGET_SOC_QUICK",
+        "type": "int",
+        "static": true
+      },
+      "about": "DC fast charging target (the EV settings' charge limit), 0.5% steps"
+    },
+    {
+      "id": "framework.hev_flag.dc_minutes",
+      "kind": "field",
+      "of": "framework.hev_flag",
+      "find": {
+        "name": "NOT_CHAR_QUICK_REM_TIME_EV",
+        "type": "int",
+        "static": true
+      },
+      "about": "the car's estimate of a DC fast charge to the DC target, minutes (the EV screen's estimate)"
+    },
+    {
+      "id": "framework.hev_flag.climate_power",
+      "kind": "field",
+      "of": "framework.hev_flag",
+      "find": {
+        "name": "DATC_CLMTPWRCNSMPTN_W",
+        "type": "int",
+        "static": true
+      },
+      "about": "climate control's power draw now, 20 W steps"
+    },
+    {
+      "id": "framework.hev_flag.other_ecu_power",
+      "kind": "field",
+      "of": "framework.hev_flag",
+      "find": {
+        "name": "PWR_OTHER_ECU",
+        "type": "int",
+        "static": true
+      },
+      "about": "the electronics' and accessories' power draw now, 10 W steps"
+    },
+    {
+      "id": "framework.hev_flag.battery_comp_power",
+      "kind": "field",
+      "of": "framework.hev_flag",
+      "find": {
+        "name": "DATC_BATTERYCOMPPWRCON_W",
+        "type": "int",
+        "static": true
+      },
+      "about": "the compressor's power draw for the battery now (conditioning or cooling), 20 W steps"
+    },
+    {
       "id": "framework.regulation_manager",
       "kind": "class",
       "find": {
@@ -2027,6 +2115,17 @@
         "static": true
       },
       "about": "onRemoteTeleHeatingStatusChanged(steering wheel heat state, rear defogger state): sent on registration and on change; no getter has it"
+    },
+    {
+      "id": "framework.bcm_listener_stub.drive_mode",
+      "kind": "field",
+      "of": "framework.bcm_listener_stub",
+      "find": {
+        "name": "TRANSACTION_onDriveModeChanged",
+        "type": "int",
+        "static": true
+      },
+      "about": "onDriveModeChanged(drive mode): sent on registration and on change; never call getDriveMode, which asks the car and can show the drive mode pop-up"
     },
     {
       "id": "framework.bcm_service.register_listener",

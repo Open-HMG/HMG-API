@@ -3,12 +3,15 @@ package hmgapi.vehicle;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.Parcel;
+import android.os.SystemClock;
 
 import hmgapi.hook.Points;
 
 /**
  * Values the car only pushes to listeners (no getter): the steering wheel heat and
- * rear defogger state (body control's onRemoteTeleHeatingStatusChanged), and the outside
+ * rear defogger state (body control's onRemoteTeleHeatingStatusChanged), the drive mode
+ * (body control's onDriveModeChanged: getDriveMode would ask the car, which can show the
+ * drive mode pop-up), and the outside
  * temperature (climate control's onDatcStatus: DatcStatus, sent on registration and on
  * change; the system service's own ambient callbacks send 0 on the EV6), and the
  * ambient light (the system service's SML_STATUS_CHANGED broadcast, passed on by
@@ -29,26 +32,28 @@ final class CarCallbacks {
     volatile boolean saidNoAmbient;
     /** body control's heating status: steering wheel heat, rear defogger (raw); MIN_VALUE: not heard yet */
     volatile int wheelHeat = Integer.MIN_VALUE, defogger = Integer.MIN_VALUE;
+    /** body control's drive mode (onDriveModeChanged, raw); MIN_VALUE: not heard yet */
+    volatile int driveMode = Integer.MIN_VALUE;
 
-    /** the cluster's last battery info (8 ints: [1] minimum pack temperature °C, [5] conditioning indicator), and when; null until heard */
-    volatile int[] battery;
-    volatile long batteryAt;
+    private final BatteryInfo battery = new BatteryInfo();
 
     /** the ambient light's last status: r, g, b (2 bytes each), brightness, dimmed while driving, drive mode; null until heard */
     volatile byte[] sml;
 
-    private Listener system, bcm, cluster;
+    private Listener system, bcm;
+    private volatile Listener cluster;
     private String lastFailure, lastBcmFailure, lastClusterFailure;   // logged once, not every tick
     private boolean lightAsked;
 
     /**
-     * After QuickBoot STR suspend, body control's cached push values may be from an earlier
-     * drive until CAN wakes up; clear them so stale readings aren't served.
+     * After QuickBoot STR suspend, clear the cached heating and battery readings
+     * so they cannot carry over to the next drive.
      */
     synchronized void onWake() {
         wheelHeat = Integer.MIN_VALUE;
         defogger = Integer.MIN_VALUE;
         lightAsked = false;
+        battery.clear();
     }
 
     /** a binder answering some transactions of one interface */
@@ -114,12 +119,25 @@ final class CarCallbacks {
                 Object svc = Hub.bcm();
                 if (svc != null) {
                     final int code = (Integer) Points.get(null, "framework.bcm_listener_stub.heating", null);
+                    final boolean mode = Points.has("framework.bcm_listener_stub.drive_mode");   // not in every car's map yet
+                    final int modeCode = mode ? (Integer) Points.get(null, "framework.bcm_listener_stub.drive_mode", null) : Integer.MIN_VALUE;
                     // the door status: on a map that has it (registration sends the current one)
                     final int doorCode = Points.has("framework.bcm_listener_stub.doors") ? (Integer) Points.get(null, "framework.bcm_listener_stub.doors", null) : Integer.MIN_VALUE;
-                    int[] codes = doorCode == Integer.MIN_VALUE ? new int[] { code } : new int[] { code, doorCode };
+                    java.util.List<Integer> want = new java.util.ArrayList<Integer>();
+                    want.add(code);
+                    if (mode) want.add(modeCode);
+                    if (doorCode != Integer.MIN_VALUE) want.add(doorCode);
+                    int[] codes = new int[want.size()];
+                    for (int i = 0; i < codes.length; i++) codes[i] = want.get(i);
                     Listener l = new Listener(Points.cls(null, "framework.bcm_listener").getName(), codes) {
                         @Override
                         void got(int c, Parcel d) {
+                            if (mode && c == modeCode) {
+                                int m = d.readInt();
+                                if (driveMode == Integer.MIN_VALUE) System.out.println("vehicle: drive mode, first value: " + m);
+                                driveMode = m;
+                                return;
+                            }
                             if (c == doorCode) {
                                 int[] v = new int[10];
                                 for (int i = 0; i < v.length; i++) v[i] = d.readInt();
@@ -136,7 +154,8 @@ final class CarCallbacks {
                     Points.call(svc.getClass().getClassLoader(), "framework.bcm_service.register_listener", svc, proxy, l);
                     bcm = l;
                     lastBcmFailure = null;
-                    System.out.println("vehicle: listening to the body control service (wheel heat, defogger" + (doorCode == Integer.MIN_VALUE ? "; no door status in this car's map" : ", doors") + ")");
+                    System.out.println("vehicle: listening to the body control service (wheel heat, defogger" + (mode ? ", drive mode" : "")
+                            + (doorCode == Integer.MIN_VALUE ? "; no door status in this car's map" : ", doors") + ")");
                 }
             } catch (Throwable t) {
                 String why = String.valueOf(t.getCause() != null ? t.getCause() : t);
@@ -157,10 +176,7 @@ final class CarCallbacks {
                     Listener l = new Listener(Points.cls(null, "framework.cluster_listener").getName(), code) {
                         @Override
                         void got(int c, Parcel d) {
-                            int[] v = d.createIntArray();
-                            if (battery == null) System.out.println("vehicle: battery info, first values: " + java.util.Arrays.toString(v));
-                            battery = v;
-                            batteryAt = android.os.SystemClock.elapsedRealtime();
+                            battery.received(d.createIntArray(), SystemClock.elapsedRealtime());
                         }
                     };
                     Object proxy = Points.call(null, "framework.cluster_listener_stub.as_interface", null, l);
@@ -303,25 +319,42 @@ final class CarCallbacks {
      * temperature of -40..60 °C (Launchpad's ClusterBatteryTemperatureReader).
      */
     int packTempMin(long waitMs) {
-        long asked = android.os.SystemClock.elapsedRealtime();
-        try {
-            Object svc = Hub.cluster();
-            if (svc == null || cluster == null) return Integer.MIN_VALUE;
-            Points.call(svc.getClass().getClassLoader(), "framework.cluster_service.battery_info", svc);
-        } catch (Throwable t) {
-            Hub.services.remove("framework.car_services.cluster");
-            return Integer.MIN_VALUE;
-        }
-        while (batteryAt < asked && android.os.SystemClock.elapsedRealtime() - asked < waitMs) {
+        return BatteryInfo.packTempMin(batteryInfo(waitMs));
+    }
+
+    int rangeKm(long waitMs) {
+        return BatteryInfo.rangeKm(batteryInfo(waitMs));
+    }
+
+    /**
+     * Use a recent cluster reply or wait up to waitMs for one. Readers share the reply
+     * and send at most one request every two seconds, even when the cluster doesn't answer.
+     */
+    private int[] batteryInfo(long waitMs) {
+        long started = SystemClock.elapsedRealtime();
+        int[] reply = battery.fresh(started);
+        if (reply != null || cluster == null) return reply;
+        if (battery.beginRequest(SystemClock.elapsedRealtime())) {
             try {
-                Thread.sleep(20);
-            } catch (InterruptedException e) {
-                break;
+                Object svc = Hub.cluster();
+                if (svc == null) return null;
+                Points.call(svc.getClass().getClassLoader(), "framework.cluster_service.battery_info", svc);
+            } catch (Throwable t) {
+                Hub.services.remove("framework.car_services.cluster");
+                return null;
             }
         }
-        int[] b = battery;
-        if (batteryAt < asked || b == null || b.length != 8 || b[1] < -40 || b[1] > 60) return Integer.MIN_VALUE;
-        return b[1];
+        long now = SystemClock.elapsedRealtime();
+        while ((reply = battery.fresh(now)) == null && now - started < waitMs) {
+            try {
+                Thread.sleep(Math.min(20, waitMs - (now - started)));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return null;
+            }
+            now = SystemClock.elapsedRealtime();
+        }
+        return reply;
     }
 
     /** the light's status from LightRelay: hex of r, g, b (2 bytes each), brightness, dimmed, drive mode */
