@@ -24,7 +24,8 @@ import org.json.JSONObject;
  * by category), Car Report, Logs.
  */
 public class MainActivity extends Activity {
-    static final String[] TABS = { "Mods", "Settings", "Car Report", "Logs" };
+    static final String[] TABS = { "Mods", "Catalogue", "Updates", "Settings", "Car Report", "Logs" };
+    static final int MODS = 0, CATALOGUE = 1, UPDATES_TAB = 2, SETTINGS = 3, REPORT = 4, LOGS = 5;
     private LinearLayout pills;
     private FrameLayout content;
     private final TextView[] tabs = new TextView[TABS.length];
@@ -90,7 +91,7 @@ public class MainActivity extends Activity {
             final int n = i;
             LinearLayout t = Ui.column(this);
             tabs[i] = new TextView(this);
-            tabs[i].setText(TABS[i]);
+            tabs[i].setText(i == UPDATES_TAB ? updatesLabel() : TABS[i]);
             Ui.size(tabs[i], 21);
             tabs[i].setPadding(Ui.dp(this, 4), Ui.dp(this, 6), Ui.dp(this, 4), Ui.dp(this, 8));
             t.addView(tabs[i]);
@@ -166,9 +167,21 @@ public class MainActivity extends Activity {
             marks[i].setVisibility(i == n ? View.VISIBLE : View.INVISIBLE);
         }
         content.removeAllViews();
-        View v = n == 0 ? new ModsTab(this).view() : n == 1 ? new SettingsTab(this).view()
-                : n == 2 ? new ReportTab(this).view() : new LogsTab(this).view();
+        tabs[UPDATES_TAB].setText(updatesLabel());
+        View v = n == MODS ? new ModsTab(this).view() : n == CATALOGUE ? new CatalogTab(this).view()
+                : n == UPDATES_TAB ? new UpdatesTab(this).view() : n == SETTINGS ? new SettingsTab(this).view()
+                : n == REPORT ? new ReportTab(this).view() : new LogsTab(this).view();
         content.addView(v);
+    }
+
+    /** "Updates (n)" when the last check found any (public/updates.json, written by the engine) */
+    static String updatesLabel() {
+        try {
+            int n = new org.json.JSONObject(UsbFolders.read(new java.io.File("/data/hmgapi/public/updates.json"))).optInt("count");
+            return n > 0 ? "Updates (" + n + ")" : "Updates";
+        } catch (Exception e) {
+            return "Updates";
+        }
     }
 
     /** "1.0.0 · Kia EV6 (usa 260507)" from the hook runtime's status */
@@ -239,7 +252,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onActivityResult(int request, int result, Intent data) {
-        if (request == UPDATES && current == 0) show(0);   // the Mods tab again: new mods, versions, the updates count
+        if (request == UPDATES && current == MODS) show(MODS);   // the Mods tab again: new mods, versions, the updates count
         if (request == UPDATES && result == RESULT_OK) plan();   // mods were installed: apply them (plan first)
     }
 

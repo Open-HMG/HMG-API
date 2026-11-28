@@ -1,9 +1,7 @@
 package hmgapi.app;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.graphics.Color;
-import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -17,24 +15,30 @@ import java.util.Arrays;
 /**
  * Get mods: HMG-API's mod catalogue (engine catalog, kept from the last check; "Check now"
  * fetches it again over home Wi-Fi). Each mod with what installing it would do here; Install
- * takes the mods it requires too (CatalogFlow). Installed mods are applied by the main screen.
+ * takes the mods it requires too (CatalogFlow), then offers to apply. A tab of the main screen.
  */
-public class CatalogActivity extends Activity {
+final class CatalogTab {
+    final MainActivity a;
+
+    CatalogTab(MainActivity a) {
+        this.a = a;
+    }
+
     private LinearLayout rows;
     private TextView message, when;
     private Button connect;
-    private boolean installed;
 
-    @Override
-    protected void onCreate(Bundle state) {
-        super.onCreate(state);
-        LinearLayout list = Ui.page(this);
+    View view() {
+        LinearLayout root = Ui.column(a);
+        root.setBackgroundColor(Ui.BG);
+        LinearLayout list = Ui.scrolling(root, 1, LinearLayout.LayoutParams.MATCH_PARENT);
+        list.setPadding(Ui.dp(a, 32), Ui.dp(a, 16), Ui.dp(a, 32), Ui.dp(a, 24));
         Ui.text(list, "Get mods", 30, true, Ui.GREEN);
         Ui.text(list, "HMG-API's mod catalogue: mods the HMG-API project lists, each from its author's own GitHub release. "
                 + "Mods they need are installed with them. Checked and downloaded over home Wi-Fi only.", 16, false, Color.GRAY);
         when = Ui.text(list, "", 15, false, Color.GRAY);
         message = Ui.text(list, "", 18, false, Ui.WARN);
-        LinearLayout buttons = Ui.row(this);
+        LinearLayout buttons = Ui.row(a);
         Ui.button(buttons, "Check now", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -45,7 +49,7 @@ public class CatalogActivity extends Activity {
             @Override
             public void onClick(View v) {
                 message.setText("Connecting to home Wi-Fi… (wireless CarPlay and Android Auto are off meanwhile)");
-                CatalogFlow.connect(CatalogActivity.this, new Runnable() {
+                CatalogFlow.connect(a, new Runnable() {
                     @Override
                     public void run() {
                         load(true);
@@ -55,16 +59,11 @@ public class CatalogActivity extends Activity {
         });
         connect.setVisibility(View.GONE);
         list.addView(buttons);
-        rows = new LinearLayout(this);
+        rows = new LinearLayout(a);
         rows.setOrientation(LinearLayout.VERTICAL);
         list.addView(rows);
         load(false);
-    }
-
-    @Override
-    public void finish() {
-        setResult(installed ? RESULT_OK : RESULT_CANCELED);   // the main screen applies after installs
-        super.finish();
+        return root;
     }
 
     private void load(final boolean refresh) {
@@ -96,7 +95,7 @@ public class CatalogActivity extends Activity {
                 else message.setText(online ? "" : "Offline (" + d.optString("offline") + "): showing the last check.");
                 for (int i = 0; mods != null && i < mods.length(); i++) row(mods.optJSONObject(i), online);
             }
-        }.start(this);
+        }.start(a);
     }
 
     private void row(final JSONObject m, boolean online) {
@@ -132,27 +131,23 @@ public class CatalogActivity extends Activity {
         Button b = Ui.button(rows, label, new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                CatalogFlow.start(CatalogActivity.this, Arrays.asList(m.optString("id")), update, new CatalogFlow.Done() {
+                CatalogFlow.start(a, Arrays.asList(m.optString("id")), update, new CatalogFlow.Done() {
                     @Override
                     public void installed(String output) {
-                        installed = true;
-                        new AlertDialog.Builder(CatalogActivity.this).setTitle("Installed")
-                                .setMessage(MainActivity.readable(output) + "\n\nGo back to apply the changes.")
-                                .setPositiveButton("OK", null).show();
+                        CatalogFlow.applyNow(a, "Installed", MainActivity.readable(output));
                         load(false);
                     }
 
                     @Override
                     public void failed(String output) {
-                        new AlertDialog.Builder(CatalogActivity.this).setTitle("Not installed").setMessage(output)
+                        new AlertDialog.Builder(a).setTitle("Not installed").setMessage(output)
                                 .setPositiveButton("OK", null).show();
                         load(false);
                     }
 
                     @Override
                     void lost(String message) {
-                        installed = true;   // the main screen's plan waits for the install, then shows what changed
-                        new AlertDialog.Builder(CatalogActivity.this).setTitle("Still installing").setMessage(message)
+                        new AlertDialog.Builder(a).setTitle("Still installing").setMessage(message)
                                 .setPositiveButton("OK", null).show();
                     }
                 });
