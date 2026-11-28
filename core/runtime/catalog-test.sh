@@ -221,6 +221,51 @@ check "apply" 0 $rc
 has "... the staged update put in place first" "update   helper 1.0.0 -> 1.1.0 (staged by the automatic check; 1.0.0 kept in /data/hmgapi/previous/helper)" "$out"
 check "... installed, the previous version kept" "1.1.0 1.0.0" "$(installed helper) $(python3 -c "import json; print(json.load(open('$D/previous/helper/mod.json'))['version'])")"
 check "... nothing left staged" no "$([ -d $D/pending/helper ] && echo yes || echo no)"
+check "... its record gone: the apply is final" no "$([ -f $D/state/staged-swap.json ] && echo yes || echo no)"
+
+# staged updates are part of the apply: a cut-off apply or an undone trial puts them back, like the /system files
+pkg helper 1.2.0; listing; eng catalog --refresh
+GAP=0 eng update-check
+check "helper 1.2.0 staged" 1.2.0 "$(python3 -c "import json; print(json.load(open('$D/pending/helper/mod.json'))['version'])")"
+# cut off between moving 1.1.0 aside and putting 1.2.0 in: only the record and previous/ are there
+rm -rf "$D/previous/helper"; mv "$D/mods/helper" "$D/previous/helper"; echo '{"ids": ["helper"]}' > "$D/state/staged-swap.json"
+eng apply
+check "an apply cut off in its staged updates: the next one waits for recover" 1 $rc
+eng recover
+check "... recover: the old version back, the update staged again" "1.1.0 1.2.0" "$(installed helper) $(python3 -c "import json; print(json.load(open('$D/pending/helper/mod.json'))['version'])")"
+check "... its record gone" no "$([ -f $D/state/staged-swap.json ] && echo yes || echo no)"
+# cut off after both moves, before the journal was written (the apply was still planning)
+rm -rf "$D/previous/helper"; mv "$D/mods/helper" "$D/previous/helper"; mv "$D/pending/helper" "$D/mods/helper"; echo '{"ids": ["helper"]}' > "$D/state/staged-swap.json"
+eng recover
+check "cut off before its journal: recover puts the old version back" "1.1.0 1.2.0" "$(installed helper) $(python3 -c "import json; print(json.load(open('$D/pending/helper/mod.json'))['version'])")"
+has "... and says so (boot.sh restarts on it)" "rolled back the staged update of helper" "$out"
+# a trial that's undone: its journal and the staged update's record go back together
+rm -rf "$D/previous/helper"; mv "$D/mods/helper" "$D/previous/helper"; mv "$D/pending/helper" "$D/mods/helper"; echo '{"ids": ["helper"]}' > "$D/state/staged-swap.json"
+python3 - "$D/state" <<'J'
+import json, os, sys
+d = sys.argv[1]; st = json.load(open(os.path.join(d, "files.json"))) if os.path.exists(os.path.join(d, "files.json")) else {"files": {}, "settings": {}}
+json.dump({"trial": True, "committed": True, "entries": [], "state": st}, open(os.path.join(d, "journal.json"), "w"))
+J
+eng keep
+check "a trial kept: the staged update stays in" "0 1.2.0 no" "$rc $(installed helper) $([ -f $D/state/staged-swap.json ] && echo yes || echo no)"
+rm -rf "$D/mods/helper"; mv "$D/previous/helper" "$D/mods/helper"; pkg helper 1.2.0; listing; eng catalog --refresh; GAP=0 eng update-check
+rm -rf "$D/previous/helper"; mv "$D/mods/helper" "$D/previous/helper"; mv "$D/pending/helper" "$D/mods/helper"; echo '{"ids": ["helper"]}' > "$D/state/staged-swap.json"
+python3 - "$D/state" <<'J'
+import json, os, sys
+d = sys.argv[1]; st = json.load(open(os.path.join(d, "files.json"))) if os.path.exists(os.path.join(d, "files.json")) else {"files": {}, "settings": {}}
+json.dump({"trial": True, "committed": True, "entries": [], "state": st}, open(os.path.join(d, "journal.json"), "w"))
+J
+eng recover
+check "a trial undone: the staged update goes back with it" "1.1.0 1.2.0 no" "$(installed helper) $(python3 -c "import json; print(json.load(open('$D/pending/helper/mod.json'))['version'])") $([ -f $D/state/staged-swap.json ] && echo yes || echo no)"
+has "... trial undone" "trial undone" "$out"
+
+# withdrawn after it was staged: dropped at the apply, not put in
+echo '{"withdrawn": [{"id": "helper", "versions": "1.2.0", "why": "breaks the cluster"}]}' > "$CAT/withdrawn.json"
+eng catalog --refresh
+eng apply
+check "a staged update withdrawn since: not put in" "0 1.1.0 no" "$rc $(installed helper) $([ -d $D/pending/helper ] && echo yes || echo no)"
+has "... said why" "dropped the staged helper 1.2.0: HMG-API's maintainers withdrew it since (breaks the cluster)" "$out"
+rm "$CAT/withdrawn.json"; pkg helper 1.1.0; listing; eng catalog --refresh
 rm "$D/settings/allow/auto_stage_updates"
 
 # ---- HMG-API's own release

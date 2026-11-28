@@ -347,6 +347,7 @@ printf 10.10.10.100 > "$F/fw/props/dhcp.wlan0.dns1"
 log=$(wk)
 has "up" "home Wi-Fi up: the mods that asked go through it; the car stays on mobile data" "$log"
 check "... the update check started, once" "update check" "$(cat "$X/data/hmgapi/wifi/update-check.test")"
+has "... after wifi.json says up (the engine reads it to know it's online)" '"state": "up"' "$(cat "$X/data/hmgapi/wifi/update-check.pub")"
 mkdir -p "$X/proc/sys/net/ipv4/conf/wlan0"; wk >/dev/null
 check "... not again while still up" 1 "$(grep -c . "$X/data/hmgapi/wifi/update-check.test")"
 check "status: up, signal, channel, no network name" '{"state": "up", "rssi": -61, "freq": 2437}' "$(pub)"

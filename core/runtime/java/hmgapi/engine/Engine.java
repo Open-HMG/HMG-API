@@ -413,7 +413,7 @@ public final class Engine {
             return 0;
         }
         if ("install".equals(cmd) || "remove".equals(cmd)) {
-            if (journalFile.exists()) {
+            if (journalFile.exists() || Catalog.swapFile(this).exists()) {
                 out.add("an earlier apply isn't finished or is a trial: run `engine keep` (trial) or `engine recover` first");
                 return 1;
             }
@@ -447,7 +447,7 @@ public final class Engine {
         if ("release-held".equals(cmd)) return releaseHeld();
         if ("keep".equals(cmd)) return keep();
         if ("firmware-reset".equals(cmd)) return firmwareReset();
-        if (journalFile.exists() && !"keep".equals(cmd)) {
+        if ((journalFile.exists() || Catalog.swapFile(this).exists()) && !"keep".equals(cmd)) {
             out.add("an earlier apply isn't finished or is a trial: run `engine keep` (trial) or `engine recover` first");
             return 1;
         }
@@ -492,6 +492,7 @@ public final class Engine {
         if ("plan".equals(cmd)) return 0;
         if (p.isEmpty()) {
             out.add("nothing to do");
+            if ("apply".equals(cmd)) Catalog.stagedDone(this);   // the staged updates changed no /system file: they're in for good
             if ("apply".equals(cmd)) LiveState.publish(this);   // a switch with no file change still reaches running apps
             return 0;
         }
@@ -512,8 +513,13 @@ public final class Engine {
             Catalog.stagedBack(this, staged);
             throw x;
         }
-        if (rc != 0) Catalog.stagedBack(this, staged);
-        else LiveState.publish(this);
+        if (rc != 0) {
+            Catalog.stagedBack(this, staged);
+            return rc;
+        }
+        // a trial's staged updates stay on the record with it: `engine keep` keeps them, undoing the trial puts them back
+        if (!trial) Catalog.stagedDone(this);
+        LiveState.publish(this);
         return rc;
     }
 
@@ -2814,6 +2820,7 @@ public final class Engine {
         }
         journalFile.delete();
         rm(prevDir);
+        Catalog.stagedDone(this);
         out.add("kept");
         return 0;
     }
@@ -2827,6 +2834,10 @@ public final class Engine {
     @SuppressWarnings("unchecked")
     int recover() throws Exception {
         if (!journalFile.exists()) {
+            if (Catalog.swapFile(this).exists()) {   // cut off after staged updates went in, before its journal: those go back
+                Catalog.stagedRecover(this);
+                return startHeld(readHeld());
+            }
             out.add("nothing to recover");
             return startHeld(readHeld());
         }
@@ -2865,6 +2876,7 @@ public final class Engine {
             if (wasFailed == null) ff.delete();
             else write(ff, wasFailed);
         }
+        Catalog.stagedRecover(this);   // the mod code that went in with it goes too
         boolean any = out.size() > before;
         if (lost.isEmpty()) {
             journalFile.delete();
