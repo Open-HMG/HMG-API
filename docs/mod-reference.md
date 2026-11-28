@@ -28,7 +28,7 @@ setting). It never edits your code.
 | your own APK | `"apps": [{"apk": "…", "package": "…"}]`: installed with the signature workaround, data kept on update, turned off with the mod, removed with it |
 | a tile in the app menu | `"provides": {"launcher": [{"package": "pkg", "class": ".Main"}]}`, with optional day/night pictures (`icon`, `icon_night`) and greyed-out ones (`icon_disabled`, `icon_disabled_night`); `tools/mkicon.sh <picture> <dir>` makes all four in the stock style from any shape (PNG or SVG; add a size and the shape's colour for a logo on its own background, e.g. `66 '#41ae45'`) |
 | to change how the car's own apps behave | `"hooks": {"jar": "hooks.jar", "entry": "my.Entry"}`: your code runs in their processes and hooks them by stable hook point names, mapped per car; the list, and which cars have each: [hook-points.md](hook-points.md) (example: `mods/examples/hello`) |
-| a background process | `"services": [{"name": "…", "script": "…", "user": "root\|system\|app"}]`, or `{"jar": "x.jar", "class": "my.Main", "args": […]}` (`BOOTCLASSPATH` already set); `"restart": true` (default) or `false`; `"start": "android"` (default), `"boot"`, or `"manual"` (only when your app or `hmgapid service-start` asks) |
+| a background process | `"services": [{"name": "…", "script": "…", "user": "root\|system\|app"}]`, or `{"jar": "x.jar", "class": "my.Main", "args": […]}` (`BOOTCLASSPATH` already set); `"restart": true` (default) or `false`; `"start": "android"` (default), `"boot"`, or `"manual"` (only when your app or `hmgapid service-start` asks); `"priority": "low"` (default: nice 10, lowest I/O priority) or `"normal"` |
 | files and settings on the unit | `patches.json` changes (`add`, `lines`, `props`, `setting`, `codecs`, …): merged with other mods, put back on removal |
 | a folder on a USB stick | `"usb": ["MyFolder"]`: your apps get `hmgapi.intent.action.USB_FOLDER`; services ask `hmgapid usb` |
 | to read the car | `"vehicle": {"read": ["battery12v.soc", "gear.park", "hv.soc"]}`, then `hmgapid vehicle <name>…` or `api.vehicle(…)`: no root, one read shared by every mod (see Vehicle readings) |
@@ -57,6 +57,12 @@ A service's environment: `HMGAPI_MOD`, `HMGAPI_MOD_DIR` (the mod's folder),
 `ANDROID_ROOT` …), the stock `PATH`. Manage services with `hmgapid
 service-start|stop|restart <name>` and read their output with `hmgapid service-log
 <name>`.
+
+hmgapid keeps a service's log at 256 KB, then `.1`, while it runs, and keeps at most
+256 KB of its output a minute (a line in the log says how much it left out). A service
+runs at a low priority (nice 10, the lowest best-effort I/O priority) unless it asks for
+`"priority": "normal"`; ask only for work the driver waits on. In safe mode (the wiki's
+Troubleshooting page) no mod's service runs, `"boot"` ones included.
 
 ### Points mapped on the car itself
 

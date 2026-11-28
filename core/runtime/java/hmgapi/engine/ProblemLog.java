@@ -319,6 +319,7 @@ final class ProblemLog {
         } catch (NumberFormatException ignored) {
             // no number: nothing to say
         }
+        s.append("safe mode: ").append(Safe.on(e.data) ? "on (" + Safe.describe(e.data) + "): no mod runs" : "off").append('\n');
         s.append("hook library: ").append(new File(e.root + "/system/lib/libhmgapi_hook.so").isFile() ? "there" : "absent").append('\n');
         int n = 0;
         for (String l : dmesg.split("\n")) {

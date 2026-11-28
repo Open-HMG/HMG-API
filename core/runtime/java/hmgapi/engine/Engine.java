@@ -147,9 +147,15 @@ public final class Engine {
 
     boolean lock(String cmd) throws IOException, InterruptedException {
         if ("status".equals(cmd) || "map".equals(cmd) || "problem".equals(cmd) || "1".equals(env(LOCKED_ENV, null))) return true;
+        return lock(cmd, Long.parseLong(env("HMGAPI_LOCK_WAIT", "900")));
+    }
+
+    /** the lock, waiting at most waitSeconds (0: only if it's free now) */
+    boolean lock(String cmd, long waitSeconds) throws IOException, InterruptedException {
+        if (locked || "1".equals(env(LOCKED_ENV, null))) return true;
         File f = new File(stateDir, "engine.lock");
         java.io.RandomAccessFile raf = new java.io.RandomAccessFile(f, "rw");
-        long wait = Long.parseLong(env("HMGAPI_LOCK_WAIT", "900")) * 1000000000L, start = System.nanoTime();
+        long wait = waitSeconds * 1000000000L, start = System.nanoTime();
         while (true) {
             java.nio.channels.FileLock l;
             try {
@@ -360,7 +366,8 @@ public final class Engine {
             else if ("--force".equals(args[i])) force = true;
         }
         stateDir.mkdirs();
-        if (!lock(cmd)) return 4;
+        boolean safeCmd = "safe".equals(cmd);   // never waits for another run (an apply can take minutes): Safe.run
+        if (!safeCmd && !lock(cmd)) return 4;
         File lj = new File(data, "settings/hmgapi.json");
         if (lj.isFile()) hmgapi = Json.object(read(lj));
         product = env("HMGAPI_PRODUCT", null);
@@ -368,6 +375,7 @@ public final class Engine {
         onebin = env("HMGAPI_ONEBIN", null);
         if (onebin == null) onebin = getprop("ro.mobis.onebindir");
         facts = new SystemCheck.Facts(root, (Map<String, Object>) hmgapi.get("car"));
+        if (safeCmd) return Safe.run(this, args);
 
         if ("status".equals(cmd)) return status();
         if ("verify-map".equals(cmd)) return MapCheck.run(this);
@@ -435,9 +443,10 @@ public final class Engine {
         if (!restoreAll) {
             CarMap map = CarMap.load(root, facts, hmgapi);
             if (!map.runnable) out.add("hooks are off on this car (" + map.reason + "): mods apply without their hooks");
+            if (Safe.on(data)) out.add("safe mode is on (" + Safe.describe(data) + "): the mods' files change as planned, but none of them runs until it's off");
         }
         if (!restoreAll && !"plan".equals(cmd) && !"apply".equals(cmd)) {
-            out.add("usage: engine plan | apply [--trial] | keep | restore | status | recover | firmware-reset | install <zip|dir> | remove <id> | nemesis-sync | map | map-car [--local [--if-needed] | --write | --forget] | verify-map | report [--usb] | usb-scan | update-hmgapi <zip> | publish-state | apps");
+            out.add("usage: engine plan | apply [--trial] | keep | restore | status | recover | firmware-reset | install <zip|dir> | remove <id> | safe [on | off] | nemesis-sync | map | map-car [--local [--if-needed] | --write | --forget] | verify-map | report [--usb] | usb-scan | update-hmgapi <zip> | publish-state | apps");
             return 2;
         }
         Plan p = plan(restoreAll, force);
@@ -2087,6 +2096,7 @@ public final class Engine {
         }
         Set<String> on = new LinkedHashSet<String>();
         adbTcpWarning(LiveState.mods(this, on), on);
+        if (Safe.on(data)) out.add("safe mode on (" + Safe.describe(data) + "): " + Safe.WHAT);
         if (journalFile.exists()) {
             Map<String, Object> j = Json.object(read(journalFile));
             out.add(Boolean.TRUE.equals(j.get("trial")) ? "trial apply in place: `engine keep` keeps it, the next start undoes it"

@@ -23,6 +23,8 @@ import java.util.Set;
  * "projection" (top level): Android Auto density, sensors, fuel and connector types,
  * and which apps hear projection events (Projection.settle).
  *
+ * "safe" (top level, only while safe mode is on: Safe): every mod is listed as off.
+ *
  * A mod is "enabled" only if it's turned on and every mod it requires is too. Mods'
  * mod.json and declared hook JARs are made readable (their folders traversable), so an app can
  * load a "live" mod that wasn't loaded when it started; settings files are not.
@@ -33,8 +35,13 @@ final class LiveState {
     static final String ACTION = "hmgapi.intent.action.STATE_CHANGED";
 
     /** every installed mod's mod.json; on gets the enabled ones (turned on, and every mod they require too) */
-    @SuppressWarnings("unchecked")
     static Map<String, Map<String, Object>> mods(Engine e, Set<String> on) {
+        return mods(e, on, true);
+    }
+
+    /** safe: false for the mods that would be on if safe mode were off (Safe.adbOnly) */
+    @SuppressWarnings("unchecked")
+    static Map<String, Map<String, Object>> mods(Engine e, Set<String> on, boolean safe) {
         File[] ds = new File(e.data, "mods").listFiles();
         Map<String, Map<String, Object>> json = new LinkedHashMap<String, Map<String, Object>>();
         if (ds != null) {
@@ -50,6 +57,7 @@ final class LiveState {
                 }
             }
         }
+        if (safe && Safe.on(e.data)) on.clear();   // safe mode: every mod counts as off (Safe)
         // a mod whose requirement is off is off too
         boolean more = true;
         while (more) {
@@ -96,6 +104,10 @@ final class LiveState {
         for (String n : notes) e.out.add(n);
         Map<String, Object> state = new LinkedHashMap<String, Object>();
         state.put("serial", System.currentTimeMillis());
+        if (Safe.on(e.data)) {   // the app's "Safe mode" pill and switch
+            state.put("safe", true);
+            state.put("safe_why", Safe.why(e.data));
+        }
         state.put("mods", mods);
         state.put("input", input);   // button bindings, settled: hook.Input in system_server acts on them
         state.put("projection", ModRuntime.projection(e, json, on, notes));   // hook.Projection in GPM
@@ -119,7 +131,7 @@ final class LiveState {
                 // Android not up: apps read the file when they start anyway
             }
         }
-        e.out.add("state published: " + on.size() + " of " + json.size() + " mods on");
+        e.out.add("state published: " + on.size() + " of " + json.size() + " mods on" + (Safe.on(e.data) ? " (safe mode)" : ""));
         return 0;
     }
 

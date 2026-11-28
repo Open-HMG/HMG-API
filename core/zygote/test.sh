@@ -17,7 +17,7 @@ chmod +x "$T/stock"
 mkdir -p "$T/hook"
 echo 5e1d0c34-aaaa-4bbb-8ccc-000000000001 > "$T/boot_id"   # one kernel boot, until a test changes it
 . ../../tools/env.sh
-clang $ARM_STATIC -DGUARD_DELAY=1 -DSTOCK="\"$T/stock\"" -DKMSG="\"$T/kmsg\"" -DHOOKDIR="\"$T/hook\"" -DHOOKLIB="\"$T/lib.so\"" -DHMGAPID="\"$T/hmgapid\"" -DBOOTID="\"$T/boot_id\"" \
+clang $ARM_STATIC -DGUARD_DELAY=1 -DSTOCK="\"$T/stock\"" -DKMSG="\"$T/kmsg\"" -DHOOKDIR="\"$T/hook\"" -DHOOKLIB="\"$T/lib.so\"" -DHMGAPID="\"$T/hmgapid\"" -DBOOTID="\"$T/boot_id\"" -DSAFEFILE="\"$T/SAFE\"" \
   -o "$T/wrap" zygote.c
 fail=0
 check() {  # name, expected-substring, actual
@@ -57,8 +57,24 @@ check "not zygote: no preload" "PRELOAD:old.so" "$out"
 
 run --zygote >/dev/null; run --zygote >/dev/null
 out=$(run --zygote)
-check "boot guard after 3 starts" "PRELOAD:old.so" "$out"
-check "log says boot guard" "boot guard, starts=3" "$(cat "$T/kmsg")"
+# the first trip: safe mode (no mod loads, none of their services run), HMG-API alone gets a try
+check "boot guard after 3 starts: hooks stay on for HMG-API alone" "PRELOAD:$T/lib.so" "$out"
+check "... logged: safe mode on" "boot guard (starts=3, this boot 3): safe mode on, hooks on without mods" "$(cat "$T/kmsg")"
+check "... the safe mode file says why" "boot guard" "$(cat "$T/SAFE")"
+check "... the counters start again, this start the first" "1" "$(cat "$T/hook/starts")"
+check "... in this boot too" "$(cat "$T/boot_id") 1" "$(cat "$T/hook/boot")"
+run --zygote >/dev/null
+check "safe mode: hooks on, logged" "hooks on, start 2 (this boot 2), safe mode: no mods" "$(cat "$T/kmsg")"
+run --zygote >/dev/null
+out=$(run --zygote)
+check "tripping again in safe mode: hooks off" "PRELOAD:old.so" "$out"
+check "... logged" "hooks off (boot guard, starts=3, this boot 3; in safe mode)" "$(cat "$T/kmsg")"
+check "... the file stays" "boot guard" "$(cat "$T/SAFE")"
+echo 0 > "$T/hook/starts"; rm -f "$T/hook/boot"; echo owner > "$T/SAFE"
+out=$(run --zygote)
+check "safe mode by the owner: hooks on (HMG-API's own)" "PRELOAD:$T/lib.so" "$out"
+check "... the file untouched" "owner" "$(cat "$T/SAFE")"
+rm -f "$T/SAFE"
 
 echo 0 > "$T/hook/starts"; rm -f "$T/hook/boot"; touch "$T/hook/disable"
 out=$(run --zygote)
@@ -81,7 +97,9 @@ check "watcher: logged" "boot guard reset" "$(cat "$T/kmsg")"
 check "watcher: this boot's count gone too" no "$([ -e "$T/hook/boot" ] && echo yes || echo no)"
 echo 0 > "$T/hook/starts"
 
-# the boot guard tells a crash loop (one kernel boot) from restarts (a new boot_id each)
+# the boot guard tells a crash loop (one kernel boot) from restarts (a new boot_id each);
+# in safe mode, so a trip turns the hooks off
+echo owner > "$T/SAFE"
 id() { echo "5e1d0c34-aaaa-4bbb-8ccc-00000000000$1" > "$T/boot_id"; }
 echo 0 > "$T/hook/starts"; rm -f "$T/hook/boot"; id 1
 run --zygote >/dev/null; run --zygote >/dev/null; run --zygote >/dev/null
@@ -101,6 +119,7 @@ run --zygote >/dev/null; run --zygote >/dev/null; run --zygote >/dev/null
 out=$(run --zygote)
 check "no boot_id: every start counts, off after 3 as before" "PRELOAD:old.so" "$out"
 check "... no boot file written" no "$([ -e "$T/hook/boot" ] && echo yes || echo no)"
+rm -f "$T/SAFE"
 echo 0 > "$T/hook/starts"
 : > "$T/kmsg"; STAY= LD_PRELOAD=old.so "$T/wrap" --zygote >/dev/null 2>&1
 sleep 2

@@ -3,7 +3,8 @@
 Feasibility test for HMG-API's hook runtime (Xposed-style method hooks on Dalvik 4.4), in three reversible steps:
 
 1. **Wrapper** (done, EV6 US 2026-10-27): `zygote.c` is installed as `/system/bin/app_process` and runs the stock binary (`app_process.hmgapi-stock`) with the same arguments. It writes a `hmgapi-hook:` line to the kernel log on every pass. Stock ARM `app_process` re-execs itself once (`NO_ADDR_COMPAT_LAYOUT_FIXUP=1`), so the zygote passes through twice; only the first pass counts.
-2. **Loader** (done, EV6 US 2026-10-27): `loader.c` → `libhmgapi_hook.so`, preloaded into the zygote (only with `/data/hmgapi/hook/enable`), so it is mapped in every app. For now it only logs `HMG-API: loaded in <pid>`. Boot guard: the wrapper counts zygote starts in `/data/hmgapi/hook/starts` and stops preloading at 3; a watcher it double-forks resets the count once that zygote has been up for 120 s. `/data/hmgapi/hook/disable` turns it off without touching `/system`.
+2. **Loader** (done, EV6 US 2026-10-27): `loader.c` → `libhmgapi_hook.so`, preloaded into the zygote (only with `/data/hmgapi/hook/enable`), so it is mapped in every app. For now it only logs `HMG-API: loaded in <pid>`. Boot guard: the wrapper counts zygote starts in `/data/hmgapi/hook/starts` (3 in one kernel boot, or 6 in a row, that didn't last); a watcher it double-forks resets the count once that zygote has been up for 120 s. The first trip turns safe mode on (`/data/hmgapi/SAFE`, "boot guard") and starts the count again, so HMG-API's own hooks get one more try without any mod; a trip in safe mode stops preloading. `/data/hmgapi/hook/disable` turns the hooks off without touching `/system` (HMG-API's own too).
+   - **Safe mode** (`/data/hmgapi/SAFE`; `hmgapid engine safe on|off`, the app's Settings → Safe mode, the file by hand): every mod off, nothing removed. The runtime loads no mod (`Mods`, state `safe`), hmgapid runs only HMG-API's own services (it reads the file itself, so boot-start ones stay off before the engine runs), and the engine publishes every mod as off: their apps turned off, their network rules out except one that lets TCP through to adbd's port (`persist.adb.tcp.port`), so adb stays reachable. The mods' file changes stay. `safe off` also resets the boot guard. `hmgapi.engine.Safe`.
 3. **Method hooks** (done, EV6 US 2026-10-27): `loader.c` interposes `JNI_CreateJavaVM`, swaps the zygote's `CallStaticVoidMethodV` once, and before `ZygoteInit.main` loads `/system/framework/hmgapi-hook.jar` (`java/`) and runs `Bridge.init()`. Hooks work like Xposed on Dalvik: the method becomes native, the original `Method` is kept as a copy. Java API shaped like Xposed (`MethodHook`, `Hooks.findAndHookMethod`). First hooks: `ActivityThread.handleBindApplication` (every app start) and, in the launcher, a log-only hook on `com.android.launcher3.view.a.g.load()`.
    - `SelfTest` (12 checks: all argument types, results, skip, exceptions, constructors, 2 hooks, 2000 calls with GC) runs in a one-off `app_process`, away from the zygote: `LD_PRELOAD=<libhmgapi_hook.so> HMGAPI_SELFTEST=<hmgapi-hook.jar> CLASSPATH=<hmgapi-hook.jar> app_process /system/bin hmgapi.hook.SelfTest`, as root (it writes the jar's Dalvik cache).
    - The zygote unsets `LD_PRELOAD` once Dalvik is up (after the stock re-exec), so programs that apps start don't load the library.
@@ -19,7 +20,7 @@ Feasibility test for HMG-API's hook runtime (Xposed-style method hooks on Dalvik
 ./test.sh
 ```
 
-Runs the wrapper under qemu-arm: argument passthrough, preload switch, boot guard, disable file, exec failure.
+Runs the wrapper under qemu-arm: argument passthrough, preload switch, boot guard (and the safe mode its first trip turns on), disable file, exec failure.
 
 ## Safety
 

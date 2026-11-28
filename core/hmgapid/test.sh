@@ -18,7 +18,7 @@ fail=0
 check() { if [ "$2" = "$3" ]; then echo "ok    $1"; else echo "FAIL  $1: wanted [$2], got [$3]"; fail=1; fi; }
 has() { case "$3" in *"$2"*) echo "ok    $1" ;; *) echo "FAIL  $1: wanted [$2] in [$3]"; fail=1 ;; esac; }
 
-# build <name> <shell uid> <packages.list line or empty>
+# build <name> <shell uid> <packages.list line or empty> [more -D flags]
 build() {
     mkdir -p "$T/$1/root/mods"
     printf '%s\n' "$3" > "$T/$1/packages.list"
@@ -28,7 +28,7 @@ build() {
     chmod +x "$T/$1/logcat" "$T/$1/app_process" "$T/$1/getprop"
     OUT="$T/$1" sh build.sh -DNOCAPCHECK -DROOTDIR="\"$T/$1/root\"" -DSH="\"/bin/sh\"" -DLOGCAT="\"$T/$1/logcat\"" \
         -DREBOOT="\"/bin/true\"" -DAPP_PROCESS="\"$T/$1/app_process\"" -DPACKAGES_LIST="\"$T/$1/packages.list\"" -DGETPROP="\"$T/$1/getprop\"" -DUSBROOT="\"$T/$1/usb\"" -DBOOTMARK="\"$T/$1/bootmark\"" -DSOCK_NAME="\"hmgapid-test-$1-$$\"" -DVEHICLE_SOCK="\"hmgapi-vehicle-test-$$\"" \
-        -DSHELL_UID="$2" >/dev/null
+        -DSHELL_UID="$2" $4 >/dev/null
 }
 run() { b=$1; shift; "$T/$b/hmgapid" "$@" 2>&1; }
 code() { b=$1; shift; set +e; "$T/$b/hmgapid" "$@" >/dev/null 2>&1; c=$?; set -e; echo $c; }
@@ -115,6 +115,7 @@ has "log runs logcat" "fake logcat -d -v time -s HMG-API:V" "$(run root log)"
 check "unknown op" "2" "$(code root frobnicate)"
 check "engine runs app_process" "app_process /system/bin hmgapi.engine.Engine apply --trial CLASSPATH=/system/framework/hmgapi-hook.jar ROOT=/system KEEP=yes PRELOAD=none" "$(run root engine apply --trial)"
 check "engine refuses other subcommands" "2" "$(code root engine rm -rf)"
+has "engine safe: passed to the engine" "hmgapi.engine.Engine safe on" "$(run root engine safe on)"
 check "root dir mode (traverse only for apps)" "drwx--x--x" "$(ls -ld "$T/root/root" | cut -c1-10)"
 has "log file" "(root) disable -> 0" "$(cat "$T/root/root/hmgapid.log")"
 
@@ -125,6 +126,7 @@ check "app: sh refused" "13" "$(code app sh 'echo no')"
 check "app: remount refused" "13" "$(code app remount rw)"
 check "app: reboot allowed" "0" "$(code app reboot)"
 check "app: engine allowed" "0" "$(code app engine status)"
+check "app: safe mode switch allowed" "0" "$(code app engine safe off)"
 
 # --- anyone else
 check "other: ping" "ok" "$(run other ping)"
@@ -229,6 +231,74 @@ check "... its process ended" no "$(kill -0 "$pid" 2>/dev/null && echo yes || ec
 check "app may list services" 0 "$(code app services)"
 check "other may not" 13 "$(code other services)"
 check "bad names refused" 2 "$(code root service-restart ../x loop)"
+
+# --- service logs while the service runs, priority, safe mode: a daemon of its own with small
+# limits (a looping echo under hmgapid wrote 885 MB in 8 s when the log was only checked at start)
+build logs "$ME" "" "-DLOG_MAX=16384 -DLOG_RATE=16384 -DLOG_WINDOW=3"   # rate = cap, as on the unit
+L=$T/logs/root
+mkdir -p "$L/mods/spam/bin" "$L/state"
+printf 'while :; do echo 0123456789012345678901234567890123456789; done\n' > "$L/mods/spam/bin/spam.sh"
+printf 'i=0; while [ $i -lt 100 ]; do echo line $i; i=$((i+1)); done; exec '"$SLEEP"' 60\n' > "$L/mods/spam/bin/quiet.sh"
+printf 'i=0; while [ $i -lt 1000 ]; do echo 0123456789012345678901234567890123456789; i=$((i+1)); done; exec '"$SLEEP"' 60\n' > "$L/mods/spam/bin/burst.sh"
+printf 'exec '"$SLEEP"' 60\n' > "$L/state/net.sh"
+printf 'spam quiet normal\n' > "$L/state/service-priority.txt"
+cat > "$L/state/services.txt" <<EOS
+spam spam root boot yes script bin/spam.sh -
+spam quiet root boot yes script bin/quiet.sh -
+spam burst root boot yes script bin/burst.sh -
+hmgapi net root boot yes script $L/state/net.sh - 1a2b
+EOS
+# logs grown before the cap (older releases): emptied when the service starts, not kept as .1
+mkdir -p "$L/logs/spam"
+head -c 3145728 /dev/zero > "$L/logs/spam/quiet.log"; head -c 3145728 /dev/zero > "$L/logs/spam/quiet.log.1"
+lst() { run logs services "$1" | awk -v n="$2" '$2 == n { print $3 }'; }
+lpid() { run logs services "$1" | awk -v n="$2" '$2 == n { print $4 }'; }
+nice_of() { [ -n "$1" ] && awk '{ print $19 }' "/proc/$1/stat" 2>/dev/null; }
+check "logs daemon starts" "hmgapid: started" "$(KEEPME=yes LD_PRELOAD= "$T/logs/hmgapid" daemon)"
+waitfor '[ "$(lst spam spam)" = running ]' || true
+sleep 4
+check "a service logging in a loop keeps running" running "$(lst spam spam)"
+size=$(cat "$L/logs/spam/spam.log" "$L/logs/spam/spam.log.1" 2>/dev/null | wc -c | tr -d ' ')
+check "... its log stays capped while it runs (log + .1)" yes "$([ "$size" -gt 0 ] && [ "$size" -le $((2 * 16384 + 512)) ] && echo yes || echo "no ($size bytes)")"
+check "... rotated to .1" yes "$([ -s "$L/logs/spam/spam.log.1" ] && echo yes || echo no)"
+# a burst (40 KB at once, then quiet): what's left out is said, and how much once its window ends
+has "a burst: says what it leaves out" "the rest is left out until the next 3 s" "$(cat "$L/logs/spam/burst.log" 2>/dev/null)"
+waitfor 'grep -q "KB of output left out" "$L/logs/spam/burst.log"' || true
+has "... and how much, once the window ends" "KB of output left out" "$(cat "$L/logs/spam/burst.log" 2>/dev/null)"
+check "... still running" running "$(lst spam burst)"
+has "... in hmgapid's log too" "service output left out (KB)" "$(cat "$L/hmgapid.log")"
+has "a quiet service's log is whole" "line 99" "$(run logs service-log spam quiet)"
+has "... an old oversized log emptied, saying so" "[hmgapid] this log was 3 MB: emptied" "$(head -1 "$L/logs/spam/quiet.log")"
+check "... and its oversized .1 gone" no "$([ -e "$L/logs/spam/quiet.log.1" ] && echo yes || echo no)"
+check "a mod's service: nice 10" 10 "$(nice_of "$(lpid spam spam)")"
+check "... unless it asked for normal" 0 "$(nice_of "$(lpid spam quiet)")"
+check "HMG-API's own: normal" 0 "$(nice_of "$(lpid hmgapi net)")"
+# safe mode: the file (as `engine safe on` writes it, or by hand)
+spid=$(lpid spam spam)
+echo owner > "$L/SAFE"
+waitfor '[ -z "$(lst spam spam)" ]' || true
+check "safe mode: a mod's service stops" "" "$(lst spam spam)$(lst spam burst)"
+check "... all of them" "" "$(lst spam quiet)"
+check "... its processes end" no "$(kill -0 "$spid" 2>/dev/null && echo yes || echo no)"
+check "... HMG-API's own keep running" running "$(lst hmgapi net)"
+has "... logged" "safe mode on" "$(cat "$L/hmgapid.log")"
+waitfor 'grep -q publish-state "$T/logs/engine.log"' || true
+has "... the engine publishes the state for it" "hmgapi.engine.Engine publish-state" "$(cat "$T/logs/engine.log" 2>/dev/null)"
+printf 'spam late root boot yes script bin/quiet.sh -\n' >> "$L/state/services.txt"
+sleep 2
+check "... a new boot-start service doesn't start" "" "$(lst spam late)"
+pkill -f "$T/logs/" 2>/dev/null || true
+sleep 1
+check "a daemon started in safe mode" "hmgapid: started" "$(KEEPME=yes LD_PRELOAD= "$T/logs/hmgapid" daemon)"
+waitfor '[ "$(lst hmgapi net)" = running ]' || true
+sleep 1
+check "... starts no mod's boot service" "" "$(run logs services spam)"
+check "... but HMG-API's own" running "$(lst hmgapi net)"
+rm "$L/SAFE"
+waitfor '[ "$(lst spam late)" = running ]' || true
+check "safe mode off: mods' services start again" "running running" "$(lst spam late) $(lst spam quiet)"
+has "... logged" "safe mode off" "$(cat "$L/hmgapid.log")"
+pkill -f "$T/logs/" 2>/dev/null || true
 
 # --- a mod's own app (its uid is an app an enabled mod declared)
 check "mod app: whoami" demo "$(run mod whoami)"

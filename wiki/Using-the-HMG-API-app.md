@@ -10,7 +10,7 @@ missing.
 
 ## The top bar
 
-- **Status**: whether HMG-API's hooks are on for your car, **Changes not applied**
+- **Status**: whether HMG-API's hooks are on for your car, **Safe mode: mods off**, **Changes not applied**
   (switches or settings saved but not applied yet) and **Restart needed** (a mod with
   code was turned on or off, or a setting that takes effect at the next start).
 - **Apply changes**: shows a plan of everything that will change, then applies it.
@@ -45,6 +45,11 @@ services' output) and **Remove**.
 - **Phone projection**: what mods change in Android Auto and CarPlay.
 - **Hook map**: your car's map, a check of it, mapping your car from its own software,
   and trying maps that haven't been checked on a car yet.
+- **Safe mode**: every mod off at once without removing anything (no mod's hooks,
+  services, apps or network rules), to see whether a mod is behind a problem. HMG-API and
+  the app stay on; the top bar says "Safe mode: mods off" while it's on. HMG-API turns it
+  on by itself if Android keeps failing to start with mods. See
+  [Troubleshooting](Troubleshooting#stuck-on-the-boot-animation-no-home-screen-or-an-app-keeps-crashing).
 - **About**.
 
 ## Car Report

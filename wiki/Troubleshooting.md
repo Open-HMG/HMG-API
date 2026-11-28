@@ -1,5 +1,88 @@
 # Troubleshooting
 
+## Stuck on the boot animation, no home screen, or an app keeps crashing
+
+Most of what follows works without the car's screen, over adb. **Turn adb on before you
+need it**, while everything works: the [adb mod](Community-mods) (or NEMESIS's Enable ADB),
+then check from a computer that `adb shell hmgapid ping` answers `ok`. adb keeps working
+when Android doesn't start (adbd runs before it), and it doesn't ask for keys. While adb
+over USB is on, the USB port is in computer mode and doesn't read sticks.
+
+**1. Safe mode: every mod off, nothing removed.** No mod's hooks, services (the ones that
+start at boot too), apps or network rules; HMG-API and its app stay on, so you can turn
+it off again. adb stays reachable: the adb mod's rule for adb over the hotspot is the one
+network rule kept. The mods' changes to system files stay as they are.
+
+```
+adb shell "hmgapid engine safe on"
+```
+```
+adb shell "hmgapid reboot"
+```
+
+Services, apps and network rules stop within seconds; the hooks after the restart. If the
+engine can't run at all, the file does the same:
+`adb shell "hmgapid sh ': > /data/hmgapi/SAFE'"`. With the screen: HMG-API → Settings →
+Safe mode. HMG-API also turns safe mode on by itself when Android fails to start several
+times in a row (see [The head unit restarted over and over](#the-head-unit-restarted-over-and-over)).
+
+If the head unit starts normally in safe mode, a mod is the cause: turn off the one you
+added or changed last (Mods tab, or `adb shell "hmgapid disable <id>"`), then turn safe
+mode off and restart:
+
+```
+adb shell "hmgapid engine safe off"
+```
+
+Turning it off also resets the boot guard's counters, so HMG-API's hooks get another try.
+
+**2. Only the hooks off** (HMG-API's own too: no tile, no ★ choice, no update block):
+
+```
+adb shell "hmgapid sh ': > /data/hmgapi/hook/disable'"
+```
+
+then restart. Back on: `adb shell "hmgapid sh 'rm /data/hmgapi/hook/disable'"`. This
+leaves mods' services, apps and network rules running; use safe mode first.
+
+**`hmgapid: not running`?** HMG-API's daemon didn't start. Use NEMESIS's root instead (a
+copy of its tool, so it goes through NEMESIS's daemon):
+
+```
+adb shell "cp /system/xbin/nemesis /data/local/tmp/nemesis-d"
+```
+```
+adb shell "/data/local/tmp/nemesis-d root -c ': > /data/hmgapi/SAFE'"
+```
+
+**A USB stick can't do this.** The stick is mounted by Android (its storage service asks
+for the mount once Android is up), so a file on it would only be seen after Android has
+started: too late for a head unit stuck on the boot animation. The steering-wheel keys are read by
+Android too. Without adb, the boot guard is what turns safe mode on.
+
+**`/data` full.** Apps stop, settings don't save, the car's own apps crash. See how full it is:
+
+```
+adb shell df /data
+```
+```
+adb shell "hmgapid sh 'du -s /data/hmgapi/* /data/hmgapi/logs/*'"
+```
+
+HMG-API keeps each mod service's log at 256 KB (and a `.1`) while it runs, at most 256 KB
+of output a minute, and its own log the same way. Releases before 1.1.0 only checked a log
+when its service started, so a service that logged in a loop could fill `/data`. Stop it
+(`adb shell "hmgapid disable <id>"`, or safe mode), then empty its log:
+`adb shell "hmgapid sh ': > /data/hmgapi/logs/<id>/<name>.log; rm -f /data/hmgapi/logs/<id>/*.1'"`.
+Car Reports and problem logs are in `/data/hmgapi/public/reports/`; `adb pull` them first if
+you still need them.
+
+**Back to stock.** Uninstall over adb, no screen needed: `./hmgapi-adb.sh uninstall` from
+the adb zip, or what it runs: `adb shell "hmgapid sh 'sh /data/hmgapi/uninstall.sh'"`.
+Every file HMG-API or its mods changed goes back to the stock bytes. A few steps need
+Android up (the HMG-API app and the mods' apps out, the ★ keys back); with Android down
+those are skipped. See [Uninstalling](Uninstalling).
+
 ## The HMG-API app isn't there, or there's no tile for it
 
 - **No tile, no ★ choice:** those come from HMG-API's hooks, which need your car's hook
@@ -47,14 +130,21 @@ The first time a mod uses a car command, HMG-API asks you on screen. If you said
 
 When Android fails to start three times during one boot with HMG-API's hooks (a
 hook crashing the system), or the head unit restarts six times in a row less than
-two minutes after starting, HMG-API turns its hooks off by itself so the head unit
-starts normally, and the app says the hooks aren't running. Turn off or remove the
-mod you added last, then reset the counter and restart: reinstall HMG-API from the
-app (Check USB updates, Reinstall HMG-API), or over adb:
+two minutes after starting, HMG-API's boot guard turns **safe mode** on by itself: no
+mod runs, and HMG-API's own hooks (its tile, its ★ choice) get one more try. The top bar
+says "Safe mode: mods off". If Android still fails to start in safe mode, the boot guard
+turns HMG-API's hooks off too, and the app says the hooks aren't running (open it from
+NEMESIS Manager → My Packages → HMG-API → Launch).
+
+Turn off or remove the mod you added or changed last, then turn safe mode off (Settings
+→ Safe mode) and restart; that resets the boot guard's counters too. Over adb:
 
 ```
-adb shell "hmgapid sh 'echo 0 > /data/hmgapi/hook/starts; rm -f /data/hmgapi/hook/boot'"
+adb shell "hmgapid engine safe off"
 ```
+
+Releases before 1.1.0 have no safe mode: reset the counter by reinstalling HMG-API, or
+`adb shell "hmgapid sh 'echo 0 > /data/hmgapi/hook/starts; rm -f /data/hmgapi/hook/boot'"`.
 
 ## A mod isn't doing anything
 
