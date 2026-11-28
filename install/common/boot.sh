@@ -28,6 +28,9 @@ if [ -s $D/state/binds.txt ]; then $H binds > $D/binds.log 2>&1 & fi
 if [ -f $D/public/HmgApi.apk ]; then sh $D/app-pending.sh </dev/null >/dev/null 2>&1 & fi
 if [ -f $D/hook-check.sh ]; then sh $D/hook-check.sh </dev/null >/dev/null 2>&1 & fi
 if [ -x $ROOT/system/xbin/nemesis ]; then (sleep 120; $H engine nemesis-sync) </dev/null >$D/nemesis-sync.log 2>&1 & fi
+# mods' relocatable native recipes, for this unit's libraries: a library that changed since (a
+# firmware update, another package's build of it) gets its sites found once, kept by its md5
+if grep -qs '"native_sites"' $D/mods/*/mod.json; then (sleep 60; $H engine sites) </dev/null >$D/sites.log 2>&1 & fi
 # the points HMG-API's map lacks only because it's older than them, mapped and checked on this
 # car (state/local-map.json): only when the map, the catalogue or the stock files changed since,
 # so after an HMG-API install or update. Used from the next start. The owner's switch skips it.

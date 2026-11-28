@@ -376,6 +376,7 @@ public final class Engine {
         if ("problem".equals(cmd)) return ProblemLog.run(this, args);
         if ("usb-scan".equals(cmd)) return UsbUpdates.scan(this);
         if ("publish-state".equals(cmd)) return LiveState.publish(this);
+        if ("sites".equals(cmd)) return SiteRecipes.run(this);
         if ("apps".equals(cmd)) return ModApps.sync(this);
         if ("probe".equals(cmd)) {   // a mod's install-time probe again (its answer is kept until then)
             if (args.length < 2 || !args[1].matches("[a-z0-9][a-z0-9-]*")) { out.add("usage: probe <mod id>"); return 2; }
@@ -437,7 +438,7 @@ public final class Engine {
             if (!map.runnable) out.add("hooks are off on this car (" + map.reason + "): mods apply without their hooks");
         }
         if (!restoreAll && !"plan".equals(cmd) && !"apply".equals(cmd)) {
-            out.add("usage: engine plan | apply [--trial] | keep | restore | status | recover | firmware-reset | install <zip|dir> | remove <id> | nemesis-sync | map | map-car [--local [--if-needed] | --write | --forget] | verify-map | report [--usb] | usb-scan | update-hmgapi <zip> | publish-state | apps");
+            out.add("usage: engine plan | apply [--trial] | keep | restore | status | recover | firmware-reset | install <zip|dir> | remove <id> | nemesis-sync | map | map-car [--local [--if-needed] | --write | --forget] | verify-map | report [--usb] | usb-scan | update-hmgapi <zip> | publish-state | apps | sites");
             return 2;
         }
         Plan p = plan(restoreAll, force);

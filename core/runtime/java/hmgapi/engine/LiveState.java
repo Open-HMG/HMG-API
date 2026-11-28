@@ -89,6 +89,7 @@ final class LiveState {
             readable(e, new File(modsDir, m.getKey()), m.getValue());
             nativeReadable(new File(modsDir, m.getKey()), m.getValue());
         }
+        SiteRecipes.run(e);   // mods' relocatable native recipes, for this unit's libraries (kept results are reused)
         ModRuntime.publish(e, json, on);   // apps, services, USB folders: hmgapid acts on them
         List<String> notes = new java.util.ArrayList<String>();
         List<Object> input = new java.util.ArrayList<Object>();
@@ -169,14 +170,20 @@ final class LiveState {
         jar.setReadable(true, false);
     }
 
-    /** a mod's native patch recipes (hooks.native) too: the apps that load the libraries read them */
+    /** a mod's native patch recipes (hooks.native, hooks.native_sites) too: the apps that load the libraries read them */
     @SuppressWarnings("unchecked")
     static void nativeReadable(File dir, Map<String, Object> mod) throws Exception {
         Object hooks = mod.get("hooks");
-        Object nat = hooks instanceof Map ? ((Map<String, Object>) hooks).get("native") : null;
-        if (!(nat instanceof Map)) return;
+        for (String key : new String[] { "native", "native_sites" }) {
+            Object nat = hooks instanceof Map ? ((Map<String, Object>) hooks).get(key) : null;
+            if (nat instanceof Map) recipesReadable(dir, (Map<String, Object>) nat);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    static void recipesReadable(File dir, Map<String, Object> nat) throws Exception {
         String base = dir.getCanonicalPath() + File.separator;
-        for (Object files : ((Map<String, Object>) nat).values()) {
+        for (Object files : nat.values()) {
             if (!(files instanceof List)) continue;
             for (Object f : (List<Object>) files) {
                 String name = String.valueOf(f);

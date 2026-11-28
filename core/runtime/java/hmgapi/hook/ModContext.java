@@ -123,20 +123,29 @@ public final class ModContext {
      * lpatch recipes, see hmgapi.engine.MemRecipe). The first that fits this build of the
      * library is applied once it's loaded (now, if it already is). A recipe overlapping
      * another mod's on the same library isn't applied (logged). Call it in appLoaded.
+     * Recipes under "native_sites" find their offsets on the unit (hmgapi.engine.SiteFind)
+     * and are tried after the fixed ones: one recipe for every build whose code around the
+     * patch is the same.
      */
     @SuppressWarnings("unchecked")
     public void nativePatch(LoadedApp app, String lib) {
         try {
             Object hooks = Mods.rawOf.get(id) == null ? null : Mods.rawOf.get(id).get("hooks");
-            Object nat = hooks instanceof Map ? ((Map<String, Object>) hooks).get("native") : null;
-            Object files = nat instanceof Map ? ((Map<String, Object>) nat).get(lib) : null;
-            if (!(files instanceof java.util.List)) throw new IllegalStateException(id + ": no recipes for " + lib + " in mod.json hooks.native");
-            java.util.List<String> names = new java.util.ArrayList<String>();
-            for (Object o : (java.util.List<Object>) files) names.add(String.valueOf(o));
-            NativePatch.request(this, lib, NativePatch.read(this, names));
+            java.util.List<String> names = names(hooks, "native", lib), sites = names(hooks, "native_sites", lib);
+            if (names.isEmpty() && sites.isEmpty()) throw new IllegalStateException(id + ": no recipes for " + lib + " in mod.json hooks.native or hooks.native_sites");
+            NativePatch.request(this, lib, NativePatch.read(this, names), NativePatch.readSites(this, sites));
         } catch (Throwable t) {
             error("native patch " + lib + " in " + app.processName, t);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    static java.util.List<String> names(Object hooks, String key, String lib) {
+        java.util.List<String> names = new java.util.ArrayList<String>();
+        Object nat = hooks instanceof Map ? ((Map<String, Object>) hooks).get(key) : null;
+        Object files = nat instanceof Map ? ((Map<String, Object>) nat).get(lib) : null;
+        if (files instanceof java.util.List) for (Object o : (java.util.List<Object>) files) names.add(String.valueOf(o));
+        return names;
     }
 
     /**
