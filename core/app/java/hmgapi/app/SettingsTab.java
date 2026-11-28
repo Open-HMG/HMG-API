@@ -309,8 +309,9 @@ final class SettingsTab {
                     }
                 });
         owner("Maps not checked on a car yet", "For a car HMG-API is new on: hooks run with a map nobody has checked on this car. "
-                + "If Android fails to start three times during one boot with its hooks, or the head unit restarts six times in a row "
-                + "within two minutes of starting, HMG-API's boot guard turns its hooks off. Takes effect at the next restart.",
+                + "If Android has to start again three times in one boot with its hooks (it crashed or hung, at any time), or six "
+                + "starts in a row don't get to the home screen, HMG-API's boot guard turns its hooks off until you reset it "
+                + "(tap \"Hooks off: boot guard\" at the top). Takes effect at the next restart.",
                 "Try unchecked maps", "testing_maps", false, new Runnable() {
                     @Override
                     public void run() {
