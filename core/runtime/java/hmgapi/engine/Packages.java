@@ -66,6 +66,7 @@ final class Packages {
             }
             if (wasOff) new File(installed, ".disabled").createNewFile();
             Engine.rm(prev);
+            Engine.rm(new File(e.data, "pending/" + v.id));   // an update staged by the automatic check: this one replaces it
             if (anyCar && v.otherCar != null) ignoreSystem(e, v.id, true);
             e.chmodTree(installed);
             e.out.add("installed " + v.id + " " + v.version + (v.uuid != null ? " (author key " + v.uuid + ")" : " (unsigned)")
@@ -73,6 +74,7 @@ final class Packages {
             scriptWarnings(e, installed);
             e.out.add("run `engine apply` (Apply changes in the app) to use it");
             LiveState.publish(e);
+            Catalog.updatesChanged(e);
             return 0;
         } finally {
             Engine.rm(stage);
@@ -210,11 +212,13 @@ final class Packages {
             return 1;
         }
         Engine.rm(installed);
+        Engine.rm(new File(e.data, "pending/" + id));
         File cache = new File(e.data, "dalvik-cache");
         DexCacheCleanup.removeObsoleteShared(cache);
         DexCacheCleanup.removeMod(cache, id);
         ignoreSystem(e, id, false);
         LiveState.publish(e);
+        Catalog.updatesChanged(e);
         e.out.add("removed " + id + " (its settings stay in /data/hmgapi/settings); run `engine apply` to put its files back to stock");
         return 0;
     }

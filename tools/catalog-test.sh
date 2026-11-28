@@ -27,20 +27,20 @@ pkg() {
     rm -rf $T/$1; cp -r mods/examples/hello $T/$1
     python3 - $T/$1/mod.json $2 <<'P'
 import json, os, sys
-m = json.load(open(sys.argv[1])); m['version'] = sys.argv[2]; m['authors'] = ['Test Author']; m['repo'] = 'https://example.org/hello'
+m = json.load(open(sys.argv[1])); m['version'] = sys.argv[2]; m['authors'] = ['Test Author']; m['repo'] = 'https://github.com/example/hello'
 if os.environ.get('DESC'): m['description'] = os.environ['DESC']
 json.dump(m, open(sys.argv[1], 'w'))
 P
     S sign $T/$1 $3 >/dev/null
     (cd $T/$1 && rm -f $4 && zip -qr $4 .)
 }
-DL=https://example.org/hello/releases/hello.zip
+DL=https://github.com/example/hello/releases/hello.zip
 J() { python3 -c "import json,sys; f=sys.argv[1]; d=json.load(open(f)); exec(sys.argv[2]); json.dump(d,open(f,'w'))" "$@"; }
 
 pkg h1 1.0.0 $T/a.key $T/h1.zip
 C add $T/h1.zip --download $DL; check "add" 0 $rc; has "says what" "hello 1.0.0, author key $UA (added to maps/authors.json as Test Author)" "$out"
 check "entry's sha256" "$(sha256sum $T/h1.zip | cut -d' ' -f1)" "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["sha256"])' $R/catalog/hello.json)"
-check "repo from mod.json" "https://example.org/hello" "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["repo"])' $R/catalog/hello.json)"
+check "repo from mod.json" "https://github.com/example/hello" "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["repo"])' $R/catalog/hello.json)"
 has "author listed" "\"$UA\"" "$(cat $R/maps/authors.json)"
 C check --base HEAD; check "check a new entry" 0 $rc
 G add -A && G -c user.name=t -c user.email=t@t commit -qm hello
@@ -68,7 +68,7 @@ G checkout -q -- .
 cp $T/h1.zip $T/dl/hello.zip
 
 # fetch --list (tools/release-mods.txt): ids, and a HMG-API pre-release's pins of mod pre-releases
-PB=https://example.org/hello/releases/download/v1.1.0-beta.1
+PB=https://github.com/example/hello/releases/download/v1.1.0-beta.1
 pkg hp 1.1.0-beta.1 $T/a.key $T/dl/hello-1.1.0-beta.1.zip
 SP=$(sha256sum $T/dl/hello-1.1.0-beta.1.zip | cut -d' ' -f1)
 L() { printf '# test\n%s\n' "$@" > $T/list.txt; }
@@ -88,7 +88,7 @@ L "hello 1.1.0 $PB/hello-1.1.0-beta.1.zip $SP"
 F fetch $T/pl4 --list $T/list.txt; check "pin: a final version refused" 1 $rc; has "says why" "a pin outside the catalogue is for a pre-release" "$out"
 L "hello 1.0.0-beta.1 $PB/hello-1.1.0-beta.1.zip $SP"
 F fetch $T/pl4 --list $T/list.txt; check "pin: not newer than the entry refused" 1 $rc; has "says why" "not newer than the catalogue's 1.0.0" "$out"
-L "hello 1.1.0-beta.1 https://example.org/hello-fork/releases/download/v1/hello-1.1.0-beta.1.zip $SP"
+L "hello 1.1.0-beta.1 https://github.com/example/hello-fork/releases/download/v1/hello-1.1.0-beta.1.zip $SP"
 F fetch $T/pl4 --list $T/list.txt; check "pin: a download outside the entry's repo releases refused" 1 $rc; has "says why" "a release of the mod's own repo" "$out"
 L "hello 1.1.0-beta.1 $PB/hello-1.1.0-beta.1.zip $(sha256sum < $T/h1.zip | cut -d' ' -f1)"
 F fetch $T/pl4 --list $T/list.txt; check "pin: other bytes than the pin's refused" 1 $rc; has "says why" "tools/release-mods.txt: hello: the download's SHA-256 is" "$out"
@@ -105,8 +105,8 @@ check "... nothing kept" "" "$(ls $T/pl4 2>/dev/null)"
 G checkout -q -- .
 
 pkg h2 1.1.0 $T/a.key $T/h2.zip
-C add $T/h2.zip --download $DL --repo https://example.org/hello/sub; check "update" 0 $rc
-check "author's repo not repeated under its root" 1 "$(grep -c example.org $R/maps/authors.json)"
+C add $T/h2.zip --download $DL --repo https://github.com/example/hello/sub; check "update" 0 $rc
+check "author's repo not repeated under its root" 1 "$(grep -c github.com/example $R/maps/authors.json)"
 C check --base HEAD; check "check an update" 0 $rc
 G checkout -q -- .
 
@@ -145,8 +145,50 @@ cp $R/catalog/hello.json $R/catalog/other.json
 C check; check "file name is the id" 1 $rc
 rm $R/catalog/other.json
 
+# what the head unit couldn't use: a download off GitHub (Http only goes there), a range it can't read
+C add $T/h1.zip --download https://example.org/hello/releases/hello.zip; check "add: a download off GitHub refused" 1 $rc
+has "says why" "the head unit only downloads from GitHub" "$out"
+J $R/catalog/hello.json "d['download']='https://example.org/hello.zip'"
+C check; check "check: a download off GitHub refused" 1 $rc; has "says why" '"download" is on example.org' "$out"
+G checkout -q -- .
+J $R/catalog/hello.json "d['requires']=['lib ^x.y', {'id': 'other', 'version': '>=1 <two'}, 'Bad Id']"
+C check; check "check: unreadable requires refused" 1 $rc
+has "... a bad range" '"requires": "^x.y" isn'"'"'t a version range (^x.y)' "$out"
+has "... in the object form too" '">=1 <two" isn'"'"'t a version range (<two)' "$out"
+has "... a bad id" "'Bad' isn't a mod id" "$out"
+J $R/catalog/hello.json "d['requires']=['lib ^1.2', 'other >=1.0.0 <2', {'id': 'x', 'version': '~1.1.0-rc.1'}, 'plain']; d['conflicts']=['z *']; d['hmgapi']='>=1.1.0-rc.1'"
+C check; check "check: readable ranges" 0 $rc
+J $R/catalog/hello.json "d['hmgapi']='newest'"
+C check; check "check: an unreadable hmgapi range refused" 1 $rc; has "says why" '"hmgapi": "newest" isn'"'"'t a version range' "$out"
+G checkout -q -- .
+
+# "wifi": {"hotspot": true} copied, so the head unit judges "system" as the install will
+python3 - $T/h1/mod.json <<'P'
+import json, sys
+m = json.load(open(sys.argv[1])); m['wifi'] = {'hotspot': True}; json.dump(m, open(sys.argv[1], 'w'))
+P
+rm -f $T/h1/extra.txt; S sign $T/h1 $T/a.key >/dev/null; (cd $T/h1 && rm -f $T/hw.zip && zip -qr $T/hw.zip .)
+C add $T/hw.zip --download $DL; check "add: a hotspot mod" 0 $rc
+check "... its wifi.hotspot in the entry" "{'hotspot': True}" "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("wifi"))' $R/catalog/hello.json)"
+J $R/catalog/hello.json "d['wifi']={'hotspot': 'yes'}"
+C check; check "check: another wifi shape refused" 1 $rc
+G checkout -q -- .
+
+# index.json, once the repo keeps one: add writes it again, check refuses a stale one
+C index; check "index" 0 $rc
+G add -A && G -c user.name=t -c user.email=t@t commit -qm index
+C check; check "check: the index is the entries" 0 $rc
+J $R/catalog/hello.json "d['description']='changed'"
+C check; check "check: an index that isn't the entries refused" 1 $rc; has "says why" "catalog/index.json isn't the entries" "$out"
+G checkout -q -- .
+C add $T/h2.zip --download $DL; check "add with an index" 0 $rc; has "... written again" "catalog/index.json: written again" "$out"
+check "... it has the new version" 1.1.0 "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["mods"][0]["version"])' $R/catalog/index.json)"
+C check; check "... and check passes" 0 $rc
+G checkout -q -- .
+G rm -q catalog/index.json && G -c user.name=t -c user.email=t@t commit -qm "no index"
+
 # bump (the auto-merge workflow): head against base, downloads served from $T/dl
-BD=https://example.org/hello/releases/download/v1.1.0/hello.zip
+BD=https://github.com/example/hello/releases/download/v1.1.0/hello.zip
 B() { G -c user.name=t -c user.email=t@t commit -qam "$1"; F bump --base main --head HEAD; }
 G branch -q -M main
 bump_entry() {   # <zip> [python edit]: the entry pointing at that zip as $BD
@@ -162,7 +204,7 @@ G checkout -q main; G checkout -qb pr3; bump_entry $T/h2.zip "d['description']='
 B desc; check "bump: a description not the package's refused" 1 $rc; has "says why" "the description isn't the package's" "$out"
 G checkout -q main; G checkout -qb pr4; DESC='Says hi, louder' pkg hd 1.1.0 $T/a.key $T/hd.zip; bump_entry $T/hd.zip "d['description']='Says hi, louder'"
 B desc-ok; check "bump: the package's description" 0 $rc
-G checkout -q main; G checkout -qb pr5; bump_entry $T/h2.zip "d['download']='https://example.org/fork/releases/download/v1.1.0/hello.zip'"
+G checkout -q main; G checkout -qb pr5; bump_entry $T/h2.zip "d['download']='https://github.com/example/fork/releases/download/v1.1.0/hello.zip'"
 B fork; check "bump: a download outside the repo's releases refused" 1 $rc; has "says why" "a release of the mod's own repo" "$out"
 G checkout -q main; G checkout -qb pr6; pkg hb2 1.1.0 $T/b.key $T/hb2.zip; bump_entry $T/hb2.zip
 B otherkey; check "bump: signed by another key refused" 1 $rc
@@ -183,5 +225,16 @@ has "page names the mod" "## Hello" "$P"
 has "page escapes text" 'Says \<b\>hi\</b\> \[x\]\(https://evil\)' "$P"
 has "page links the download" "(<$DL>)" "$P"
 has "page shows the key" "\`$UA\`" "$P"
+
+# catalog/withdrawn.json: not an entry; its form checked
+echo '{"withdrawn": [{"id": "hello", "versions": ">=1.0.0", "why": "breaks things"}]}' > $R/catalog/withdrawn.json
+C check
+check "withdrawn.json: not taken for an entry, and fine" 0 $rc
+echo '{"withdrawn": [{"id": "hello"}, {"id": "Bad"}, {"id": "x", "why": "y", "versions": ">>1"}]}' > $R/catalog/withdrawn.json
+C check
+has "withdrawn.json: a why is needed" 'hello: say "why"' "$out"
+has "... an id" 'entry 2 has no mod "id"' "$out"
+has "... a readable range" 'x: "versions"' "$out"
+rm $R/catalog/withdrawn.json
 
 [ $fail = 0 ] && echo "catalog: all ok" || { echo "catalog: FAILED"; exit 1; }

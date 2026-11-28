@@ -362,8 +362,8 @@ is switched on again, the client goes off and the hotspot comes back as it was. 
 next to the hotspot, on a second interface, didn't hold up on these units' Wi-Fi driver.)
 While joined, the traffic of the mods that ask (their apps, and their services) goes through
 home Wi-Fi; the car's own stays on mobile data. A mod that asks while the switch is off has no
-internet (the plan says so). IPv4 only for now. This is also how HMG-API itself is meant to
-check for updates.
+internet (the plan says so). IPv4 only for now. HMG-API itself checks its catalogue and
+updates this way (`Catalog`), each time home Wi-Fi comes up.
 
 How it's routed, for a mod that wants to know: its packets are marked (`0x2951`) and go out by
 table 95 (home Wi-Fi's default; an unreachable default while home Wi-Fi is down), masqueraded
@@ -539,6 +539,29 @@ optional `"repo": "https://…"` in `mod.json` is the link the catalogue shows f
 your source. Keep your key private and backed up: a lost key
 means a new UUID, and owners would have to remove the old mod before installing
 yours again.
+
+### Updates from your own releases
+
+A mod the catalogue doesn't list (installed from USB or adb, private, or waiting for
+its catalogue PR) still gets updates over home Wi-Fi when its `mod.json` has
+`"repo": "https://github.com/<owner>/<repo>"`. The head unit checks that repo's GitHub
+releases (one API call per repo, at most every 6 hours) and offers the newest one
+that is newer than what's installed, in the Updates tab, saying where it came from:
+
+- Tag releases `vX.Y.Z` (or `vX.Y.Z-beta.N`, marked as a pre-release). An owner on a
+  final version gets finals; an owner on a pre-release gets that mod's pre-releases too.
+- Attach the signed zip as `<id>-<version>.zip` or `<id>-v<version>.zip`, or name your
+  own pattern in `mod.json`: `"release_asset": "my-mod-v{version}.zip"` (needed when one
+  release carries several mods).
+- A `SHA256SUMS` asset is optional. Without it, GitHub's digest of the asset is checked,
+  if it has one.
+- Only your key updates your mod: a release signed with another key, a zip whose
+  `mod.json` isn't the tag's id and version, or one over 64 MB is never taken.
+
+For a listed mod the catalogue stays the source; the owner can choose its releases
+instead (a test build from a fork), or turn updates off, on the mod's page
+(`hmgapid engine update-source <id> catalogue | releases | off | default`).
+HMG-API's maintainers can stop a version for both sources in `catalog/withdrawn.json`.
 
 ## Building a mod outside this repo
 
