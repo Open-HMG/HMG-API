@@ -56,7 +56,8 @@ other way round. Uninstall that package in NEMESIS Manager first:
 | Package | Can't be installed with |
 |---|---|
 | HMG-API | HMG Leafia Plus (`wireless.carplay.aa`), `carplay.session`, `voicehandler.vr-gates` (the last two until we know they don't clash) |
-| Wireless CarPlay + Android Auto (mod) | NEMESIS's Wireless Projection (`wireless.projection`) and Projection TBT (`projection.tbt`) |
+| Wireless CarPlay + Android Auto (mod) | NEMESIS's Wireless Projection (`wireless.projection`), Projection TBT (`projection.tbt`) and Enhanced Projection (`enhanced.projection`) |
+| Phone Turn-by-Turn (mod) | NEMESIS's Projection TBT (`projection.tbt`) and Enhanced Projection (`enhanced.projection`) |
 | adb (mod) | NEMESIS's ADB over TCP (`adb.tcp`) |
 
 ## adb
