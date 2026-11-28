@@ -101,7 +101,9 @@ check "still stock after refusals" "$BEFORE" "$(tree)"
 rm -f $T/sync.log
 run $P/install.sh $P
 has "install finishes" "installed. Restart the head unit" "$out"
-check "the stock copy reaches storage (sync) before the wrapper is written" "keep=$(md5sum < $T/real | cut -c1-32) app_process=$(md5sum < $T/real | cut -c1-32)" "$(sed -n 1p $T/sync.log)"
+# (other syncs come before it: every file put() writes, and the stock copy's own rename)
+check "the stock copy reaches storage (sync) before the wrapper is written" yes \
+    "$(grep -qx "keep=$(md5sum < $T/real | cut -c1-32) app_process=$(md5sum < $T/real | cut -c1-32)" $T/sync.log && echo yes || echo no)"
 check "app_process is the wrapper" "$(md5sum < $P/app_process)" "$(md5sum < $R/system/bin/app_process)"
 check "stock app_process kept beside it" "$(md5sum < $T/real)" "$(md5sum < $R/system/bin/app_process.hmgapi-stock)"
 check "stock app_process backed up" "$(md5sum < $T/real)" "$(md5sum < $R/data/hmgapi/stock/system/bin/app_process)"
