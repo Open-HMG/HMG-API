@@ -35,7 +35,7 @@ final class LogsTab {
             @Override
             public void onClick(View v) {
                 problem = true;
-                a.show(3);
+                a.show(MainActivity.LOGS);
             }
         });
         Ui.button(bar, "Refresh", new View.OnClickListener() {

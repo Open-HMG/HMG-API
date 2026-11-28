@@ -41,7 +41,7 @@ final class ProblemPage {
             @Override
             public void onClick(View v) {
                 LogsTab.problem = false;
-                a.show(3);
+                a.show(MainActivity.LOGS);
             }
         });
         Ui.text(list, "Record a problem", 28, true, Ui.TEXT);
@@ -119,10 +119,10 @@ final class ProblemPage {
                 recording = false;
                 result = r;
                 error = e == null ? null : String.valueOf(e.getMessage());
-                if (LogsTab.problem && a.current == 3) a.show(3);   // redraw, if the page is still open
+                if (LogsTab.problem && a.current == MainActivity.LOGS) a.show(MainActivity.LOGS);   // redraw, if the page is still open
             }
         }.start(a);
-        a.show(3);
+        a.show(MainActivity.LOGS);
     }
 
     void stop(final Button go) {

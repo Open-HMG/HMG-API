@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Get mods: HMG-API's catalogue on the head unit.** Mods tab → Get mods lists `catalog/`
+  (each mod's own GitHub release, pinned by SHA-256 and author key) with what installing it
+  would do here; Install downloads it over home Wi-Fi and installs it. No server of our own:
+  the catalogue comes from `catalog/index.json` when there is one (`tools/catalog.py index`),
+  else from GitHub's listing of the folder. Engine: `catalog`, `catalog-plan`, `catalog-install`.
 - **Dependencies are installed with a mod.** A mod's `requires` (copied into its catalogue
   entry by `catalog.py add`, and read again from the downloaded package's `mod.json`) are met
   by what's installed, or by the catalogue's version, installed first; a required mod that's
@@ -20,6 +25,22 @@
   installed or turned on, signed with the installed key) into `/data/hmgapi/pending/`, which
   nothing loads; `engine apply` puts them in place first and keeps the previous version in
   `/data/hmgapi/previous/`.
+- **Updates.** Mods tab → Updates (with how many) lists installed mods with a newer catalogue
+  version, and a newer HMG-API release (on a pre-release, only that version's next ones), with
+  its release notes, Update and Update all (each mod that can go; the ones that can't are listed
+  with why). "Install anyway" is per mod and says for what: not listed for this head unit, or an
+  author who isn't on the trusted list. A mod's row in the list says "update x.y.z". HMG-API checks by itself each time
+  home Wi-Fi comes up, at most every 6 hours (owner switch `no_update_check` turns that off), and
+  can also download and stage the mods' plain updates then (`auto_stage_updates`, off by
+  default): they wait aside until the owner applies.
+  HMG-API itself only updates on the owner's tap: its update zip is checked against its
+  release's `SHA256SUMS`, then against the release key as from a USB stick. Engine: `updates`,
+  `update <id>... | --all | hmgapi`, `update-check`; `logs/hmgapi/updates.log`.
+- **HMG-API's own HTTPS** (`/data/hmgapi/lib/libhmgapi_fetch.so`, `core/fetch`): Android 4.4's
+  Java TLS can't reach GitHub, so the engine uses the unit's own `libssl.so` (TLS 1.2), on a
+  socket marked for home Wi-Fi only, with its own DNS lookup on home Wi-Fi's server. Tested
+  first as a mod on an Ioniq 5 US 260507 (HMG-API rc.10): the catalogue and three packages
+  over home Wi-Fi, each with its SHA-256.
 - **Home Wi-Fi joins on cars whose Wi-Fi library checks a checksum** (Ioniq 5 US 260507). The
   stock library starts the car's Wi-Fi client only if `wpa_supplicant_crc32.conf` holds the
   CRC-32 of `wpa_supplicant.conf`; HMG-API's saved networks didn't update it, so the client
