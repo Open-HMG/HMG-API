@@ -2,6 +2,9 @@
 
 # HMG-API
 
+> [!IMPORTANT]
+> **HMG-API is separating from NEMESIS.** Soon, having both installed will no longer be supported. On NEMESIS 1.17? Update HMG-API to [1.1.0-rc.10](https://github.com/Open-HMG/HMG-API/releases/tag/v1.1.0-rc.10) and don't uninstall an older HMG-API. Read [the statement](https://github.com/Open-HMG/HMG-API/discussions/444) and [#397](https://github.com/Open-HMG/HMG-API/issues/397).
+
 [![Support HMG-API](https://img.shields.io/badge/Support_HMG--API-%E2%9D%A4-bf3989?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/Open-HMG/HMG-API/wiki/Support)
 
 > **HMG-API is free**, made by volunteers. If it saved you a dealer visit or made your drives nicer, please consider [supporting the people who build it](https://github.com/Open-HMG/HMG-API/wiki/Support): each maintainer has their own links there. It keeps the testing and new-car ports going.
