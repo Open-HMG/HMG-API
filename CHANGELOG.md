@@ -27,6 +27,8 @@
   again has them turned on by the next start's `engine recover`. The USB installer's restart
   waits while the car isn't in P. Tested off-car only: what shifting into reverse does to a
   running install on a car is still to be checked (`docs/car-test.md`).
+- **A root service can read its own settings** (`HmgApi.settings()`, `saveSettings()`): the
+  daemon sees such a service as root, so the client names its mod (`HMGAPI_MOD`).
 
 ## 1.1.0-rc.10 (2026-11-25)
 
