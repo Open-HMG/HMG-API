@@ -472,6 +472,25 @@ check for updates.
   `com.hkmc.software.wifi.module` feature are there (`hmgapi.wifi.unpowered`): the mod
   turns it on. Once the chip has shown on SDIO, it's `hmgapi.wifi` for every mod. The
   Car Report's `unit.wifi` says which: `seen`, `stock hotspot`, `unpowered` or `none`.
+- **Projection AP:** `"wifi": {"projection": true}`: HMG-API brings up the access point
+  wireless CarPlay and Android Auto join (HKMC's connectivity AP, apMode 2) as soon as
+  Android's Wi-Fi service is there, once each boot, so it's up before the phone's Bluetooth
+  reconnects. Some builds' stock apps never start it for Android Auto (the US Sorento PHEV
+  on 260507, #314), and they don't look again when it comes up later. It comes with
+  `"hotspot": true`. It's left alone when it's already up (in either mode), while a Wi-Fi
+  client is on (the car's own, or home Wi-Fi's while parked, which brings it back itself),
+  and once it's been up this boot: if the car turns it off later, that's the car's choice.
+  The keeper checks Android's Wi-Fi state, waits out transitions, and lets a saved Wi-Fi
+  client restore at boot.
+  The name and key are the ones the phone is told (HMG-API's projection AP hook, rc.5).
+  A QuickBoot resume is the same boot, so the keeper checks again after a suspend too.
+  A mod never starts the AP itself. HMG-API does it in two places: the Wi-Fi keeper
+  (`hmgapi wifi`, from boot; its log `/data/hmgapi/logs/hmgapi/wifi.log`), and, for a mod
+  attaching a phone right now, `hmgapi.hook.Wifi.projectionAp(context, "<mod>")` in the
+  mod's app process (from 1.1.0-rc.8). That one starts the AP in mode 2 as the stock apps
+  do, even over a plain hotspot or the car's own Wi-Fi client, since a phone is connecting;
+  only home Wi-Fi keeps the radio while parked. It returns false when it left the radio
+  alone or failed, and logs either way.
 - **`media_codecs.xml` by codec name** (patches.json):
   `{"type": "codecs", "path": "/system/etc/media_codecs.xml", "stock": "any",
   "remove": ["OMX.google.h264.decoder"], "add": [{"name": "OMX.google.vp9.decoder",

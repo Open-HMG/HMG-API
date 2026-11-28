@@ -393,7 +393,9 @@ rm -f $HS
 rm -rf $R/data/hmgapi/mods/*
 mkdir -p $R/data/hmgapi/mods/hc; printf '{"id": "hc", "version": "1.0.0", "wifi": {"hotspot": "yes"}}\n' > $R/data/hmgapi/mods/hc/mod.json
 eng plan
-has "\"wifi\" with another value: refused, with the form" '"wifi": {"client": true}, {"hotspot": true} and/or {"home": true}' "$out"
+has "\"wifi\" with another value: refused, with the form" '"wifi": {"client": true}, {"hotspot": true}, {"projection": true} and/or {"home": true}' "$out"
+has "bad Wi-Fi declaration reported against its mod" 'hc: "wifi":' "$out"
+hasnt "bad Wi-Fi declaration doesn't crash plan" 'engine error:' "$out"
 rm -rf $R/data/hmgapi/mods/hc
 
 # ---- one engine run at a time (rc.5: the app's two plans after a USB install raced on .features/*.tmp)

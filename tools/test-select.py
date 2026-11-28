@@ -20,7 +20,7 @@ ENGINE = ['core/runtime/engine-test.sh', 'core/runtime/signing-test.sh', 'core/r
           'core/runtime/live-test.sh', 'core/runtime/native-test.sh', 'core/runtime/runtime-test.sh', 'core/runtime/net-test.sh', 'core/runtime/homewifi-test.sh',
           'core/runtime/overlap-test.sh', 'core/runtime/scriptcheck-test.sh', 'core/runtime/sitefind-test.sh', 'install/nemesis/mod-test.sh', 'install/nemesis/sync-test.sh',
           'tools/catalog-test.sh', 'tools/version-test.sh', 'tools/check-scripts.sh']
-INSTALL = ['install/common/test.sh', 'install/common/install-test.sh', 'install/usb/test.sh', 'install/nemesis/mod-test.sh', 'install/nemesis/sync-test.sh']
+INSTALL = ['install/common/test.sh', 'install/common/install-test.sh', 'install/common/orders-test.sh', 'install/usb/test.sh', 'install/nemesis/mod-test.sh', 'install/nemesis/sync-test.sh']
 MODS = ['tools/check-scripts.sh']   # the example mods' scripts (their tests run in sdk-test)
 HOOKS = ['core/hookpoints/test.sh']
 SDK = ['tools/sdk-test.sh']
@@ -52,6 +52,7 @@ RULES = [
     (['core/app/*'], ['core/app/qr-test.sh']),
     (['mods/examples/*'], ['core/runtime/signing-test.sh', 'install/nemesis/mod-test.sh', 'tools/check-scripts.sh'] + SDK),   # hello: its test.sh runs in sdk-test
     (['install/*'], INSTALL + ['core/runtime/packages-test.sh']),
+    (['tools/zygote-orders.py'], ['install/common/orders-test.sh']),
     (['install/nemesis/mod/*', 'install/nemesis/bin/open.sh'], SDK),
     (['tools/sitefind.py'], ['core/runtime/sitefind-test.sh'] + SDK),
     (['tools/mkdelta.py', 'tools/mkrecipe.py', 'tools/mkmemrecipe.py'], ['core/runtime/engine-test.sh', 'core/runtime/safety-test.sh', 'tools/lpatch/test.sh']),

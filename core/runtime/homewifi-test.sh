@@ -11,6 +11,8 @@ case "$UNIT_SH" in *busybox*) UNIT_SH= ;; esac
 UNIT_SH=${UNIT_SH:-$(command -v mksh || command -v bash)}
 CP=$(mktemp -d)
 sh tools/engine-classes.sh "$CP"
+javac --release 8 -cp "$CP" -d "$CP" core/runtime/test/hmgapi/engine/WifiApTest.java
+java -cp "$CP" hmgapi.engine.WifiApTest
 T=$(mktemp -d)
 cleanup() { r=$?; [ $r != 0 ] && [ -z "$done" ] && echo "FAIL  stopped (exit $r) after: ${last:-the start}"; [ -f "$T/fake/fw/wpa.sleep" ] && kill "$(cat "$T/fake/fw/wpa.sleep")" 2>/dev/null || true; rm -rf "$T" "$CP"; }
 trap cleanup EXIT
@@ -53,7 +55,7 @@ check "groups: none for the allowed one, home and plain" "cell 0
 dl 2951
 quiet 2950" "$(cat "$D/state/service-gids.txt")"
 has "allowing cellular warns" "WARNING: cell: may use the car's cellular link (overrides.allow_cellular): at your own risk" "$out"
-has "the home Wi-Fi keeper runs" "hmgapi wifi root android yes script /data/hmgapi/state/wifi.sh" "$(cat "$D/state/services.txt")"
+has "the home Wi-Fi keeper runs, from boot" "hmgapi wifi root boot yes script /data/hmgapi/state/wifi.sh" "$(cat "$D/state/services.txt")"
 check "its script written" yes "$([ -s "$D/state/wifi.sh" ] && echo yes || echo no)"
 eng plan
 has "the plan: home Wi-Fi on" "home Wi-Fi  on" "$out"
@@ -125,6 +127,12 @@ cat > "$F/bin/setprop" <<'S'
 mkdir -p "$FW/props"; printf '%s' "$2" > "$FW/props/$1"
 S
 printf '#!/bin/sh\necho "$*" >> "$FW/ndc.log"\n' > "$F/bin/ndc"
+cat > "$F/bin/service" <<'S'
+#!/bin/sh
+# toolbox's service: Android's Wi-Fi service is there once $FW/wifisvc is
+[ "$1 $2" = "check wifi" ] || exit 1
+if [ -f "$FW/wifisvc" ]; then echo "Service wifi: found"; else echo "Service wifi: not found"; fi
+S
 chmod +x "$F/bin/"*
 export FW=$F/fw
 keeper() { HMGAPI_PACKAGES=$F/packages.list PATH=$F/bin:$PATH $UNIT_SH "$D/state/net.sh" "$@" 2>&1; }
@@ -191,14 +199,25 @@ echo "app_process $*" >> "$FW/apps.log"
 case "$3 $4" in
     "stop ") if [ -f "$FW/ap" ]; then cat "$FW/ap"; rm "$FW/ap"; else echo 0; fi ;;
     "start "*) echo "$4" > "$FW/ap"; echo "hotspot on" ;;
+    "ensure-projection ")
+        if [ "$(cat "$FW/props/init.svc.wpa_supplicant")" = running ]; then
+            echo "the car's own Wi-Fi client is on or set to restore, left alone"
+        elif [ -f "$FW/ap" ]; then
+            echo "already up"
+        else
+            echo 2 > "$FW/ap"; echo "up in mode 2"
+        fi ;;
     "client on") : > "$FW/client"; echo running > "$FW/props/init.svc.wpa_supplicant"; echo "client on" ;;
     "client off") rm -f "$FW/client"; echo stopped > "$FW/props/init.svc.wpa_supplicant"; echo "client off" ;;
 esac
 S
 printf '#!/bin/sh\n:\n' > "$F/bin/chown"
 chmod +x "$F/bin/"*
-mkdir -p "$F/fw/props"
+mkdir -p "$F/fw/props" "$X/data/hmgapi/state"
 echo 2 > "$F/fw/ap"   # the projection hotspot is up
+: > "$F/fw/wifisvc"   # Android's Wi-Fi service is up
+cp "$D/state/wifi.txt" "$X/data/hmgapi/state/wifi.txt"
+check "the keeper's asks: home Wi-Fi only" "home" "$(cat "$X/data/hmgapi/state/wifi.txt")"
 # the keeper's loop replaced by N keeps
 sed -e 's/^while :; do$/for _k in $(seq 1 ${KEEPS:-1}); do keep; done; exit 0/' "$D/state/wifi.sh" > "$D/state/wifi.sh.n"
 wk() { r=0; HMGAPI_TEST_ROOT=$X KEEPS=${1:-1} PATH=$F/bin:$PATH $UNIT_SH "$D/state/wifi.sh.n" 2>&1 || r=$?
@@ -371,6 +390,102 @@ wk >/dev/null
 verb down >/dev/null
 check "down while parked: the hotspot back" 2 "$(cat "$F/fw/ap")"
 check "... the client off" no "$([ -f "$F/fw/client" ] && echo yes || echo no)"
+
+# ---- the projection AP ("wifi": {"projection": true}): the engine
+rm -f "$D/settings/allow/home_wifi" "$D/settings/hmgapi.json"
+mkdir -p "$D/mods/aa"
+echo '{"id": "aa", "version": "1.0.0", "wifi": {"projection": true}}' > "$D/mods/aa/mod.json"
+eng publish-state
+check "publish with a projection ask runs" 0 $rc
+check "the keeper's asks: the projection AP for aa, no home Wi-Fi" "projection aa" "$(cat "$D/state/wifi.txt")"
+has "the keeper runs without home Wi-Fi, from boot" "hmgapi wifi root boot yes script /data/hmgapi/state/wifi.sh" "$(cat "$D/state/services.txt")"
+hasnt "... no vehicle service for it" "hmgapi vehicle " "$(cat "$D/state/services.txt")"
+eng plan
+has "the plan: the projection AP" "wifi     the projection AP up from boot, once each boot, unless a Wi-Fi client is on [aa]" "$out"
+has "the plan: the hotspot feature comes with it (the chip powered)" "com.hkmc.software.wifihotspot" "$out"
+has "the plan: home Wi-Fi still off" "home Wi-Fi  off" "$out"
+mkdir -p "$D/mods/bad-wifi"
+echo '{"id": "bad-wifi", "version": "1.0.0", "wifi": {"projection": true, "hotspot": "yes"}}' > "$D/mods/bad-wifi/mod.json"
+eng publish-state
+check "a malformed Wi-Fi request doesn't break state publication" 0 $rc
+check "only the valid projection request is published" "projection aa" "$(cat "$D/state/wifi.txt")"
+rm -rf "$D/mods/bad-wifi"
+
+# ---- the projection AP: the keeper
+cp "$D/state/wifi.txt" "$X/data/hmgapi/state/wifi.txt"
+echo boot-3 > "$X/proc/sys/kernel/random/boot_id"
+rm -f "$F/fw/ap" "$F/fw/wifisvc" "$X/data/hmgapi/wifi/mode"
+echo stopped > "$F/fw/props/init.svc.wpa_supplicant"
+: > "$F/fw/apps.log"
+wk >/dev/null
+check "from boot, no Wi-Fi service yet: nothing tried" "" "$(cat "$F/fw/apps.log")"
+: > "$F/fw/wifisvc"
+log=$(wk)
+has "the Wi-Fi service there: the projection AP up" "projection AP: up in mode 2 (requested by aa)" "$log"
+check "... in mode 2 (connectivity)" 2 "$(cat "$F/fw/ap")"
+check "... home Wi-Fi off in the status" off "$(state)"
+rm "$F/fw/ap"; : > "$F/fw/apps.log"
+wk >/dev/null
+check "... once a boot: the car turning it off later is left alone" "" "$(cat "$F/fw/apps.log")"
+echo boot-4 > "$X/proc/sys/kernel/random/boot_id"
+echo 1 > "$F/fw/ap"
+has "a new boot, the plain hotspot already up: left as it is" "projection AP: already up" "$(wk)"
+check "... still the plain one" 1 "$(cat "$F/fw/ap")"
+echo boot-5 > "$X/proc/sys/kernel/random/boot_id"
+rm "$F/fw/ap"; echo running > "$F/fw/props/init.svc.wpa_supplicant"
+has "the car's own Wi-Fi client on: left alone" "the car's own Wi-Fi client is on or set to restore, left alone" "$(wk)"
+check "... no AP" no "$([ -f "$F/fw/ap" ] && echo yes || echo no)"
+echo stopped > "$F/fw/props/init.svc.wpa_supplicant"
+echo boot-6 > "$X/proc/sys/kernel/random/boot_id"
+mv "$F/bin/app_process" "$F/bin/app_process.ok"
+printf '#!/bin/sh\necho "app_process $*" >> "$FW/apps.log"; echo "projection AP didn\x27t come on"; exit 1\n' > "$F/bin/app_process"; chmod +x "$F/bin/app_process"
+has "it doesn't come on: said once" "projection AP: not up yet, trying again" "$(wk)"
+hasnt "... and not again" "not up yet" "$(wk)"
+mv "$F/bin/app_process.ok" "$F/bin/app_process"
+has "... tried again, up" "projection AP: up in mode 2 (requested by aa)" "$(wk)"
+# QuickBoot: the same boot resumes; the keeper's sleep took far longer than asked (/proc/uptime counts
+# the suspend). A fake sleep moves the clock: by what it was asked, or by 400 s more (a suspend).
+mkdir -p "$F/sleepbin"
+printf '#!/bin/sh\necho "$1" >> "$FW/sleeps"; read -r u r < "%s/proc/uptime"; u=${u%%.*}; echo "$((u + $1 + ${SUSPEND:-0})).00 0" > "%s/proc/uptime"\n' "$X" "$X" > "$F/sleepbin/sleep"; chmod +x "$F/sleepbin/sleep"
+sed -e 's/^while :; do$/for _k in $(seq 1 ${KEEPS:-1}); do keep; tick; done; keep; exit 0/' "$D/state/wifi.sh" > "$D/state/wifi.sh.t"
+wt() { r=0; HMGAPI_TEST_ROOT=$X FW=$F/fw KEEPS=${1:-1} SUSPEND=${SUSPEND:-0} PATH=$F/sleepbin:$F/bin:$PATH $UNIT_SH "$D/state/wifi.sh.t" 2>&1 || r=$?
+    [ $r = 0 ] || { echo "FAIL  the keeper exited $r, after: $last" >&2; fail=1; }; }
+rm "$F/fw/ap"; : > "$F/fw/apps.log"
+log=$(wt)
+hasnt "a plain sleep, the AP off since: still the car's choice" "projection AP" "$log"
+check "... not started" no "$([ -f "$F/fw/ap" ] && echo yes || echo no)"
+SUSPEND=400; log=$(wt); SUSPEND=0
+has "back from a QuickBoot suspend: said" "back from a suspend" "$log"
+has "... the projection AP up again" "projection AP: up in mode 2 (requested by aa)" "$log"
+check "... in mode 2" 2 "$(cat "$F/fw/ap")"
+echo boot-6b > "$X/proc/sys/kernel/random/boot_id"
+rm "$F/fw/ap"; : > "$F/fw/sleeps"
+mv "$F/bin/app_process" "$F/bin/app_process.ok"
+printf '#!/bin/sh\necho "app_process $*" >> "$FW/apps.log"; echo "projection AP didn\x27t come on"; exit 1\n' > "$F/bin/app_process"; chmod +x "$F/bin/app_process"
+wt 31 >/dev/null
+check "it keeps not coming on: every 2 s for about a minute" 2 "$(sed -n 29p "$F/fw/sleeps")"
+check "... then every 30 s" 30 "$(sed -n 30p "$F/fw/sleeps")"
+mv "$F/bin/app_process.ok" "$F/bin/app_process"
+has "... and up once it can" "projection AP: up in mode 2 (requested by aa)" "$(wt)"
+# with home Wi-Fi on too: home Wi-Fi has the radio while parked, and brings the AP back itself
+: > "$D/settings/allow/home_wifi"
+eng publish-state
+check "both asks" "home
+projection aa" "$(cat "$D/state/wifi.txt")"
+cp "$D/state/wifi.txt" "$X/data/hmgapi/state/wifi.txt"
+echo boot-7 > "$X/proc/sys/kernel/random/boot_id"
+echo delay_mode > "$F/fw/veh.power"; echo 1 > "$F/fw/veh.parked"
+echo 2 > "$F/fw/ap"
+log=$(wk 2)
+has "parked: home Wi-Fi switches as before" "the car off: the hotspot off, the car's Wi-Fi client on" "$log"
+check "... the AP stays off while the client is on" no "$([ -f "$F/fw/ap" ] && echo yes || echo no)"
+echo on > "$F/fw/veh.power"; echo 0 > "$F/fw/veh.parked"
+has "the car on: the AP back (home Wi-Fi's)" "the hotspot back" "$(wk)"
+check "... mode 2" 2 "$(cat "$F/fw/ap")"
+rm -rf "$D/mods/aa" "$D/settings/allow/home_wifi"
+eng publish-state
+check "no asks: no keeper" "" "$(grep 'hmgapi wifi ' "$D/state/services.txt" || true)"
+check "... its asks file empty" "" "$(cat "$D/state/wifi.txt")"
 
 done=1
 [ $fail = 0 ] && echo "all home Wi-Fi checks passed"

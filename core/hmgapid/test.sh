@@ -50,7 +50,7 @@ check "second daemon refuses" "hmgapid: already running" "$("$T/root/hmgapid" da
 
 # --- root/shell caller
 check "ping" "ok" "$(run root ping)"
-check "version" "hmgapid $(sed -n 's/^#define VERSION "\(.*\)"/\1/p' hmgapid.c)" "$(run root version)"
+check "version: Engine.java's" "hmgapid $(sed -n 's/.*HMGAPI_VERSION = "\(.*\)";/\1/p' ../runtime/java/hmgapi/engine/Engine.java)" "$(run root version)"
 check "sh output and exit code" "hi 3" "$(run root sh 'echo hi; exit 3' | tr '\n' ' ')$(code root sh 'exit 3')"
 check "sh stderr streamed" "err" "$(run root sh 'echo err >&2')"
 # a background job with its output elsewhere (the boot hook's "(sleep 120; ...) &") must not

@@ -3,11 +3,11 @@
 *                   @Open-HMG/maintainers
 
 # Root, signing, /system writes and CI: the maintainer.
-/.github/           @VysseCodes
+/.github/           @VysseCodes @Open-HMG/releasers
 /core/hmgapid/      @VysseCodes
 /core/zygote/       @VysseCodes
 /core/loader/       @VysseCodes
 /install/           @VysseCodes
 /tools/lpatch/      @VysseCodes
 /SECURITY.md        @VysseCodes
-/CLAUDE.md          @VysseCodes
+/CLAUDE.md          @VysseCodes @Open-HMG/releasers

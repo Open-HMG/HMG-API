@@ -44,7 +44,10 @@ typedef unsigned int u32;
 typedef unsigned char u8;
 typedef long sl;
 
-#define VERSION "1.1.0-rc.5"
+/* The release (Engine.java's HMGAPI_VERSION): build.sh passes it, so a release changes one file. */
+#ifndef VERSION
+#error "VERSION isn't set: build with core/hmgapid/build.sh"
+#endif
 
 #ifndef ROOTDIR
 #define ROOTDIR "/data/hmgapi"

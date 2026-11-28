@@ -28,6 +28,15 @@ import java.util.Set;
  * back on rmnet0 (HKMC's mobile_hipri stays up for that), so only mods that ask ("wifi":
  * {"home": true}) use it: their traffic is marked (MARK) and routed through table TABLE. Home
  * Wi-Fi is the way HMG-API is meant to check for and fetch updates while parked.
+ *
+ * The projection AP (mod.json "wifi": {"projection": true}): HMG-API brings up the AP wireless
+ * CarPlay and Android Auto join (apMode 2) as soon as Android's Wi-Fi service is there, once each
+ * boot, before the phone's Bluetooth reconnects. On some builds the stock apps never start it for
+ * Android Auto (MQ4PHEV US 260507, #314: PhoneProjection reads APMode.UNKNOWN and never tries
+ * again), and they don't look again when it comes up later. Bringing Wi-Fi up is core's job, not a
+ * mod's. It's left alone when it's already up (either mode), while a Wi-Fi client is on (the stock
+ * one or home Wi-Fi's: they can't run together), and after it's up once: whatever the car does
+ * with it later this boot is the car's. The same keeper as home Wi-Fi, which owns the radio.
  */
 final class HomeWifi {
     private HomeWifi() {}
@@ -35,6 +44,22 @@ final class HomeWifi {
     static final int SERVICE_GID = 2950, HOME_GID = 2951, TABLE = 95, PRIORITY = 900;
     static final String MARK = "0x2951", IFACE = "wlan0";
     static final String SCRIPT_PATH = "/data/hmgapi/state/wifi.sh";
+
+    /** mod.json "wifi": {"projection": true} (the hotspot feature comes with it: Engine.wifiAsk) */
+    static boolean asksProjection(Map<String, Object> mj) {
+        try {
+            return mj != null && Engine.wifiAsk(mj.get("wifi"), "projection");
+        } catch (IllegalArgumentException e) {
+            // Apply reports the bad declaration against the mod. Ignore it when publishing state.
+            return false;
+        }
+    }
+
+    static List<String> projection(Map<String, Map<String, Object>> json, Set<String> on) {
+        List<String> out = new ArrayList<String>();
+        for (String id : on) if (asksProjection(json.get(id))) out.add(id);
+        return out;
+    }
 
     /** the owner's switch: the HMG-API app (settings/allow/home_wifi), or hmgapi.json "home_wifi" */
     static boolean on(Engine e) {
@@ -110,16 +135,25 @@ final class HomeWifi {
         return net.length() > 0 || new File(e.stateDir, "mods-net.applied").isFile();
     }
 
-    /** the home Wi-Fi keeper's services.txt line, or null when it's off (its script written) */
-    static String service(Engine e) throws Exception {
+    /**
+     * the Wi-Fi keeper's services.txt line, or null when neither home Wi-Fi nor the projection AP is
+     * wanted (its script and state/wifi.txt written: "home", "projection <mod>" lines). From boot:
+     * the projection AP has to be up before the phone's Bluetooth reconnects.
+     */
+    static String service(Engine e, Map<String, Map<String, Object>> json, Set<String> on) throws Exception {
         File script = new File(e.stateDir, "wifi.sh");
-        if (!on(e)) return null;
+        List<String> proj = projection(json, on);
+        StringBuilder asks = new StringBuilder();
+        if (on(e)) asks.append("home\n");
+        for (String id : proj) asks.append("projection ").append(id).append('\n');
+        ModRuntime.writeIfChanged(new File(e.stateDir, "wifi.txt"), asks.toString());
+        if (asks.length() == 0) return null;
         if (!(script.isFile() && Engine.read(script).equals(SCRIPT))) {
             File tmp = new File(e.stateDir, ".wifi.sh.tmp");
             Engine.write(tmp, SCRIPT);
             if (!tmp.renameTo(script)) throw new java.io.IOException("can't write wifi.sh");
         }
-        return "hmgapi wifi root android yes script " + SCRIPT_PATH + " - " + Integer.toHexString(SCRIPT.hashCode());
+        return "hmgapi wifi root boot yes script " + SCRIPT_PATH + " - " + Integer.toHexString(SCRIPT.hashCode());
     }
 
     /** the plan's lines */
@@ -127,6 +161,8 @@ final class HomeWifi {
         List<String> out = new ArrayList<String>();
         boolean home = on(e);
         out.add("home Wi-Fi  " + (home ? "on: while the car is off, the hotspot off and the car's Wi-Fi client on the saved networks" : "off"));
+        List<String> proj = projection(json, on);
+        for (String id : proj) out.add("wifi     the projection AP up from boot, once each boot, unless a Wi-Fi client is on [" + id + "]");
         for (Map.Entry<String, String> m : modes(e, json, on).entrySet()) {
             String mode = m.getValue();
             out.add("network  " + ("home".equals(mode) ? "home Wi-Fi only (no cellular)" : "allow".equals(mode)
@@ -147,7 +183,9 @@ final class HomeWifi {
         "# as root (service \"hmgapi wifi\"). While the car is off (30 s, or parked), the hotspot goes off and",
         "# the car's own Wi-Fi client joins the saved networks; when the car is on, the client goes off and",
         "# the hotspot comes back as it was. While joined, the car's own traffic stays on mobile data; only",
-        "# the mods that asked (and HMG-API) go through home Wi-Fi.",
+        "# the mods that asked (and HMG-API) go through home Wi-Fi. For mods that ask (\"wifi\": {\"projection\": true}),",
+        "# it brings the projection AP (apMode 2) up once each boot, as soon as Android's Wi-Fi service is there.",
+        "# What's wanted: $ASKS (\"home\", \"projection <mod>\" lines; the engine writes it).",
         "#   sh wifi.sh                 keep (the service)",
         "#   sh wifi.sh down            the client off, the hotspot back (the uninstaller, home Wi-Fi off)",
         "#   sh wifi.sh now [minutes] | back   home Wi-Fi on request (the car in P; 0: until out of P), and back (hmgapid wifi)",
@@ -159,6 +197,7 @@ final class HomeWifi {
         "NET=$X/data/misc/wifi/wpa_supplicant.conf   # Android's own Wi-Fi config: the saved networks",
         "WPA=$X/data/misc/wifi/sockets/$I            # the car's own client's control socket, while it runs",
         "PUB=$X/data/hmgapi/public/wifi.json",
+        "ASKS=$X/data/hmgapi/state/wifi.txt",
         "JAR=/system/framework/hmgapi-hook.jar",
         "nl='",
         "'",
@@ -170,6 +209,8 @@ final class HomeWifi {
         "reading() { hmgapid vehicle \"$1\" 2>/dev/null | while read -r k v; do [ \"$k\" = \"$1\" ] && echo \"$v\"; done; }",
         "tool() { CLASSPATH=$JAR app_process /system/bin hmgapi.engine.WifiAp \"$@\" 2>&1; }",
         "boot() { cat $X/proc/sys/kernel/random/boot_id 2>/dev/null; }",
+        "wants() { [ -f $ASKS ] && while read -r w rest; do [ \"$w\" = \"$1\" ] && { echo \"${rest:-$w}\"; }; done < $ASKS; }",
+        "wifi_svc() { case $(service check wifi 2>/dev/null) in *\": found\"*) true ;; *) false ;; esac; }",
         "",
         "# ---- the saved networks: Android's own config (the network={...} blocks; the rest is left as it is)",
         "ssid_of() { while IFS= read -r l; do case $l in *ssid=\\\"*) l=${l#*ssid=\\\"}; echo \"${l%\\\"}\"; return ;; esac; done; }",
@@ -283,7 +324,7 @@ final class HomeWifi {
         "# the car's own Wi-Fi client, not switched on by HMG-API (its Wi-Fi settings, Tilepad): left alone",
         "stock_client() { ! client_mode && case $(getprop init.svc.wpa_supplicant)$(getprop init.svc.p2p_supplicant) in *running*) true ;; *) false ;; esac; }",
         "",
-        "now() { read -r u rest < $X/proc/uptime; echo ${u%.*}; }",
+        "now() { u=0; [ -r $X/proc/uptime ] && read -r u rest < $X/proc/uptime; u=${u%.*}; echo ${u:-0}; }",
         "# home Wi-Fi's moment: the car off (its screen goes dark with it, and the stock apps end projection",
         "# then) for 30 s, or parked (the car events' rule), whichever comes first; a quick off and on again",
         "# (a stop for a moment) doesn't switch anything",
@@ -323,13 +364,42 @@ final class HomeWifi {
         "    echo \"back to the car's Wi-Fi within a few seconds\"",
         "}",
         "",
+        "# ---- the projection AP: up once each boot (and after a QuickBoot suspend) for the mods that ask;",
+        "# then the car's. A mod attaching a phone asks again itself (hmgapi.hook.Wifi.projectionAp).",
+        "nap=10 apn=0",
+        "ap_keep() {",
+        "    mods=$(wants projection)",
+        "    [ -n \"$mods\" ] || return 0",
+        "    [ \"$(cat $W/ap.boot 2>/dev/null)\" = \"$(boot)\" ] && return 0",
+        "    nap=2   # until it's up: the phone's Bluetooth reconnects early",
+        "    client_mode && return 0   # home Wi-Fi has the radio: it brings the AP back itself",
+        "    if r=$(tool ensure-projection); then   # WifiAp checked the AP and client through Android",
+        "        boot > $W/ap.boot; nap=10 apn=0; say \"projection AP: $r (requested by $(echo $mods))\"",
+        "    else",
+        "        [ \"$(cat $W/ap.fail 2>/dev/null)\" = \"$(boot)\" ] || { boot > $W/ap.fail; say \"projection AP: not up yet, trying again ($r)\"; }",
+        "        apn=$((apn + 1))",
+        "        [ $apn -lt 30 ] || nap=30   # about a minute of tries, then every 30 s (each try is a Dalvik start)",
+        "    fi",
+        "}",
+        "# QuickBoot: the head unit suspends with the car off and resumes as the same boot. /proc/uptime",
+        "# counts the suspended time (as elapsedRealtime does), so a sleep that took far longer than asked",
+        "# was a suspend: the projection AP gets checked again, as after a boot.",
+        "woke() {",
+        "    rm -f $W/ap.boot $W/ap.fail; apn=0",
+        "    [ -n \"$(wants projection)\" ] && say \"back from a suspend ($1 s): the projection AP checked again\"",
+        "}",
+        "",
         "keep() {",
         "    mkdir -p $W",
+        "    nap=10",
+        "    wifi_svc || { nap=2; return; }   # from boot: Android's Wi-Fi service isn't there yet",
         "    # HMG-API's client from before a restart (Android remembers \"Wi-Fi on\"): the hotspot back first",
         "    if [ -f $W/mode ] && ! client_mode; then",
         "        boot > $W/mode",
         "        client_off \"after a restart while home Wi-Fi was on\"",
         "    fi",
+        "    ap_keep",
+        "    [ -n \"$(wants home)\" ] || { status off; return; }",
         "    if stock_client; then status stock; return; fi",
         "    pw=$(reading power) p=$(reading parked)",
         "    if client_mode; then",
@@ -372,8 +442,9 @@ final class HomeWifi {
         "    forget) forget \"$2\"; exit $? ;;",
         "esac",
         "trap 'down; say stopped; exit 0' TERM   # never left with the hotspot off",
+        "tick() { t0=$(now); sleep $nap; d=$(($(now) - t0)); [ $d -le $((nap + 60)) ] || woke $d; }",
         "while :; do",
         "    keep",
-        "    sleep 10",
+        "    tick",
         "done");
 }

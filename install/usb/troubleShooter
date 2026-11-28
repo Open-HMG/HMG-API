@@ -6,7 +6,6 @@
 # the same stick:
 #   HMGAPI/install/payload/   install, or update an installed HMG-API
 #   HMGAPI/UNINSTALL          uninstall instead (HMGAPI/UNINSTALL-PURGE: also /data/hmgapi)
-#   HMGAPI/FORCE              install even if app_process isn't a known stock build (own risk)
 # Copies its log to HMGAPI/install.log, shows the result, and restarts the unit.
 # Toolbox and mksh only: the unit has no busybox. ROOT and HMGAPI_USB_DIRS: off-car tests.
 export PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin${PATH:+:$PATH}
@@ -15,6 +14,8 @@ umask 077
 ROOT=${ROOT:-}
 STAGE=$ROOT/data/local/tmp/hmgapi-usb
 
+# an app_process build HMG-API hasn't checked (install.sh, uninstall.sh: ASK_BUILD in lib.sh)
+UNKNOWN_TOAST="HMG-API hasn't checked your car's software build yet, so nothing was changed. Please open an issue at github.com/Open-HMG/HMG-API with HMGAPI/install.log from this stick."
 toast() {
     echo "$1"
     [ -n "$ROOT" ] && return
@@ -49,8 +50,10 @@ fi
 
 [ -n "$ROOT" ] || mount -o remount,rw /system >/dev/null 2>&1   # allowed in this process
 
-# the owner's call: an app_process HMG-API doesn't know yet (install, and its uninstall)
-[ -f "$U/HMGAPI/FORCE" ] && export HMGAPI_FORCE=1
+# HMGAPI/FORCE (install an app_process HMG-API doesn't know yet, and its uninstall) is off for now:
+# an unknown build is refused with nothing changed, and its line goes into stock.txt. To put the
+# stick file back, uncomment this line and the one in install/nemesis/scripts/postinstall.sh
+#[ -f "$U/HMGAPI/FORCE" ] && export HMGAPI_FORCE=1
 if [ -f "$U/HMGAPI/UNINSTALL" ] || [ -f "$U/HMGAPI/UNINSTALL-PURGE" ]; then
     if [ ! -f "$ROOT/data/hmgapi/uninstall.sh" ]; then
         toast "HMG-API isn't installed. Nothing was changed."
@@ -63,7 +66,9 @@ if [ -f "$U/HMGAPI/UNINSTALL" ] || [ -f "$U/HMGAPI/UNINSTALL-PURGE" ]; then
     rc=$?
     cp "$STAGE.log" "$U/HMGAPI/install.log" 2>/dev/null
     rm -f "$STAGE.log"
-    if [ $rc = 0 ]; then toast "HMG-API uninstalled, restarting."; else toast "HMG-API uninstall failed: see HMGAPI/install.log on the stick."; fi
+    if [ $rc = 0 ]; then toast "HMG-API uninstalled, restarting."
+    elif grep -q "isn't a known stock build" "$U/HMGAPI/install.log" 2>/dev/null; then toast "$UNKNOWN_TOAST"
+    else toast "HMG-API uninstall failed: see HMGAPI/install.log on the stick."; fi
     finish $rc
 fi
 
@@ -82,6 +87,8 @@ cp "$STAGE.log" "$U/HMGAPI/install.log" 2>/dev/null
 rm -r "$STAGE" "$STAGE.log" 2>/dev/null
 if [ $rc = 0 ]; then
     toast "HMG-API installed, restarting."
+elif grep -q "isn't a known stock build" "$U/HMGAPI/install.log" 2>/dev/null; then
+    toast "$UNKNOWN_TOAST"
 else
     toast "HMG-API install failed: see HMGAPI/install.log on the stick."
 fi

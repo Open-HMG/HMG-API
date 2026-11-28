@@ -34,7 +34,7 @@ without new features is still a PATCH.
 
 ### Where the version is written
 
-- Core: `HMGAPI_VERSION` in `core/runtime/java/hmgapi/engine/Engine.java`. It names the
+- Core: `HMGAPI_VERSION` in `core/runtime/java/hmgapi/engine/Engine.java` (hmgapid takes it at build). It names the
   release, the SDK (`hmgapi-mod-sdk-<version>.zip`) and the downloads.
 - A mod: `"version"` in its `mod.json`.
 - The tag: `v<version>` (`v1.2.0-rc.1`). The release workflows refuse a tag that isn't

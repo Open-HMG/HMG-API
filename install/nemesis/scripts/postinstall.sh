@@ -11,6 +11,7 @@ if [ ! -d ./payload ]; then
     exit 1
 fi
 export HMGAPI_FROM_NEMESIS=1   # install.sh: NEMESIS is listing it already, no NEMESIS sync
-# HMGAPI/FORCE on a USB stick: install even if app_process isn't a known stock build (own risk)
-for d in /storage/usb0 /storage/usb1 /storage/usb2; do [ -f "$d/HMGAPI/FORCE" ] && export HMGAPI_FORCE=1; done
+# HMGAPI/FORCE on a USB stick (install even if app_process isn't a known stock build) is off for
+# now, as in install/usb/troubleShooter; uncomment to put it back
+#for d in /storage/usb0 /storage/usb1 /storage/usb2; do [ -f "$d/HMGAPI/FORCE" ] && export HMGAPI_FORCE=1; done
 exec sh ./payload/install.sh "$PWD/payload"

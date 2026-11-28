@@ -98,7 +98,7 @@ installed() { [ -f $R/system/bin/hmgapid ] && [ -f $R/system/bin/app_process.hmg
 mkdir -p $R/system/bin $R/system/lib $R/system/framework $R/system/etc $R/data/dalvik-cache $R/data/local/tmp
 # a car's own app_process when tools/cars.py runs this on its stock tree (HMGAPI_CAR, docs/car-trees.md)
 STOCK=${HMGAPI_CAR:+$HMGAPI_CAR/bin/app_process}
-if [ -f "$STOCK" ]; then cp $STOCK $R/system/bin/app_process; else head -c 9000 /dev/urandom > $R/system/bin/app_process; fi
+if [ -f "$STOCK" ]; then cp $STOCK $R/system/bin/app_process; else { printf '\177ELF'; head -c 9000 /dev/urandom; } > $R/system/bin/app_process; fi
 chmod 755 $R/system/bin/app_process
 printf 'echo qb stock\n' > $R/system/etc/qb_runtime.sh
 BEFORE=$(tree)
@@ -136,20 +136,32 @@ run $TS
 has "UNINSTALL with nothing installed: says so" "HMG-API isn't installed. Nothing was changed" "$out"
 rm $S/HMGAPI/UNINSTALL
 
-# another car's app_process: refused unless the owner puts HMGAPI/FORCE on the stick
+# another car's app_process: refused, and HMGAPI/FORCE on the stick doesn't change that (off for now)
 cp $R/system/bin/app_process $R/../app_process.mine
 echo "another car" >> $R/system/bin/app_process
 OTHER=$(tree)
 run $TS
-has "unknown app_process: refused, says how to go on" "an empty file HMGAPI/FORCE on the USB stick" "$(cat $S/HMGAPI/install.log)"
+has "unknown app_process: refused, asks for an issue" "isn't a known stock build, so nothing was changed. HMG-API only takes app_process builds it has checked, and this one isn't checked yet. Please open an issue at https://github.com/Open-HMG/HMG-API/issues/new/choose" "$(cat $S/HMGAPI/install.log)"
+has "... the toast says what happened and what to send" "HMG-API hasn't checked your car's software build yet, so nothing was changed. Please open an issue at github.com/Open-HMG/HMG-API with HMGAPI/install.log from this stick." "$out"
+check "... and names no way to force it" "" "$(grep -i 'FORCE' $S/HMGAPI/install.log || true)"
 check "... nothing changed" "$OTHER" "$(tree)"
 : > $S/HMGAPI/FORCE
 run $TS
-has "HMGAPI/FORCE: installed at the owner's risk" "isn't a known stock build; HMGAPI_FORCE=1, going on at your own risk" "$(cat $S/HMGAPI/install.log)"
+has "HMGAPI/FORCE on the stick: still refused (off for now)" "isn't a known stock build, so nothing was changed" "$(cat $S/HMGAPI/install.log)"
+check "... nothing changed" "$OTHER" "$(tree)"
+rm $S/HMGAPI/FORCE
+# installed on that build by the maintainers' override (the environment, as over adb): the stick's
+# uninstall refuses its backup, and the toast says why and what to send
+HMGAPI_FORCE=1 run $TS; unset HMGAPI_FORCE
+check "maintainers' override: installs on the unknown build" yes "$(installed)"
 : > $S/HMGAPI/UNINSTALL
 run $TS
-check "... and uninstalled back to that car's own bytes" "$OTHER" "$(tree)"
-rm $S/HMGAPI/UNINSTALL $S/HMGAPI/FORCE
+has "... the stick's uninstall refuses, HMG-API stays" "isn't a known stock build, so nothing was changed and HMG-API is still installed" "$(cat $S/HMGAPI/install.log)"
+has "... the toast says the same in short" "HMG-API hasn't checked your car's software build yet, so nothing was changed." "$out"
+check "... still installed" yes "$(installed)"
+HMGAPI_FORCE=1 run $TS; unset HMGAPI_FORCE
+check "... with the override: back to that car's own bytes" "$OTHER" "$(tree)"
+rm $S/HMGAPI/UNINSTALL
 rm -rf $R/data/hmgapi
 mv $R/../app_process.mine $R/system/bin/app_process
 
