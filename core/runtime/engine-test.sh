@@ -174,12 +174,13 @@ echo "gear.park 0" > $T/gear.out
 eng apply
 check "nothing to change on /system: no gear needed" "0" "$rc"
 # apps an apply stopped while their files changed (pm disable lasts across restarts): an apply
-# cut off before it let them go leaves the list, and recover (the next start) turns them on
+# cut off before it let them go leaves the list; recover keeps it while Android isn't up, for
+# boot.sh's release-held (the held-apps checks further down start them with a package manager)
 printf 'dev.example.gpm\ndev.example.dipo\n' > $R/data/hmgapi/state/held.txt
 eng recover
-has "recover: the apps a cut-off apply stopped turned on again" "enabled  dev.example.gpm (stopped by an apply that was cut off)" "$out"
-has "... each" "enabled  dev.example.dipo" "$out"
-check "... the list gone" no "$([ -e $R/data/hmgapi/state/held.txt ] && echo yes || echo no)"
+has "recover: the apps a cut-off apply stopped, Android not up: left for boot.sh" "start again once Android is up (boot.sh: engine release-held)" "$out"
+check "... still listed" "dev.example.gpm dev.example.dipo" "$(echo $(cat $R/data/hmgapi/state/held.txt))"
+rm -f $R/data/hmgapi/state/held.txt
 unset HMGAPI_HMGAPID
 
 # ---- trial: undone by recover, or kept
@@ -498,6 +499,9 @@ OWN_A=$(own /system/lib/a.so); OWN_Z=$(own /system/lib/z.so); OWN_N=$(own /syste
 check "stock modes and owners set up" "640 1000 1000 u:object_r:system_file:s0|644 0 0 -|755 0 2000 u:object_r:netd_exec:s0" "$OWN_A|$OWN_Z|$OWN_N"
 sums() { for f in lib/a.so lib/z.so bin/netd app/Test.apk app/Test.odex framework/framework-res.apk app/Pers.apk app/Off.apk; do md5 $R/system/$f; done | tr '\n' ' '; }
 STOCK_ALL=$(sums)
+# netd and framework-res.apk are boot-critical (refused without the owner's override): these checks
+# are about modes, owners and held apps on real paths, so the override lets them change
+printf '{"overrides": {"allow_critical": ["/system/bin/netd", "/system/framework/framework-res.apk"]}}\n' > $R/data/hmgapi/settings/hmgapi.json
 # a package manager: Test.apk's app runs, Off.apk's is off already, Pers.apk's is persistent, framework-res is android
 cat > $T/pm <<EOF
 #!/bin/sh
@@ -638,4 +642,5 @@ chmod 644 $R/system/bin/netd; sed -i.bak '/^\/system\/bin\/netd /d' $R/meta.txt
 eng restore
 check "restore of an old record: /system/bin's defaults" "755 0 2000 -" "$(own /system/bin/netd)"
 unset HMGAPI_PM HMGAPI_PROPS
+rm -f $R/data/hmgapi/settings/hmgapi.json
 exit $fail

@@ -1410,6 +1410,13 @@ public final class Engine {
                 return t.path + ": " + ch.mod.id + ": mode " + ms + " (only plain modes like 644 or 755: no setuid, setgid or sticky bits)";
             }
         }
+        // boot-critical first: of the reasons a change is refused, the one that matters most
+        boolean critical = critical(t.path);
+        if (critical && !allowedCritical(t.path)) {
+            return t.path + ": the unit needs this file to boot, so mods can't change it (hmgapi.json overrides.allow_critical"
+                    + " lists paths allowed anyway, at your own risk)";
+        }
+        if (critical) out.add("WARNING: " + t.path + " is boot-critical; changing it because overrides.allow_critical lists it");
         // a binary written without its mode doesn't run, and an uninstall putting back a stock one that
         // doesn't run can keep the unit from booting: say it, every time
         if ((t.path.startsWith("/system/bin/") || t.path.startsWith("/system/xbin/")) && modeOf(t) == null && !t.changes.isEmpty()) {
@@ -1443,12 +1450,6 @@ public final class Engine {
             }
             return null;
         }
-        boolean critical = critical(t.path);
-        if (critical && !allowedCritical(t.path)) {
-            return t.path + ": the unit needs this file to boot, so mods can't change it (hmgapi.json overrides.allow_critical"
-                    + " lists paths allowed anyway, at your own risk)";
-        }
-        if (critical) out.add("WARNING: " + t.path + " is boot-critical; changing it because overrides.allow_critical lists it");
         return null;
     }
 

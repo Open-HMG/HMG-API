@@ -117,6 +117,8 @@ eng plan; check "a folder that only starts like hw/ isn't critical" 0 $rc
 head -c 2048 /dev/urandom > $R/system/bin/netd; chmod 755 $R/system/bin/netd
 echo "/system/bin/netd 0 2000 u:object_r:netd_exec:s0" > $R/meta.txt
 NETD=$(md5 $R/system/bin/netd)
+# netd is boot-critical (checked above): the owner's override, so these checks are about modes alone
+printf '{"overrides": {"allow_critical": ["/system/bin/netd"]}}\n' > $R/data/hmgapi/settings/hmgapi.json
 own() { echo "$(python3 -c 'import os, sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o7777)[2:])' $R$1) $(grep "^$1 " $R/meta.txt | sed "s#^$1 ##")"; }
 mod a '{"type": "add", "path": "/system/bin/netd", "src": "a.xml", "stock": "any"}'
 eng plan; has "a /system/bin change with no mode refused" '/system/bin/netd: a: a change in /system/bin or /system/xbin needs a "mode"' "$out"; check "... refusal exit" 3 $rc
@@ -132,6 +134,7 @@ mod a '{"type": "add", "path": "/system/xbin/tool", "src": "a.xml", "mode": "755
 eng apply; check "a new /system/xbin file with a mode" "755 0 2000 -" "$(own /system/xbin/tool)"
 eng restore; check "... removed again" absent "$(md5 $R/system/xbin/tool)"
 rm -f $R/meta.txt
+rm -f $R/data/hmgapi/settings/hmgapi.json
 
 # ---- live props
 mod a '{"type": "prop", "key": "ro.secure", "value": "0"}'
