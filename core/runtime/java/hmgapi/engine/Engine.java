@@ -498,10 +498,22 @@ public final class Engine {
         // files on /system change (and apps may be held): only in P (Gear)
         if (p.filesChange()) {
             int g = Gear.check(this, restoreAll ? "the restore" : "the apply", gearUnknownOk);
-            if (g != 0) return g;
+            if (g != 0) {
+                Catalog.stagedBack(this, staged);   // not applied: the staged updates wait in pending/ again
+                return g;
+            }
         }
-        int rc = apply(p, trial);
-        if (rc == 0) LiveState.publish(this);
+        // a staged update stays in mods/ only if the apply that takes it goes through: its code loads
+        // from there at boot, and must never run on the /system files of the version before it
+        int rc;
+        try {
+            rc = apply(p, trial);
+        } catch (Throwable x) {
+            Catalog.stagedBack(this, staged);
+            throw x;
+        }
+        if (rc != 0) Catalog.stagedBack(this, staged);
+        else LiveState.publish(this);
         return rc;
     }
 
