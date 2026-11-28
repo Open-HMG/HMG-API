@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.1.0 (2026-11-DD)
+
+1.1.0-rc.10's code: only the version, this heading and the release notes changed. It is the
+last release checked with NEMESIS (1.17.1, on a car with rc.10); HMG-API is separating from
+NEMESIS (Discussion #444), and later releases aren't checked against it. Everything new since
+1.0.2 is in the entries below, from 1.1.0-beta.1 to 1.1.0-rc.10.
+
+**Tested on:** TODO (car, region, head unit software, NEMESIS 1.17.1).
+
+**Bundled mods:** Wireless CarPlay + Android Auto 2.2.0 (2.2.0-rc.9's code), ADB 1.0.1
+(1.0.1-rc.1's code), NEMESIS in the app menu.
+
 ## 1.1.0-rc.10 (2026-11-25)
 
 - **No owner-facing way to force an unknown `app_process`, for now.** An empty `HMGAPI/FORCE`
