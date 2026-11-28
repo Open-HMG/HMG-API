@@ -196,7 +196,7 @@ final class Releases {
         boolean pre = c.prereleases() || !have.tag.isEmpty();
         Version bv = have;
         Map<String, Object> bestAsset = null, bestRel = null;
-        String bestVer = null, skipped = null;
+        String bestVer = null, bestAt = null, skipped = null;
         for (Object o : list) {
             if (!(o instanceof Map)) continue;
             Map<String, Object> rel = (Map<String, Object>) o;
@@ -223,11 +223,12 @@ final class Releases {
                 skipped = m.id + " " + ver + ": its zip is " + size + " bytes, more than HMG-API takes (" + Packages.MAX_BYTES + ")";
                 continue;
             }
-            String url = String.valueOf(a.get("browser_download_url"));
-            if (!url.startsWith("https://github.com/" + m.repo + "/releases/download/")) {
-                skipped = m.id + " " + ver + ": its zip isn't a download from " + m.repo + "'s releases";
+            String at = where(rel, m.repo), url = String.valueOf(a.get("browser_download_url"));
+            if (!url.startsWith("https://github.com/" + at + "/releases/download/")) {
+                skipped = m.id + " " + ver + ": its zip isn't a download from " + at + "'s releases";
                 continue;
             }
+            bestAt = at;
             bestAsset = a;
             bestRel = rel;
             bestVer = ver;
@@ -244,10 +245,10 @@ final class Releases {
         if (m.description != null) en.put("description", m.description);
         en.put("version", ver);
         en.put("uuid", m.uuid);
-        en.put("repo", "https://github.com/" + m.repo);
+        en.put("repo", "https://github.com/" + bestAt);
         en.put("download", bestAsset.get("browser_download_url"));
         if (bestAsset.get("size") instanceof Number) en.put("size", bestAsset.get("size"));
-        String sha = sha256(http, tmp, m, String.valueOf(bestAsset.get("name")), bestRel.get("assets"), bestAsset);
+        String sha = sha256(http, tmp, bestAt, String.valueOf(bestAsset.get("name")), bestRel.get("assets"), bestAsset);
         if (sha != null) en.put("sha256", sha);
         en.put("source", "release");
         en.put("prerelease", Boolean.TRUE.equals(bestRel.get("prerelease")) || !bv.tag.isEmpty());
@@ -256,6 +257,20 @@ final class Releases {
         if (body.length() > MAX_NOTES) body = body.substring(0, MAX_NOTES) + "\n…";
         if (!body.isEmpty()) en.put("notes", body);
         return en;
+    }
+
+    /**
+     * The repo a release is in, from its page: the one mod.json names, or where GitHub moved it (a
+     * transfer to another owner, a rename; GitHub's API follows those). Its downloads must be that
+     * repo's. Either way the package must still be signed by the installed key.
+     */
+    static String where(Map<String, Object> rel, String repo) {
+        Object page = rel.get("html_url");
+        if (page instanceof String) {
+            Matcher m = Pattern.compile("https://github\\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/releases/tag/.+").matcher((String) page);
+            if (m.matches()) return m.group(1);
+        }
+        return repo;
     }
 
     /** the release's zip for m: "release_asset" with {version}, else the one .zip named "<id>-..." (the one with the version, if several) */
@@ -286,13 +301,13 @@ final class Releases {
 
     /** the zip's SHA-256: from the release's SHA256SUMS, else GitHub's digest of the asset, else null (the signature decides) */
     @SuppressWarnings("unchecked")
-    static String sha256(Http http, File tmp, Mod m, String name, Object assets, Map<String, Object> asset) {
+    static String sha256(Http http, File tmp, String repo, String name, Object assets, Map<String, Object> asset) {
         for (Object o : assets instanceof List ? (List<Object>) assets : new ArrayList<Object>()) {
             if (!(o instanceof Map) || !"SHA256SUMS".equals(((Map<String, Object>) o).get("name"))) continue;
             String url = String.valueOf(((Map<String, Object>) o).get("browser_download_url"));
-            if (!url.startsWith("https://github.com/" + m.repo + "/releases/download/")) break;
+            if (!url.startsWith("https://github.com/" + repo + "/releases/download/")) break;
             try {
-                File s = new File(tmp, "sums-" + m.id);
+                File s = new File(tmp, "sums-" + name);
                 if (!http.get(url, s, Catalog.MAX_ENTRY).ok()) break;
                 for (String l : Engine.read(s).split("\n")) {
                     String[] p = l.trim().split("\\s+");

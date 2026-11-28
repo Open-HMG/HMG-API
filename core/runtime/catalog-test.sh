@@ -610,6 +610,19 @@ rpkg dev/beta beta 2.0.0-beta.2 ''; releases dev/beta "$(rel dev/beta v2.0.0-bet
 eng updates --refresh
 check "a beta installed: its next beta offered" 2.0.0-beta.2 "$(u beta 'm[0]["version"]')"
 
+# a repo moved to another owner (GitHub's API follows it): its downloads are the new repo's
+rm -rf "$W/objects.githubusercontent.com/r/org"; mkdir -p "$W/objects.githubusercontent.com/r/org/beta" "$W/github.com/org/beta/releases/download/v2.0.0-beta.3"
+rpkg dev/beta beta 2.0.0-beta.3 ''
+mv $W/github.com/dev/beta/releases/download/v2.0.0-beta.3/beta-2.0.0-beta.3.zip.redirect $W/github.com/org/beta/releases/download/v2.0.0-beta.3/
+releases dev/beta "$(rel org/beta v2.0.0-beta.3 true "$(asset org/beta v2.0.0-beta.3 beta-2.0.0-beta.3.zip $ZSIZE '')")"
+eng updates --refresh
+check "a moved repo: offered, from where it is now" "2.0.0-beta.3 https://github.com/org/beta" "$(u beta 'm[0]["version"]+" "+m[0]["repo"]')"
+releases dev/beta "$(rel dev/beta v2.0.0-beta.3 true "$(asset org/beta v2.0.0-beta.3 beta-2.0.0-beta.3.zip $ZSIZE '')")"
+eng updates --refresh
+check "... a download from another repo than its release's: not offered" None "$(u beta 'm[0]["version"]')"
+releases dev/beta "$(rel dev/beta v2.0.0-beta.2 true "$(asset dev/beta v2.0.0-beta.2 beta-2.0.0-beta.2.zip 100 '')")"
+eng updates --refresh
+
 # GitHub's API limit: said, the last answer kept
 echo 403 > "$W/api.github.com/repos/dev/beta/releases_per_page=10.status"
 echo 403 > "$W/api.github.com/repos/dev/side/releases_per_page=10.status"
