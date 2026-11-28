@@ -1,3 +1,6 @@
+<!-- Which branch? A fix for the current release: release/1.1. A feature, new hook point or
+     mod API: the next minor's release/1.x. Docs that don't ship: main. (docs/releasing.md) -->
+
 ## What this changes
 
 ## Tested on

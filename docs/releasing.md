@@ -45,12 +45,38 @@ without new features is still a PATCH.
   `1.1.1-rc.1` is `1.1.0.99.1`, all below their final. (1.0.0's betas used `.99.N` for
   betas, `0.99.1`..`0.99.6`; those still sort below everything since.)
 
+## Branches
+
+From 1.1.0 on, each release line has its own branch, and pull requests go into the branch
+for the release they belong to:
+
+| Branch | What goes in | Tags from it |
+|---|---|---|
+| `release/<major>.<minor>` for the current final (`release/1.1`) | fixes for that line: bugs, maps for already supported cars, docs that ship | its patches and their rcs (`v1.1.1`, `v1.1.1-rc.1`) |
+| `release/<major>.<minor>` for the next minor (`release/1.2`) | features, new hook points, new mod API, new mod.json fields, and the fixes from the line before | its alphas, betas, rcs and final (`v1.2.0-rc.1`, `v1.2.0`) |
+| `main` | the latest final, plus docs and repo housekeeping that doesn't ship | none |
+
+- **A fix goes into the oldest line it's for**, then is merged forward (`release/1.1` into
+  `release/1.2`) so the next minor has it too. Don't cherry-pick fixes between lines.
+- **At each final**, its release branch is merged into `main`, so `main` is always the
+  latest release. When a minor's final is out, the next one's branch is created from it
+  (`git switch -c release/1.3 v1.2.0`) and the held feature PRs are retargeted to it
+  (`gh pr edit <n> --base release/1.3`).
+- The PR template asks which branch a PR is for; a maintainer retargets PRs opened against
+  the wrong one.
+- CI runs on pull requests into any branch and on pushes to `main` and `release/**`.
+
+A hotfix for an older line (1.0.3 after 1.1.0 is out) is published but not "Latest":
+the release workflow marks only the highest final as Latest. Check the "Set as the
+latest release" box is clear when publishing such a draft.
+
 ## The release candidate flow
 
-1. **Betas** (optional): features may still land on `main`. Each beta is cut from `main`.
+1. **Betas** (optional): features may still land on the next minor's branch. Each beta is
+   cut from it.
 2. **rc.1 = feature freeze.** A cutoff date for maintainers goes out first (a tracking
-   issue). From rc.1, `main` takes only fixes for the release until the final is out;
-   features wait in their PRs (or go to the next minor).
+   issue). From rc.1, the branch takes only fixes for the release until the final is out;
+   features wait in their PRs (or go to the minor after).
 3. **rc.N+1 only for a blocker:** something that would make the final worse than the
    release before it (install or uninstall fails, a car that worked stops working, a
    crash loop, data loss). Small fixes that aren't blockers wait for the next patch.
@@ -58,42 +84,21 @@ without new features is still a PATCH.
    release notes change between the last rc and the final. If anything else has to change,
    that's another rc.
 
-The release PR for each (branch `release/v<version>`, as for 1.0.2): `HMGAPI_VERSION`,
-the CHANGELOG ("Unreleased" becomes "<version> (date)"), and
-`.github/release-notes/v<version>.md`. A maintainer merges it and pushes the tag; the
-release workflow builds a **draft** once its `release` environment is approved. A
-maintainer checks the draft off-car: every file in `SHA256SUMS`, the version in the
-update package, and the bundled mods as `tools/release-mods.txt` pins them. Then:
+A patch (1.1.1) can have its own rc when the fix is risky; usually it doesn't.
 
-- **an alpha, beta or rc is published right away**, as a pre-release. Owners testing it
-  on their cars is what it's for, so it doesn't wait for a maintainer's own car;
-- **a final** is checked on a car first, then published.
+The release PR for each (branch `release/v<version>`, into the line's release branch):
+`HMGAPI_VERSION`, the app manifest's version, the CHANGELOG ("Unreleased" becomes
+"<version> (date)"), and `.github/release-notes/v<version>.md`. A maintainer merges it and
+pushes the tag on that branch; the release workflow builds a **draft** once its `release`
+environment is approved. A maintainer checks the draft off-car: every file in `SHA256SUMS`,
+the version in the update package, and the bundled mods as `tools/release-mods.txt` pins
+them. Then **every release, rcs included, is checked on a car before it's published**
+(Discussion #444: an RC is only offered as an update after an on-car check). An alpha,
+beta or rc is published as a pre-release; a final as Latest.
 
 A core pre-release that bundles a mod's pre-release needs that mod's release published
-first: `tools/release-mods.txt` pins its download, which a draft doesn't serve.
-
-## Hotfixes
-
-A hotfix is a PATCH release for a bug in the current final.
-
-1. **The fix goes on `main` first**, by PR, as any fix.
-2. If `main` has nothing unreleased beyond fixes: release from `main` as usual (1.1.1).
-3. If `main` already has unreleased features (they belong to the next minor), branch
-   **`release/<major>.<minor>`** from the last final tag of that line, if it isn't there
-   yet:
-
-   ```
-   git switch -c release/1.1 v1.1.0
-   ```
-
-   Then cherry-pick the fix from `main` (`git cherry-pick -x <commit>`), open the release PR
-   against `release/1.1`, and tag `v1.1.1` on that branch. Later hotfixes for 1.1 go on the
-   same branch. The CHANGELOG entry goes on both branches.
-4. A hotfix can have its own rc (`1.1.1-rc.1`) when the fix is risky; usually it doesn't.
-
-A hotfix for an older line (1.0.3 after 1.1.0 is out) is published but not "Latest":
-the release workflow marks only the highest final as Latest. Check the "Set as the
-latest release" box is clear when publishing such a draft.
+first: `tools/release-mods.txt` pins its download, which a draft doesn't serve. A final
+bundles only mods' finals, so their catalogue entries come first.
 
 ## Mods
 
