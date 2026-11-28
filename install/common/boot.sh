@@ -74,8 +74,8 @@ if [ -x $ROOT/system/xbin/nemesis ]; then (sleep 120; $H engine nemesis-sync) </
 # car (state/local-map.json): only when the map, the catalogue or the stock files changed since,
 # so after an HMG-API install or update. Used from the next start. The owner's switch skips it.
 if [ -d $D/maps ] && [ ! -f $D/settings/allow/no_local_points ]; then (sleep 90; $H engine map-car --local --if-needed) </dev/null >$D/map-local.log 2>&1 & fi
-# the journal, or the apps a cut-off apply stopped (state/held.txt: engine recover turns them on)
-if [ -f $D/state/journal.json ] || [ -f $D/state/held.txt ]; then
+# the journal: an apply cut off, or a trial (the apps it stopped are started below, once Android is up)
+if [ -f $D/state/journal.json ]; then
     # Restart only after a recover that finished (it takes the journal away). One that
     # failed part-way has "rolled back" in its log too and keeps the journal: restarting
     # on that would come straight back here, at every start. It's tried again at the
@@ -88,5 +88,13 @@ if [ -f $D/state/journal.json ] || [ -f $D/state/held.txt ]; then
     else
         echo "$(date) recover didn't finish (see $D/recover.log): not restarting, tried again at the next start"
     fi
+fi
+# Apps an apply stopped (pm disable) while their files changed and never started again: a power
+# cut or a killed engine in the middle. Android keeps them off across restarts (GPM, DiPO, iAP2,
+# navigation...). pm needs Android up, so once it is, and only with the files put back (the
+# engine keeps them off while an unfinished apply's journal is there).
+if [ -s $D/state/held.txt ]; then
+    (n=0; while [ "$(getprop sys.boot_completed)" != 1 ] && [ $n -lt 300 ]; do sleep 2; n=$((n + 1)); done
+     $H engine release-held) </dev/null >$D/held.log 2>&1 &
 fi
 echo "$(date) boot done"

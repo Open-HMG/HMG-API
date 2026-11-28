@@ -461,6 +461,11 @@ check for updates.
   "type": "video/x-vnd.on2.vp9", "kind": "decoder"}]}`. Added codecs go last
   (lowest priority); comments are never touched; one mod adding what another
   removes is a conflict, with the reason.
+- **File modes** (patches.json): a change's `"mode"` (`"644"`, `"755"`; no setuid,
+  setgid or sticky bits) is the mode the file is written with. Without one, a file
+  keeps the mode, owner and SELinux label it had before HMG-API first wrote it (a new
+  file gets 644 root:root, or root:shell under `/system/bin`). A change under `/system/bin` or `/system/xbin` must give a
+  `"mode"`. Restore and rollback put back each file's own mode, owner and label.
 - **List settings** (enabled keyboards): `{"type": "setting", "namespace": "secure",
   "key": "enabled_input_methods", "add": ["org.pocketworkstation.pckeyboard/.LatinIME"]}`
   (separator `:` by default). Every mod's entries on top of the stock list; the stock

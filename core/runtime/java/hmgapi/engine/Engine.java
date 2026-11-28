@@ -28,7 +28,8 @@ import java.util.TreeMap;
  *   engine keep                keep a trial apply
  *   engine restore             every file and setting HMG-API changed back to stock
  *   engine status              files HMG-API owns: stock, mods, expected and live md5
- *   engine recover             at start (hmgapid): roll back an unfinished or trial apply
+ *   engine recover             at start (hmgapid): roll back an unfinished or trial apply, start the apps it held
+ *   engine release-held        at start, once Android is up: start apps an apply left stopped (state/held.txt)
  *
  * Mods: /data/hmgapi/mods/<id>/patches.json (see the wiki's patch engine page).
  * The goal: mods work side by side and never overwrite each other. HMG-API
@@ -126,7 +127,6 @@ public final class Engine {
     final File prevDir = new File(stateDir, "prev");
     final File stateFile = new File(stateDir, "files.json");
     final File journalFile = new File(stateDir, "journal.json");
-    final File heldFile = new File(stateDir, "held.txt");   // apps an apply stopped (hold), until it lets them go
 
     final List<String> out = new ArrayList<String>();
     final List<String> problems = new ArrayList<String>();   // stop the apply
@@ -429,6 +429,7 @@ public final class Engine {
         }
         if ("nemesis-sync".equals(cmd)) return NemesisSync.run(this);
         if ("recover".equals(cmd)) return recover();
+        if ("release-held".equals(cmd)) return releaseHeld();
         if ("keep".equals(cmd)) return keep();
         if ("firmware-reset".equals(cmd)) return firmwareReset();
         if (journalFile.exists() && !"keep".equals(cmd)) {
@@ -443,7 +444,7 @@ public final class Engine {
             if (!map.runnable) out.add("hooks are off on this car (" + map.reason + "): mods apply without their hooks");
         }
         if (!restoreAll && !"plan".equals(cmd) && !"apply".equals(cmd)) {
-            out.add("usage: engine plan | apply [--trial] [--gear-unknown-ok] | keep | restore | status | recover | firmware-reset | install <zip|dir> | remove <id> | nemesis-sync | map | map-car [--local [--if-needed] | --write | --forget] | verify-map | report [--usb] | boot-guard [reset] | usb-scan | update-hmgapi <zip> | publish-state | apps");
+            out.add("usage: engine plan | apply [--trial] [--gear-unknown-ok] | keep | restore | status | recover | release-held | firmware-reset | install <zip|dir> | remove <id> | nemesis-sync | map | map-car [--local [--if-needed] | --write | --forget] | verify-map | report [--usb] | boot-guard [reset] | usb-scan | update-hmgapi <zip> | publish-state | apps");
             return 2;
         }
         Plan p = plan(restoreAll, force);
@@ -931,6 +932,7 @@ public final class Engine {
         String odexStock;        // app: that odex's md5 (recorded in files.json "odex"; null in an older engine's records)
         Set<String> mods = new LinkedHashSet<String>();
         boolean restore;         // no mod wants it any more: back to stock
+        Map<String, Object> stockMeta;   // path (and an app's odex) -> FileMeta's map, as before HMG-API's first write
     }
 
     final class Plan {
@@ -1194,6 +1196,7 @@ public final class Engine {
         t.stock = (String) f.get("stock");
         t.result = t.stock;
         t.app = Boolean.TRUE.equals(f.get("app"));
+        t.stockMeta = f.get("stockMeta") instanceof Map ? (Map<String, Object>) f.get("stockMeta") : null;   // mode, owner, label (FileMeta)
         if (!"absent".equals(t.stock)) {
             t.baseline = stockCopy(t.path, t.stock);
             if (t.baseline == null) return;
@@ -1407,6 +1410,11 @@ public final class Engine {
                 return t.path + ": " + ch.mod.id + ": mode " + ms + " (only plain modes like 644 or 755: no setuid, setgid or sticky bits)";
             }
         }
+        // a binary written without its mode doesn't run, and an uninstall putting back a stock one that
+        // doesn't run can keep the unit from booting: say it, every time
+        if ((t.path.startsWith("/system/bin/") || t.path.startsWith("/system/xbin/")) && modeOf(t) == null && !t.changes.isEmpty()) {
+            return t.path + ": " + t.changes.get(0).mod.id + ": a change in /system/bin or /system/xbin needs a \"mode\" (\"755\" for a program)";
+        }
         if (t.path.equals("/system/build.prop")) {
             for (Ch ch : t.changes) {
                 if (!"props".equals(ch.type)) {
@@ -1441,6 +1449,12 @@ public final class Engine {
                     + " lists paths allowed anyway, at your own risk)";
         }
         if (critical) out.add("WARNING: " + t.path + " is boot-critical; changing it because overrides.allow_critical lists it");
+        return null;
+    }
+
+    /** the "mode" a target's changes give it (the first that gives one), or null */
+    static String modeOf(Target t) {
+        for (Ch ch : t.changes) if (ch.c.get("mode") != null) return String.valueOf(ch.c.get("mode"));
         return null;
     }
 
@@ -1479,6 +1493,7 @@ public final class Engine {
                 if (t.baseline == null) return;
                 t.newBackup = !t.baseline.equals(backup(t.path));
             }
+            t.stockMeta = owned.get("stockMeta") instanceof Map ? (Map<String, Object>) owned.get("stockMeta") : null;
         } else {
             String m = md5(live);
             if ("absent".equals(m)) {
@@ -1971,6 +1986,14 @@ public final class Engine {
 
     // ------------------------------------------------------------------ apply
 
+    /**
+     * One transaction. The journal (what each file was, its bytes in prev/, its mode, owner and
+     * label) goes down before anything changes, the apps holding changed files are written into
+     * it before they're stopped, and any failure (a rename, a dexopt, a remount, a full disk)
+     * puts every file and setting back in this same run, last changed first, then starts the
+     * apps again. Only a cut-off run (a power cut, a killed engine) or a rollback that fails
+     * too leaves the journal for the next start (boot.sh: engine recover).
+     */
     @SuppressWarnings("unchecked")
     int apply(Plan p, boolean trial) throws Exception {
         Map<String, Object> files = (Map<String, Object>) p.state.get("files");
@@ -1992,6 +2015,9 @@ public final class Engine {
         prevDir.mkdirs();
         List<Object> entries = new ArrayList<Object>();
         for (Target t : changed) {
+            // a file HMG-API hasn't written yet: its mode, owner and label as found are its stock ones (restore puts them back)
+            boolean first = !t.restore && t.stockMeta == null && p.owned(t.path) == null;
+            Map<String, Object> sm = new LinkedHashMap<String, Object>();
             for (String path : withOdex(t)) {
                 Map<String, Object> e = new LinkedHashMap<String, Object>();
                 e.put("path", path);
@@ -2000,10 +2026,13 @@ public final class Engine {
                     File prev = new File(prevDir, path.replace('/', '_'));
                     e.put("md5", checkedCopy(live, prev, md5(live)));
                     e.put("prev", prev.getPath());
-                    e.put("mode", mode(live));
+                    Map<String, Object> meta = FileMeta.read(this, live).toMap();
+                    e.putAll(meta);
+                    if (first) sm.put(path, meta);
                 }
                 entries.add(e);
             }
+            if (!sm.isEmpty()) t.stockMeta = sm;
         }
         // settings, live props and binds as they are now: recover writes them back too (a trial's
         // persist.* prop, or an apply cut off after the settings but before the state, stayed set and
@@ -2024,105 +2053,166 @@ public final class Engine {
         j.put("settings", wasSet);
         j.put("binds", bindsFile.isFile() ? read(bindsFile) : null);
         j.put("binds_failed", bindsFailed.isFile() ? read(bindsFailed) : null);
+        j.put("held", new ArrayList<Object>());
         j.put("state", Json.parse(Json.write(p.state)));   // a copy: p.state changes below
         write(journalFile, Json.write(j));
 
-        // files taken as found (changed outside HMG-API): their old backups no longer say what was there
-        for (String path : p.rebased.keySet()) {
-            rm(backup(path));
-            if (path.endsWith(".apk")) rm(backup(path.replaceAll("\\.apk$", ".odex")));
-        }
-        // stock backups, as install.sh's backup() takes them: copied beside, checked against the stock md5,
-        // then renamed, so a cut-off copy never sits under the backup's name. Taken once, and again only
-        // when the one there isn't the stock file (a damaged one, replaced from a NEMESIS copy)
-        for (Target t : changed) {
-            if (t.restore) continue;
-            if (t.newBackup) checkedCopy(t.baseline, backup(t.path), t.stock);
-            if (t.app && t.odexSrc != null && t.odexStock != null) {
-                File ob = backup(t.path.replaceAll("\\.apk$", ".odex"));
-                if (!t.odexStock.equals(md5(ob))) checkedCopy(t.odexSrc, ob, t.odexStock);
-            }
-        }
-
-        Set<String> held = hold(changed);
+        Set<String> held = new LinkedHashSet<String>();
+        List<String[]> settingsUndo = new ArrayList<String[]>();   // {key, live value before}, in the order set
+        String bindsBefore = currentBinds();
+        boolean rw = false, keepHeld = false;
         try {
+            // files taken as found (changed outside HMG-API): their old backups no longer say what was there
+            for (String path : p.rebased.keySet()) {
+                rm(backup(path));
+                if (path.endsWith(".apk")) rm(backup(path.replaceAll("\\.apk$", ".odex")));
+            }
+            // stock backups, as install.sh's backup() takes them: copied beside, checked against the stock md5,
+            // then renamed, so a cut-off copy never sits under the backup's name. Taken once, and again only
+            // when the one there isn't the stock file (a damaged one, replaced from a NEMESIS copy)
+            for (Target t : changed) {
+                if (t.restore) continue;
+                if (t.newBackup) checkedCopy(t.baseline, backup(t.path), t.stock);
+                if (t.app && t.odexSrc != null && t.odexStock != null) {
+                    File ob = backup(t.path.replaceAll("\\.apk$", ".odex"));
+                    if (!t.odexStock.equals(md5(ob))) checkedCopy(t.odexSrc, ob, t.odexStock);
+                }
+            }
+
+            held = hold(changed, j);
             remount("rw");
+            rw = true;
             for (Target t : changed) swap(t);
-        } finally {
+            rw = false;
             remount("ro");
-            release(held);
-        }
 
-        // settings
-        for (Map.Entry<String, Object[]> e : p.settings.entrySet()) {
-            String k = e.getKey();
-            String v = String.valueOf(e.getValue()[0]);
-            Map<String, Object> s = (Map<String, Object>) st.get(k);
-            if (s != null && v.equals(String.valueOf(s.get("value")))) continue;
-            String was;
-            if (s == null) {
-                s = new LinkedHashMap<String, Object>();
-                s.put("stock", before.get(k));   // read once, for the journal
-                st.put(k, s);
-                was = s.get("stock") == null ? "" : String.valueOf(s.get("stock"));
+            // settings
+            for (Map.Entry<String, Object[]> e : p.settings.entrySet()) {
+                String k = e.getKey();
+                String v = String.valueOf(e.getValue()[0]);
+                Map<String, Object> s = (Map<String, Object>) st.get(k);
+                if (s != null && v.equals(String.valueOf(s.get("value")))) continue;
+                String was;
+                if (s == null) {
+                    s = new LinkedHashMap<String, Object>();
+                    s.put("stock", before.get(k));   // read once, for the journal
+                    st.put(k, s);
+                    was = s.get("stock") == null ? "" : String.valueOf(s.get("stock"));
+                } else {
+                    was = String.valueOf(s.get("value"));
+                }
+                boolean live = !v.equals(was);   // mirror/restart only when the value really changes
+                // already the wanted value: only take it over. Setting it again isn't harmless:
+                // init re-runs its triggers (persist.sys.usb.config re-enumerated USB and dropped adb)
+                if (live) {
+                    settingsUndo.add(new String[] { k, settingGet(k) });
+                    settingPut(k, v);
+                }
+                s.put("value", v);
+                s.put("mod", e.getValue()[1]);
+                Map<String, Object> c = (Map<String, Object>) e.getValue()[2];
+                if (c != null && c.get("mirror") != null) s.put("mirror", c.get("mirror"));
+                else s.remove("mirror");
+                if (c != null && c.get("restart") != null) s.put("restart", c.get("restart"));
+                else s.remove("restart");
+                if (live) after(s, v);
+                out.add("set      " + k + " = " + (v.isEmpty() ? "(unset)" : v));
+            }
+            for (String k : p.settingsRestore) {
+                Map<String, Object> s = (Map<String, Object>) st.remove(k);
+                settingsUndo.add(new String[] { k, settingGet(k) });
+                settingPut(k, s.get("stock") == null ? null : String.valueOf(s.get("stock")));
+                String back = s.get("stock") == null ? "" : String.valueOf(s.get("stock"));
+                if (!back.equals(String.valueOf(s.get("value")))) after(s, back);
+                out.add("set      " + k + " back to " + s.get("stock"));
+            }
+            cut("settings");
+
+            // binds: hmgapid does them after the output is printed (restarting a service like adbd
+            // may cut the link that asked); a new list clears earlier failures
+            String bt = bindsText(p.binds);
+            if (!bt.equals(bindsBefore)) {
+                write(bindsFile, bt);
+                bindsFailed.delete();
+                bindsChanged = true;
+            }
+            cut("binds");
+
+            // state
+            for (Target t : changed) {
+                if (t.restore) {
+                    files.remove(t.path);
+                    continue;
+                }
+                Map<String, Object> f = new LinkedHashMap<String, Object>();
+                f.put("stock", t.stock);
+                f.put("result", t.result);
+                f.put("mods", new ArrayList<Object>(t.mods));
+                if (t.app) f.put("app", true);
+                if (t.app && t.odexStock != null) f.put("odex", t.odexStock);
+                if (t.stockMeta != null) f.put("stockMeta", t.stockMeta);
+                files.put(t.path, f);
+            }
+            write(stateFile, Json.write(p.state));
+            if (trial) {
+                j.put("committed", true);
+                write(journalFile, Json.write(j));
+                out.add("trial: undone at the next start unless you run `engine keep`");
             } else {
-                was = String.valueOf(s.get("value"));
+                journalFile.delete();
+                rm(prevDir);
             }
-            boolean live = !v.equals(was);   // mirror/restart only when the value really changes
-            // already the wanted value: only take it over. Setting it again isn't harmless:
-            // init re-runs its triggers (persist.sys.usb.config re-enumerated USB and dropped adb)
-            if (live) settingPut(k, v);
-            s.put("value", v);
-            s.put("mod", e.getValue()[1]);
-            Map<String, Object> c = (Map<String, Object>) e.getValue()[2];
-            if (c != null && c.get("mirror") != null) s.put("mirror", c.get("mirror"));
-            else s.remove("mirror");
-            if (c != null && c.get("restart") != null) s.put("restart", c.get("restart"));
-            else s.remove("restart");
-            if (live) after(s, v);
-            out.add("set      " + k + " = " + (v.isEmpty() ? "(unset)" : v));
-        }
-        for (String k : p.settingsRestore) {
-            Map<String, Object> s = (Map<String, Object>) st.remove(k);
-            settingPut(k, s.get("stock") == null ? null : String.valueOf(s.get("stock")));
-            String back = s.get("stock") == null ? "" : String.valueOf(s.get("stock"));
-            if (!back.equals(String.valueOf(s.get("value")))) after(s, back);
-            out.add("set      " + k + " back to " + s.get("stock"));
-        }
-        cut("settings");
-
-        // binds: hmgapid does them after the output is printed (restarting a service like adbd
-        // may cut the link that asked); a new list clears earlier failures
-        String bt = bindsText(p.binds);
-        if (!bt.equals(currentBinds())) {
-            write(bindsFile, bt);
-            bindsFailed.delete();
-            bindsChanged = true;
-        }
-        cut("binds");
-
-        // state
-        for (Target t : changed) {
-            if (t.restore) {
-                files.remove(t.path);
-                continue;
+        } catch (Throwable failure) {
+            out.add("apply failed: " + failure);
+            // settings and binds as they were, nothing left to run after the output
+            for (int i = settingsUndo.size() - 1; i >= 0; i--) {
+                try {
+                    settingPut(settingsUndo.get(i)[0], settingsUndo.get(i)[1]);
+                } catch (Exception x) {
+                    out.add("WARNING: couldn't put " + settingsUndo.get(i)[0] + " back to " + settingsUndo.get(i)[1] + ": " + x);
+                }
             }
-            Map<String, Object> f = new LinkedHashMap<String, Object>();
-            f.put("stock", t.stock);
-            f.put("result", t.result);
-            f.put("mods", new ArrayList<Object>(t.mods));
-            if (t.app) f.put("app", true);
-            if (t.app && t.odexStock != null) f.put("odex", t.odexStock);
-            files.put(t.path, f);
-        }
-        write(stateFile, Json.write(p.state));
-        if (trial) {
-            j.put("committed", true);
-            write(journalFile, Json.write(j));
-            out.add("trial: undone at the next start unless you run `engine keep`");
-        } else {
-            journalFile.delete();
-            rm(prevDir);
+            mirrors.clear();
+            restarts.clear();
+            if (bindsChanged) {
+                write(bindsFile, bindsBefore);
+                String wasFailed = (String) j.get("binds_failed");
+                if (wasFailed == null) bindsFailed.delete();
+                else write(bindsFailed, wasFailed);
+                bindsChanged = false;
+            }
+            if (rw) {
+                rw = false;
+                try {
+                    remount("ro");
+                } catch (Exception ignored) {
+                    // the rollback remounts for itself
+                }
+            }
+            List<String> lostNow = new ArrayList<String>();
+            List<String> left = rollback(j, lostNow);
+            left.addAll(lostNow);   // a saved copy that's gone in the same run: say it, and leave the journal for recover
+            if (left.isEmpty()) {
+                journalFile.delete();
+                rm(prevDir);
+                out.add("rolled back: every file is as it was before this apply");
+            } else {
+                keepHeld = true;
+                out.add("NOT rolled back: " + left);
+                out.add("the next start tries again (`engine recover`); " + (held.isEmpty() ? "" : held + " stay off until then; ")
+                        + "other engine commands wait for it");
+            }
+            rm(stageDir);
+            throw failure;
+        } finally {
+            if (rw) remount("ro");
+            if (!keepHeld && !held.isEmpty()) {
+                List<Object> still = new ArrayList<Object>(release(held));
+                if (journalFile.exists()) {   // a trial waiting: what recover would still turn on
+                    j.put("held", still);
+                    write(journalFile, Json.write(j));
+                }
+            }
         }
         rm(stageDir);
         Set<String> needs = new LinkedHashSet<String>();
@@ -2231,6 +2321,101 @@ public final class Engine {
         }
     }
 
+    /**
+     * Puts the journaled files back as they were, last changed first, with their modes, owners
+     * and labels, and the state with them. A file already as it was is left alone, so a run
+     * cut off before the swap writes nothing. Returns what couldn't be put back (then the
+     * journal must stay).
+     */
+    @SuppressWarnings("unchecked")
+    List<String> rollback(Map<String, Object> j, List<String> lost) throws Exception {
+        List<Object> entries = new ArrayList<Object>((List<Object>) j.get("entries"));
+        Collections.reverse(entries);
+        List<Map<String, Object>> todo = new ArrayList<Map<String, Object>>();
+        Set<String> apks = new LinkedHashSet<String>();
+        for (Object o : entries) {
+            Map<String, Object> e = (Map<String, Object>) o;
+            String path = (String) e.get("path");
+            File dst = sys(path), prev = e.get("prev") == null ? null : new File((String) e.get("prev"));
+            new File(dst.getPath() + ".hmgapi-new").delete();   // a cut-off apply's half-written copy: its room back first
+            if (prev != null) {   // the saved copy checked before it's written back (its md5 was kept when it was taken)
+                String have = md5(prev);
+                if ("absent".equals(have) || (e.get("md5") != null && !have.equals(e.get("md5")))) {
+                    lost.add(path);
+                    out.add("can't put back " + path + ": its saved copy is " + ("absent".equals(have) ? "gone" : "damaged") + "; left as it is");
+                    continue;
+                }
+            }
+            boolean same = prev == null ? !dst.exists()
+                    : dst.isFile() && md5(dst).equals(md5(prev)) && FileMeta.read(this, dst).same(journalMeta(e, path));
+            if (!same) {
+                todo.add(e);
+                if (path.endsWith(".apk")) apks.add(path);
+            }
+        }
+        // an app's odex as it was, but its apk not: its dalvik-cache copy needs filling again
+        for (Object o : entries) {
+            Map<String, Object> e = (Map<String, Object>) o;
+            String path = (String) e.get("path");
+            if (path.endsWith(".odex") && apks.contains(path.replaceAll("\\.odex$", ".apk")) && !todo.contains(e)) todo.add(e);
+        }
+        List<String> left = new ArrayList<String>();
+        if (!todo.isEmpty()) {
+            try {
+                remount("rw");
+            } catch (Exception x) {
+                for (Map<String, Object> e : todo) left.add(e.get("path") + " (" + x.getMessage() + ")");
+                return left;
+            }
+            try {
+                for (Map<String, Object> e : todo) {
+                    String path = (String) e.get("path");
+                    File dst = sys(path);
+                    try {
+                        testFail("rollback", path);
+                        if (e.get("prev") == null) {
+                            if (dst.exists() && !dst.delete()) throw new IOException("delete " + dst);
+                            FileMeta.gone(this, dst);
+                        } else {
+                            putBack(new File((String) e.get("prev")), dst, journalMeta(e, path));
+                        }
+                        if (path.endsWith(".odex")) dalvik(path.replaceAll("\\.odex$", ".apk"), dst, false);
+                        out.add("rolled back " + path);
+                    } catch (Exception x) {
+                        left.add(path + " (" + x.getMessage() + ")");
+                    }
+                }
+            } finally {
+                remount("ro");
+            }
+        }
+        if (left.isEmpty()) write(stateFile, Json.write(j.get("state")));
+        return left;
+    }
+
+    /** a journal entry's mode, owner and label (a journal from before they were read: the /system defaults) */
+    static FileMeta journalMeta(Map<String, Object> e, String path) {
+        FileMeta m = FileMeta.from(e);
+        return m != null ? m : FileMeta.defaults(path);
+    }
+
+    /** the stock mode, owner and label of path (an app's apk or odex), as recorded before HMG-API's first write */
+    static FileMeta stockMeta(Target t, String path) {
+        FileMeta m = t.stockMeta == null ? null : FileMeta.from(t.stockMeta.get(path));
+        return m != null ? m : FileMeta.defaults(path);   // recorded by an HMG-API before this: the /system defaults
+    }
+
+    /** what a built file is written with: its stock owner and label (else the live file's, else the defaults), the mod's mode if it gives one */
+    FileMeta targetMeta(Target t) throws IOException {
+        FileMeta m = t.stockMeta == null ? null : FileMeta.from(t.stockMeta.get(t.path));
+        File live = sys(t.path);
+        if (m == null) m = live.isFile() ? FileMeta.read(this, live) : FileMeta.defaults(t.path);
+        m = m.copy();
+        String mode = modeOf(t);
+        if (mode != null) m.mode = Integer.parseInt(mode, 8);
+        return m;
+    }
+
     List<String> withOdex(Target t) {
         List<String> l = new ArrayList<String>();
         l.add(t.path);
@@ -2239,16 +2424,18 @@ public final class Engine {
     }
 
     void swap(Target t) throws Exception {
+        testFail("swap", t.path);
         File dst = sys(t.path);
         if (t.restore) {
             if ("absent".equals(t.stock)) {
                 if (dst.exists() && !dst.delete()) throw new IOException("delete " + dst);
+                FileMeta.gone(this, dst);
             } else {
-                put(t.baseline, dst, "644");   // checked against its recorded md5 in the plan (restoreFrom)
+                put(t.baseline, dst, stockMeta(t, t.path));   // checked against its recorded md5 in the plan (restoreFrom)
             }
             if (t.app) {
                 String odex = t.path.replaceAll("\\.apk$", ".odex");
-                if (t.odexSrc != null) put(t.odexSrc, sys(odex), "644");
+                if (t.odexSrc != null) put(t.odexSrc, sys(odex), stockMeta(t, odex));
                 dalvik(t.path, sys(odex), false);
             }
             out.add("restored " + t.path);
@@ -2256,13 +2443,13 @@ public final class Engine {
         }
         if (!t.exists) {
             if (dst.exists() && !dst.delete()) throw new IOException("delete " + dst);
+            FileMeta.gone(this, dst);
             return;
         }
-        put(t.stage, dst, t.changes.isEmpty() || t.changes.get(0).c.get("mode") == null ? "644"
-                : String.valueOf(t.changes.get(0).c.get("mode")));
+        put(t.stage, dst, targetMeta(t));
         if (t.app) {
             File odex = sys(t.path.replaceAll("\\.apk$", ".odex"));
-            odex.delete();
+            odex.delete();   // dexopt --preopt opens its output O_EXCL; the journal has the old one
             dalvik(t.path, odex, true);
         }
         out.add("wrote    " + t.path);
@@ -2282,6 +2469,7 @@ public final class Engine {
      * the cache under HMGAPI_ROOT when the test made one.
      */
     void dalvik(String apkPath, File odex, boolean dexopt) throws Exception {
+        if (dexopt) testFail("dexopt", apkPath);
         String name = dalvikName(apkPath);
         File cache = new File(root + "/data/dalvik-cache/" + name);
         cache.delete();
@@ -2303,86 +2491,178 @@ public final class Engine {
         }
     }
 
-    /** Write next to the target and rename, so a reader never sees half a file. */
-    void put(File src, File dst, String mode) throws Exception {
+    /**
+     * Write next to the target with its mode, owner and label, then rename, so a reader never
+     * sees half a file or one that can't run. Nothing is left behind when it fails.
+     */
+    void put(File src, File dst, FileMeta meta) throws Exception {
         File tmp = new File(dst.getPath() + ".hmgapi-new");
         dst.getParentFile().mkdirs();
-        copy(src, tmp);
-        if (!host) {
-            exec("/system/bin/chmod", mode, tmp.getPath());
-            exec("/system/bin/chown", "0:0", tmp.getPath());
-        }
-        if (!md5(tmp).equals(md5(src))) {
+        try {
+            testFail("put", devicePath(dst));
+            copy(src, tmp);
+            FileMeta.set(this, tmp, meta);
+            if (!md5(tmp).equals(md5(src))) throw new IOException("copy to " + dst + " came out different");
+            if (!tmp.renameTo(dst)) throw new IOException("rename onto " + dst);
+            FileMeta.moved(this, tmp, dst);
+        } catch (Exception e) {
             tmp.delete();
-            throw new IOException("copy to " + dst + " came out different");
-        }
-        if (!tmp.renameTo(dst)) {
-            tmp.delete();
-            throw new IOException("rename onto " + dst);
+            FileMeta.gone(this, tmp);
+            throw e;
         }
     }
 
     /**
-     * The apps whose files change, stopped (pm disable) for the swap. pm disable lasts
-     * across restarts, so the list is written down first (state/held.txt): an apply cut off
-     * between here and release() (the engine killed, a reset) leaves them disabled, and
-     * recover() (the next start, with the journal) turns them on again. Only in P: run()
-     * checked the gear before the journal (Gear).
+     * Off the unit only, for the tests: HMGAPI_TEST_FAIL="<step>:<path> ..." makes that step fail
+     * there (swap, put, dexopt, rollback); "halt:<path>" ends the engine at once in swap,
+     * as a power cut would (no rollback, no finally).
      */
-    Set<String> hold(List<Target> changed) throws Exception {
+    void testFail(String step, String path) throws IOException {
+        if (!host) return;
+        for (String s : env("HMGAPI_TEST_FAIL", "").split(" ")) {
+            if ("swap".equals(step) && s.equals("halt:" + path)) {
+                System.out.flush();
+                Runtime.getRuntime().halt(9);
+            }
+            if (s.equals(step + ":" + path)) throw new IOException("test: " + step + " fails at " + path);
+        }
+    }
+
+    /** f's path on the unit (without HMGAPI_ROOT) */
+    String devicePath(File f) {
+        String p = f.getPath();
+        return !root.isEmpty() && p.startsWith(root) ? p.substring(root.length()) : p;
+    }
+
+    // ------------------------------------------------------------------ apps held while their files change
+
+    /** The package manager, or null where there's none (off the unit, unless a test gives one). */
+    String pm() { return env("HMGAPI_PM", host ? null : "/system/bin/pm"); }
+
+    /** never stopped: Android itself, and what HMG-API's USB install path needs */
+    static final String[] NEVER_HOLD = { "android", "com.hkmc.system.app.OTAClient" };
+    static final int FLAG_PERSISTENT = 1 << 3;   // ApplicationInfo.FLAG_PERSISTENT
+
+    /**
+     * Stops (pm disable) the apps whose apk changes, so none runs on a half-changed file (DiPO
+     * and iAP2 crash-looped, SIGBUS). Android keeps an app disabled across restarts, so the
+     * list goes into the journal and state/held.txt first: a power cut or a killed engine
+     * before release leaves it for recover and boot.sh. Never Android itself, a persistent
+     * app (Android starts those on its own; off, it may not come up at all), OTAClient, or an
+     * app that was off already (it stays off).
+     */
+    Set<String> hold(List<Target> changed, Map<String, Object> j) throws Exception {
         Set<String> held = new LinkedHashSet<String>();
-        if (host || !"1".equals(getprop("sys.boot_completed"))) return held;
+        String pm = pm();
+        if (pm == null || !"1".equals(getprop("sys.boot_completed"))) return held;
         Map<String, String> pkgs = new LinkedHashMap<String, String>();
-        for (String l : exec("/system/bin/pm", "list", "packages", "-f").text.split("\n")) {
+        for (String l : exec(pm, "list", "packages", "-f").text.split("\n")) {
             l = l.trim();
             int eq = l.lastIndexOf('=');
             if (l.startsWith("package:") && eq > 0) pkgs.put(l.substring(8, eq), l.substring(eq + 1));
         }
-        List<String> want = new ArrayList<String>();
+        Set<String> off = new LinkedHashSet<String>();
+        for (String l : exec(pm, "list", "packages", "-d").text.split("\n")) if (l.trim().startsWith("package:")) off.add(l.trim().substring(8));
+        Map<String, Long> flags = packageFlags();
         for (Target t : changed) {
             String pkg = pkgs.get(t.path);
-            if (pkg != null) want.add(pkg);
+            if (pkg == null || off.contains(pkg)) continue;
+            String why = null;
+            for (String n : NEVER_HOLD) if (n.equals(pkg)) why = "never stopped";
+            if (why == null && t.path.startsWith("/system/framework/")) why = "part of Android itself";
+            if (why == null && flags.get(pkg) == null) why = "not in packages.xml, so it can't be told whether it's persistent";
+            if (why == null && (flags.get(pkg) & FLAG_PERSISTENT) != 0) why = "persistent";
+            if (why != null) out.add("note     " + pkg + " keeps running while " + t.path + " changes (" + why + ")");
+            else held.add(pkg);
         }
-        if (want.isEmpty()) return held;
-        StringBuilder b = new StringBuilder();
-        for (String pkg : want) b.append(pkg).append('\n');
-        write(heldFile, b.toString());
-        for (String pkg : want) if (exec("/system/bin/pm", "disable", pkg).code == 0) held.add(pkg);
-        if (!held.isEmpty()) out.add("stopped  " + held + " while their files change");
+        if (held.isEmpty()) return held;
+        j.put("held", new ArrayList<Object>(held));
+        write(journalFile, Json.write(j));
+        Set<String> all = readHeld();
+        all.addAll(held);
+        writeHeld(all);
+        for (String pkg : held) exec(pm, "disable", pkg);
+        out.add("stopped  " + held + " while their files change");
         return held;
     }
 
-    void release(Set<String> held) throws Exception {
-        for (String pkg : held) exec("/system/bin/pm", "enable", pkg);
-        heldFile.delete();
+    /** Starts held apps again (pm enable). Returns those it couldn't; they stay in held.txt for the next try. */
+    List<String> release(Set<String> held) throws Exception {
+        List<String> left = new ArrayList<String>();
+        String pm = pm();
+        Set<String> done = new LinkedHashSet<String>();
+        for (String pkg : held) {
+            Run r = pm == null ? null : exec(pm, "enable", pkg);
+            if (r != null && r.code == 0 && r.text.contains("new state")) done.add(pkg);
+            else left.add(pkg);
+        }
+        Set<String> all = readHeld();
+        all.removeAll(done);
+        writeHeld(all);
+        if (!done.isEmpty()) out.add("started  " + done + " again");
+        if (!left.isEmpty()) out.add("WARNING: couldn't start " + left + " again; the next start tries again (state/held.txt)");
+        return left;
     }
 
-    /**
-     * Apps a cut-off apply left stopped (hold): on again. At boot this runs before Android
-     * is up (boot.sh), and pm needs the package manager: so it waits for Android (up to five
-     * minutes), and keeps the list until every app is on, for the next recover (boot.sh runs
-     * one while the list is there).
-     */
-    void releaseLeftHeld() throws Exception {
-        if (!heldFile.isFile()) return;
-        for (int i = 0; !host && i < 150 && !"1".equals(getprop("sys.boot_completed")); i++) Thread.sleep(2000);
-        StringBuilder left = new StringBuilder();
-        for (String pkg : read(heldFile).split("\n")) {
-            pkg = pkg.trim();
-            if (pkg.isEmpty()) continue;
-            if (!host && exec("/system/bin/pm", "enable", pkg).code != 0) {
-                left.append(pkg).append('\n');
-                out.add("couldn't turn on " + pkg + " (stopped by an apply that was cut off): tried again at the next start");
-                continue;
-            }
-            out.add("enabled  " + pkg + " (stopped by an apply that was cut off)");
+    /** Held apps left over (a cut-off apply, or a release that failed): started again once Android is up and no apply is waiting. */
+    @SuppressWarnings("unchecked")
+    int releaseHeld() throws Exception {
+        Set<String> held = readHeld();
+        if (held.isEmpty()) {
+            out.add("no apps held");
+            return 0;
         }
-        if (left.length() == 0) heldFile.delete();
-        else write(heldFile, left.toString());
+        if (journalFile.exists() && !Boolean.TRUE.equals(Json.object(read(journalFile)).get("committed"))) {
+            out.add("held     " + held + " stay off: an apply didn't finish, and their files are as it left them; `engine recover` puts them back and starts them");
+            return 1;
+        }
+        if (!"1".equals(getprop("sys.boot_completed"))) {
+            out.add("held     " + held + ": Android isn't up yet");
+            return 1;
+        }
+        return release(held).isEmpty() ? 0 : 1;
+    }
+
+    File heldFile() { return new File(stateDir, "held.txt"); }
+
+    Set<String> readHeld() throws IOException {
+        Set<String> s = new LinkedHashSet<String>();
+        if (!heldFile().isFile()) return s;
+        for (String l : read(heldFile()).split("\n")) if (l.trim().matches("[A-Za-z0-9_.]+")) s.add(l.trim());
+        return s;
+    }
+
+    void writeHeld(Set<String> s) throws IOException {
+        if (s.isEmpty()) {
+            heldFile().delete();
+            return;
+        }
+        StringBuilder b = new StringBuilder();
+        for (String p : s) b.append(p).append('\n');
+        write(heldFile(), b.toString());
+    }
+
+    /** Each package's ApplicationInfo flags, from /data/system/packages.xml (what PackageManager wrote at its last scan). */
+    Map<String, Long> packageFlags() {
+        Map<String, Long> m = new LinkedHashMap<String, Long>();
+        try {
+            java.util.regex.Matcher pk = java.util.regex.Pattern.compile("<package\\s[^>]*>").matcher(read(new File(root + "/data/system/packages.xml")));
+            while (pk.find()) {
+                java.util.regex.Matcher n = java.util.regex.Pattern.compile("\\sname=\"([^\"]+)\"").matcher(pk.group());
+                java.util.regex.Matcher f = java.util.regex.Pattern.compile("\\sflags=\"(-?[0-9]+)\"").matcher(pk.group());
+                if (n.find() && f.find()) m.put(n.group(1), Long.parseLong(f.group(1)));
+            }
+        } catch (Exception e) {
+            // unreadable: no app counts as known, so none is held
+        }
+        return m;
     }
 
     void remount(String mode) throws Exception {
-        if (host) return;
+        if (host) {
+            if ("rw".equals(mode)) testFail("remount", "rw");
+            return;
+        }
         Run r = exec(env("HMGAPI_HMGAPID", "/system/bin/hmgapid"), "remount", mode);
         if (r.code != 0 && "rw".equals(mode)) throw new IOException("remount rw: " + r.text);
     }
@@ -2416,6 +2696,8 @@ public final class Engine {
                     ? "trial apply in place: `engine keep` keeps it, the next start undoes it"
                     : "an apply didn't finish: the next start rolls it back (`engine recover`)");
         }
+        Set<String> held = readHeld();
+        if (!held.isEmpty()) out.add("held     " + held + " stopped (pm disable) by an apply that didn't start them again; `engine recover` starts them");
         return bad == 0 ? 0 : 4;
     }
 
@@ -2496,12 +2778,17 @@ public final class Engine {
         return 0;
     }
 
+    /**
+     * An apply cut off (a power cut, a killed engine) or a waiting trial: every journaled file
+     * back as it was (bytes, mode, owner, label), then the apps it held started again. The
+     * output says "rolled back" or "trial undone" only when files changed (boot.sh restarts
+     * the unit on those words). Left over held apps alone: started again too.
+     */
     @SuppressWarnings("unchecked")
     int recover() throws Exception {
         if (!journalFile.exists()) {
-            releaseLeftHeld();
             out.add("nothing to recover");
-            return 0;
+            return startHeld(readHeld());
         }
         Map<String, Object> j = journal();
         if (j == null) {
@@ -2509,42 +2796,20 @@ public final class Engine {
             setAside("state/journal.json is damaged (an apply was cut off while writing it?), so nothing could be put back from it");
             out.add("the files and settings that apply changed stay as they are; `engine status` shows them, and `engine apply`"
                     + " (or apply --force) builds them again");
-            return 0;
+            return startHeld(readHeld());
         }
-        // each saved copy checked before any is written: one that's gone or isn't what was saved is skipped,
-        // not written back, and not tried again at every start
+        int before = out.size();
+        // a saved copy that's gone or isn't what was saved is skipped, not written back, and not tried
+        // again at every start (lost); a file that couldn't be written is tried again (left)
         List<String> lost = new ArrayList<String>();
-        for (Object o : (List<Object>) j.get("entries")) {
-            Map<String, Object> e = (Map<String, Object>) o;
-            Object prev = e.get("prev");
-            if (prev == null) continue;
-            File pf = new File(String.valueOf(prev));
-            String have = md5(pf);
-            if ("absent".equals(have) || (e.get("md5") != null && !have.equals(e.get("md5")))) lost.add((String) e.get("path"));
-        }
-        remount("rw");
-        try {
-            for (Object o : (List<Object>) j.get("entries")) {
-                Map<String, Object> e = (Map<String, Object>) o;
-                String path = (String) e.get("path");
-                File dst = sys(path);
-                new File(dst.getPath() + ".hmgapi-new").delete();   // a cut-off apply's half-written copy: its room back first
-                if (lost.contains(path)) {
-                    out.add("can't put back " + path + ": its saved copy is " + ("absent".equals(md5(new File(String.valueOf(e.get("prev")))))
-                            ? "gone" : "damaged") + "; left as it is");
-                    continue;
-                }
-                Object prev = e.get("prev");
-                if (prev == null) {
-                    if (dst.exists()) dst.delete();
-                } else {
-                    putBack(new File((String) prev), dst, e.get("mode") == null ? "644" : String.valueOf(e.get("mode")));
-                }
-                if (path.endsWith(".odex")) dalvik(path.replaceAll("\\.odex$", ".apk"), dst, false);
-                out.add("rolled back " + path);
-            }
-        } finally {
-            remount("ro");
+        List<String> left = rollback(j, lost);
+        if (!left.isEmpty()) {
+            out.add("recover didn't finish, the journal stays: couldn't put back " + left);
+            Set<String> held = readHeld();
+            if (j.get("held") instanceof List) for (Object o : (List<Object>) j.get("held")) held.add(String.valueOf(o));
+            writeHeld(held);
+            if (!held.isEmpty()) out.add("held     " + held + " stay off until it does");
+            return 1;
         }
         recoverSettings(j);
         if (j.containsKey("binds")) {
@@ -2560,7 +2825,7 @@ public final class Engine {
             if (wasFailed == null) ff.delete();
             else write(ff, wasFailed);
         }
-        write(stateFile, Json.write(j.get("state")));
+        boolean any = out.size() > before;
         if (lost.isEmpty()) {
             journalFile.delete();
             rm(prevDir);
@@ -2568,8 +2833,22 @@ public final class Engine {
             setAside(lost.size() + " file(s) couldn't be put back");
             out.add("`engine status` shows them (CHANGED); `engine apply --force` builds them again");
         }
-        releaseLeftHeld();   // after the files are back: the apps start on the files they had
-        out.add(Boolean.TRUE.equals(j.get("trial")) && Boolean.TRUE.equals(j.get("committed")) ? "trial undone" : "unfinished apply rolled back");
+        if (Boolean.TRUE.equals(j.get("trial"))) out.add(any ? "trial undone" : "trial dropped: its files were as before it already");
+        else out.add(any ? "unfinished apply rolled back" : "unfinished apply dropped: no file had changed yet");
+        Set<String> held = readHeld();
+        if (j.get("held") instanceof List) for (Object o : (List<Object>) j.get("held")) held.add(String.valueOf(o));
+        return startHeld(held);
+    }
+
+    /** held apps started again now if Android is up, else left in held.txt for boot.sh (engine release-held) */
+    int startHeld(Set<String> held) throws Exception {
+        if (held.isEmpty()) return 0;
+        writeHeld(held);
+        if (!"1".equals(getprop("sys.boot_completed"))) {
+            out.add("held     " + held + " start again once Android is up (boot.sh: engine release-held)");
+            return 0;
+        }
+        release(held);
         return 0;
     }
 
@@ -2597,12 +2876,12 @@ public final class Engine {
      * saved copy takes its place. The saved copy and the journal stay until recover finishes,
      * so a cut here is put right at the next start.
      */
-    void putBack(File src, File dst, String mode) throws Exception {
+    void putBack(File src, File dst, FileMeta meta) throws Exception {
         if (dst.isFile() && free("system", dst.getParentFile()) < src.length() + SYSTEM_SPARE) {
             if (!dst.delete()) throw new IOException("delete " + dst);
             out.add("room     /system is short of room: " + dst.getPath().substring(root.length()) + " removed before its saved copy goes back");
         }
-        put(src, dst, mode);
+        put(src, dst, meta);
     }
 
     /**
@@ -2659,7 +2938,6 @@ public final class Engine {
 
     File backup(String path) { return new File(stockDir, path); }
 
-    String mode(File f) { return "644"; }
 
     String settingGet(String k) throws Exception {
         if (host) return hostSettings().get(k);

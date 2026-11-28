@@ -112,6 +112,27 @@ rm $R/data/hmgapi/settings/hmgapi.json
 mod a '{"type": "add", "path": "/system/lib/hwx/x.so", "src": "a.xml", "stock": "any"}'
 eng plan; check "a folder that only starts like hw/ isn't critical" 0 $rc
 
+# ---- /system/bin and /system/xbin: a change must say its mode; stock modes, owners and labels come back
+# (off the unit: the file's own mode, owners and labels in $R/meta.txt)
+head -c 2048 /dev/urandom > $R/system/bin/netd; chmod 755 $R/system/bin/netd
+echo "/system/bin/netd 0 2000 u:object_r:netd_exec:s0" > $R/meta.txt
+NETD=$(md5 $R/system/bin/netd)
+own() { echo "$(python3 -c 'import os, sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o7777)[2:])' $R$1) $(grep "^$1 " $R/meta.txt | sed "s#^$1 ##")"; }
+mod a '{"type": "add", "path": "/system/bin/netd", "src": "a.xml", "stock": "any"}'
+eng plan; has "a /system/bin change with no mode refused" '/system/bin/netd: a: a change in /system/bin or /system/xbin needs a "mode"' "$out"; check "... refusal exit" 3 $rc
+mod a '{"type": "add", "path": "/system/xbin/tool", "src": "a.xml"}'
+eng plan; has "... /system/xbin too, a new file as well" '/system/xbin/tool: a: a change in /system/bin or /system/xbin needs a "mode"' "$out"
+mod a '{"type": "add", "path": "/system/bin/netd", "src": "a.xml", "stock": "any", "mode": "750"}'
+eng apply; check "with a mode: applies" 0 $rc
+check "... the mod's mode, the stock owner and label" "750 0 2000 u:object_r:netd_exec:s0" "$(own /system/bin/netd)"
+eng restore
+check "restore: stock bytes" "$NETD" "$(md5 $R/system/bin/netd)"
+check "restore: stock mode, owner and label (executable again)" "755 0 2000 u:object_r:netd_exec:s0" "$(own /system/bin/netd)"
+mod a '{"type": "add", "path": "/system/xbin/tool", "src": "a.xml", "mode": "755"}'
+eng apply; check "a new /system/xbin file with a mode" "755 0 2000 -" "$(own /system/xbin/tool)"
+eng restore; check "... removed again" absent "$(md5 $R/system/xbin/tool)"
+rm -f $R/meta.txt
+
 # ---- live props
 mod a '{"type": "prop", "key": "ro.secure", "value": "0"}'
 eng plan; has "non-persist prop refused" "only persist.* properties can be set" "$out"

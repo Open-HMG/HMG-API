@@ -29,6 +29,10 @@ mkdir -p "$R/system/onebin/cvev_us" "$R/system/etc/permissions" "$R/system/lib" 
 # stock
 printf 'a\n-/system/etc/permissions/com.hkmc.software.wifihotspot.xml\nb\n' > "$FX"
 echo '<permissions stock="1"/>' > "$BX"
+# b.xml's stock mode, owner and label (off the unit, owners and labels live in meta.txt): kept through all of it
+chmod 640 "$BX"; echo "/system/etc/permissions/b.xml 1000 1000 u:object_r:system_file:s0" > "$R/meta.txt"
+own() { echo "$(python3 -c 'import os, sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o7777)[2:])' "$BX") $(sed -n 's#^/system/etc/permissions/b.xml ##p' "$R/meta.txt")"; }
+BX_OWN="640 1000 1000 u:object_r:system_file:s0"
 cp "$FX" "$T/fx.stock"; cp "$BX" "$T/bx.stock"
 FX_STOCK=$(md5 "$FX"); BX_STOCK=$(md5 "$BX")
 # a NEMESIS package installs: edits featurexml.cfg and b.xml, adds a library; it keeps its own stock copies
@@ -66,6 +70,7 @@ b
 pkg-line" "$(cat "$FX")"
 check "HMG-API's backup of featurexml: as it found it (the package's)" "$FX_PKG" "$(md5 "$D/stock/system/onebin/cvev_us/featurexml.cfg")"
 check "HMG-API's backup of b.xml: the stock NEMESIS kept" "$BX_STOCK" "$(md5 "$D/stock/system/etc/permissions/b.xml")"
+check "b.xml over the package: its mode, owner and label kept" "$BX_OWN" "$(own)"
 
 # the package is uninstalled now (the wrong order): NEMESIS puts its copies back and forgets them
 cp "$T/fx.stock" "$FX"; cp "$T/bx.stock" "$BX"; rm -f "$LIB"; rm -rf "$NB/wireless.projection" "$NB/carplay.wifi.audio"
@@ -80,12 +85,14 @@ check "featurexml: stock plus the mod's edit, the package's line gone" "a
 b" "$(cat "$FX")"
 check "HMG-API's backup of featurexml: real stock now" "$FX_STOCK" "$(md5 "$D/stock/system/onebin/cvev_us/featurexml.cfg")"
 check "b.xml: the mod's" "$(md5 "$D/mods/w/b.xml")" "$(md5 "$BX")"
+check "... built on again: mode, owner and label still the stock ones" "$BX_OWN" "$(own)"
 mod ', {"type": "add", "path": "/system/lib/libleafiaaac.so", "src": "lib.so"}'
 eng apply
 check "the library goes in once the package is gone" "$(md5 "$D/mods/w/lib.so")" "$(md5 "$LIB")"
 eng restore
 check "restore: featurexml stock" "$FX_STOCK" "$(md5 "$FX")"
 check "restore: b.xml stock" "$BX_STOCK" "$(md5 "$BX")"
+check "restore: b.xml's mode, owner and label" "$BX_OWN" "$(own)"
 check "restore: the library gone" absent "$(md5 "$LIB")"
 
 # the library deleted outside HMG-API (an old package's uninstall, #226): absent before HMG-API added it, so stock

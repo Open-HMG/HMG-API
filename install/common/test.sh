@@ -262,8 +262,11 @@ check "... and boot.log says so" "1" "$(grep -c "recover didn't finish" "$T/boot
 rm -f "$D/state/journal.json"; rm -f "$T/hmgapid.calls"
 env ROOT="$T" $SH "$PWD/boot.sh" > /dev/null 2>&1; wait
 check "boot: no journal: recover isn't run" "" "$(calls)"
-echo dev.example.gpm > "$D/state/held.txt"; printf 'enabled  dev.example.gpm (stopped by an apply that was cut off)\nnothing to recover\n' > "$T/recover.out"; echo 0 > "$T/recover.rc"
-env ROOT="$T" $SH "$PWD/boot.sh" > /dev/null 2>&1
-check "boot: apps a cut-off apply stopped, no journal: recover turns them on, no restart" "engine recover|" "$(calls)"
+# apps an apply stopped and never started again (a power cut mid-apply): once Android is up, release-held
+mkdir -p "$T/fakebin"; printf '#!/bin/sh\necho 1\n' > "$T/fakebin/getprop"; chmod +x "$T/fakebin/getprop"
+echo com.example.gpm > "$D/state/held.txt"; rm -f "$T/hmgapid.calls"
+env ROOT="$T" PATH="$T/fakebin:$PATH" $SH "$PWD/boot.sh" > /dev/null 2>&1
+n=0; until grep -q release-held "$T/hmgapid.calls" 2>/dev/null || [ $n -ge 50 ]; do sleep 0.1; n=$((n + 1)); done
+check "boot: apps left held: engine release-held once Android is up (no recover without a journal)" "engine release-held|" "$(calls)"
 rm -f "$D/state/held.txt"
 exit $fail
