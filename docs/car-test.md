@@ -174,9 +174,22 @@ Run each as the owner (`adb shell hmgapid vehicle-do ...`). Each answers `ok ...
    on release? (Unknown: the car has no getter for it.)
 6. Guide lines: `vehicle-do guide_lines off`, shift to R and look at the camera view
    (lines gone?), back to P, `vehicle-do guide_lines restore`, R again (lines back?).
-7. Rear camera turns: `vehicle-do rear_camera take` → ok; a second take by another
+   Kept across a restart: `vehicle-do guide_lines off`, then `adb shell cat
+   /data/hmgapi/state/guide-lines.stock` (**expect** `2 <mod>` with the lines on before).
+   Restart the vehicle service (`adb shell hmgapid service-restart hmgapi vehicle`) or the head
+   unit, then shift to R: **expect** the lines back. The log says `guide lines back to 2
+   (stock, kept from before a restart)`, and the file is gone. Do it once more and
+   remove the mod (`hmgapid engine remove <id>`) instead of restarting: the lines come
+   back once the vehicle service starts.
+7. Safety functions, with mods installed (Wireless CarPlay/AA, Car Check and any hook
+   mods): shift to R. **Expect** the rear camera (and the 360 view on a car that has
+   one) with its guide lines, as on a stock car. `adb shell grep 'protected: '
+   /data/hmgapi/logs/hmgapi/log.log` shows `protected: com.hkmc.system.app.rearcamera runs
+   …` and no `refused` line from a mod you didn't expect. `hmgapid engine report`
+   prints a `safety:` line; its numbers match what the log shows.
+8. Rear camera turns: `vehicle-do rear_camera take` → ok; a second take by another
    mod would be refused (the owner always can); `release`.
-8. Startup notice (optional; it has no known undo): `adb shell hmgapid allow
+9. Startup notice (optional; it has no known undo): `adb shell hmgapid allow
    startup_notice on` (the app's switch shows it on), then at the next start, while
    the notice shows, `vehicle-do startup_notice dismiss`. **Note** whether it went
    away. Then `adb shell hmgapid allow startup_notice off`.

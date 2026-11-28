@@ -36,7 +36,16 @@ public final class CommandsTest {
         public void lightStatus() { calls.add("light status"); }
         public int[] lightState() { return light; }
         public int guideLines() { return lines; }
-        public void setGuideLines(int state) { calls.add("lines " + state); lines = state; }
+        boolean pgsDown;   // the car's camera service not answering (early boot)
+        public void setGuideLines(int state) {
+            if (pgsDown) throw new IllegalStateException("no pgs service");
+            calls.add("lines " + state);
+            lines = state;
+        }
+        int kept;   // state/guide-lines.stock
+        String keptBy;
+        public int linesKept() { return kept; }
+        public void keepLines(int state, String mod) { kept = state; keptBy = mod; }
         public void hideStartupNotice() { calls.add("notice hidden"); }
         public boolean noticeAllowed() { return allowed; }
         boolean lightBlocked;
@@ -299,8 +308,57 @@ public final class CommandsTest {
         check("restore puts back what was there", "ok restored", c.handle("cam", "guide_lines", new String[] { "restore" }));
         check("... on (2)", "lines 1 | lines 2", calls(car));
         c.handle("cam", "guide_lines", new String[] { "off" });
+        check("the stock state is kept on disk before the change", "2 cam", car.kept + " " + car.keptBy);
         c.tick(declared("other ambient_light"));
         check("turned off: restored", "lines 1 | lines 2", calls(car));
+        check("... and the kept state forgotten", "0", String.valueOf(car.kept));
+
+        // a restart (vehicle service or unit) while cam held them off: nothing in memory, the kept state on disk
+        new Commands(car).handle("cam", "guide_lines", new String[] { "off" });   // the service before the restart
+        calls(car);
+        Commands after = new Commands(car);
+        after.start();
+        check("restart: the stock state goes back at the service's start", "lines 2", calls(car));
+        check("... and is forgotten", "0", String.valueOf(car.kept));
+        after.start();
+        check("... once", "", calls(car));
+
+        // the camera service isn't up yet at the start: tried again every tick until it answers
+        car.lines = 1; car.kept = 2; car.pgsDown = true;
+        after = new Commands(car);
+        after.start();
+        after.tick(declared());
+        check("camera service down: nothing sent, still kept", "2", calls(car) + car.kept);
+        car.pgsDown = false;
+        after.tick(declared());
+        check("... back on a later tick", "lines 2", calls(car));
+        check("... then forgotten", "0", String.valueOf(car.kept));
+
+        // a mod asks before the kept state could go back: the kept state stays the one to restore
+        car.lines = 1; car.kept = 2; car.pgsDown = true;
+        after = new Commands(car);
+        after.start();
+        car.pgsDown = false;
+        check("a mod changes them while a restore is pending", "ok guide lines on", after.handle("cam", "guide_lines", new String[] { "on" }));
+        check("... the kept state is still the stock one", "2 cam", car.kept + " " + car.keptBy);
+        after.handle("cam", "guide_lines", new String[] { "restore" });
+        check("... restore puts the stock state back, not the one found", "lines 2 | lines 2", calls(car));
+        check("... forgotten", "0", String.valueOf(car.kept));
+
+        // a restore that fails keeps the state on disk and tries again
+        after.handle("cam", "guide_lines", new String[] { "off" });
+        calls(car);
+        car.pgsDown = true;
+        after.tick(declared());
+        check("mod off, camera service down: still kept", "2", String.valueOf(car.kept));
+        car.pgsDown = false;
+        after.tick(declared());
+        check("... back on the next tick", "lines 2", calls(car));
+        check("... forgotten", "0", String.valueOf(car.kept));
+
+        car.kept = 7;
+        new Commands(car).start();
+        check("a kept state that isn't on or off: forgotten, nothing sent", "0", calls(car) + car.kept);
 
         car.lines = 0;
         check("guide lines on a 360-view car: refused with the reason", "refused: this car's guide lines aren't the rear camera's (a 360 view draws its own)", c.handle("cam", "guide_lines", new String[] { "off" }));

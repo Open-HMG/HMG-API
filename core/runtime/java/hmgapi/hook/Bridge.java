@@ -49,6 +49,15 @@ public final class Bridge {
 
     private static final Map<Member, HookList> hooked = new HashMap<Member, HookList>();
 
+    /**
+     * Set in a protected app process (hmgapi.engine.Protected: the cameras, guide lines,
+     * telematics) before its own code runs: every mod's hook passes straight through
+     * there, including the ones mods put on in the zygote, and no mod may add one.
+     */
+    static volatile boolean modsOff;
+    /** the direct-hook lines this process already logged (each once) */
+    private static final java.util.Set<String> said = new java.util.HashSet<String>();
+
     /** Called once by the native loader, in the zygote. */
     static void init() {
         try {
@@ -63,7 +72,12 @@ public final class Bridge {
         SelfTest.selfTest();
     }
 
-    /** Adds a hook to a method or constructor. Several hooks on one method run in the order added. */
+    /**
+     * Adds a hook to a method or constructor. Several hooks on one method run in the order added.
+     * Mods hook through ModContext.hook (a point declared in mod.json). A mod calling this
+     * directly is refused in a protected process and on a safety function's classes
+     * (hmgapi.engine.Protected), and logged everywhere else ("undeclared hook:", in the Car Report).
+     */
     public static synchronized void hookMethod(Member member, MethodHook hook) {
         if (!(member instanceof Method) && !(member instanceof Constructor)) {
             throw new IllegalArgumentException("only methods and constructors can be hooked: " + member);
@@ -71,6 +85,21 @@ public final class Bridge {
         if (Modifier.isAbstract(member.getModifiers())) {
             throw new IllegalArgumentException("abstract methods can't be hooked: " + member);
         }
+        // whose hook: a mod's (by its class loader) or HMG-API's own. A mod's is refused in a
+        // protected process and on a safety function's classes, declared or not; one outside
+        // its declared points is logged for the Car Report (Protected.direct)
+        String mod = ownerOf(hook);
+        if (mod != null) {
+            String cls = member.getDeclaringClass().getName();
+            String proc = processName();
+            hmgapi.engine.Protected.Direct d = hmgapi.engine.Protected.direct(mod, hook instanceof ModContext.Guard, cls,
+                    cls + "." + member.getName(), proc, modsOff);
+            if (d != null) {
+                if (said.add(d.line)) log(5, d.line);
+                if (d.refused) throw new IllegalStateException(d.line);
+            }
+        }
+        hook.owner = mod;
         HookList list = hooked.get(member);
         if (list == null) {
             Class<?>[] params;
@@ -97,6 +126,31 @@ public final class Bridge {
         list.hooks = now;
     }
 
+    /** the mod whose code a hook is, or null for HMG-API's own */
+    static String ownerOf(MethodHook hook) {
+        if (hook instanceof ModContext.Guard) return ((ModContext.Guard) hook).mod.id;   // a declared point's
+        ClassLoader l = hook.getClass().getClassLoader();
+        if (l == Bridge.class.getClassLoader()) return null;
+        for (Map.Entry<String, ClassLoader> e : Mods.loaders.entrySet()) if (e.getValue() == l) return e.getKey();
+        for (Map.Entry<String, ClassLoader> e : Mods.parts.entrySet()) {
+            if (e.getValue() == l) return e.getKey().substring(0, e.getKey().indexOf('/'));   // "<mod>/<package>"
+        }
+        return "an unknown caller (" + hook.getClass().getName() + ")";
+    }
+
+    /** this process's name (/proc/self/cmdline), or null in the zygote */
+    static String processName() {
+        try {
+            byte[] b = Mods.readBytes(new java.io.File("/proc/self/cmdline"));
+            int n = 0;
+            while (n < b.length && b[n] != 0) n++;
+            String s = new String(b, 0, n, "UTF-8");
+            return s.isEmpty() || "zygote".equals(s) ? null : s;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private static int slotOf(Member member) {
         try {
             Field f = member.getClass().getDeclaredField("slot");
@@ -118,6 +172,10 @@ public final class Bridge {
         MethodHook.Param param = new MethodHook.Param(member, thisObject, args);
         int ran = 0;
         while (ran < hooks.length) {
+            if (modsOff && hooks[ran].owner != null) {   // a protected process: mods' hooks pass straight through
+                ran++;
+                continue;
+            }
             try {
                 hooks[ran].beforeHookedMethod(param);
             } catch (Throwable t) {
@@ -135,6 +193,7 @@ public final class Bridge {
             }
         }
         for (int i = ran - 1; i >= 0; i--) {
+            if (modsOff && hooks[i].owner != null) continue;
             Object lastResult = param.getResult();
             Throwable lastThrowable = param.getThrowable();
             try {

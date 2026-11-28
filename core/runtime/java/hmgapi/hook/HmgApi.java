@@ -83,16 +83,25 @@ final class HmgApi {
         } catch (Throwable t) {
             e("projection AP", t);
         }
-        Points.hook(null, "framework.activity_thread.handle_bind_application",
-                new MethodHook() {
+        MethodHook bind = new MethodHook() {
                     @Override
                     protected void beforeHookedMethod(Param param) {
                         // before the app's own code runs (Application.onCreate comes inside this method)
                         try {
                             Object data = param.args[0];
                             String pkg = ((android.content.pm.ApplicationInfo) Points.get(null, "framework.app_bind_data.app_info", data)).packageName;
+                            String proc = (String) Points.get(null, "framework.app_bind_data.process_name", data);
+                            // a safety function's process: mods' hooks pass through from here on, nothing more is added
+                            String why = hmgapi.engine.Protected.process(pkg, proc);
+                            if (why != null) {
+                                Bridge.modsOff = true;
+                                protectedWhy = why;
+                                i(hmgapi.engine.Protected.MARK + (proc == null ? pkg : proc) + " runs " + why
+                                        + ": no mod loads here, mods' hooks pass through, HMG-API adds nothing (built in, no override)");
+                                return;
+                            }
                             if (Updates.OTA.equals(pkg)) {
-                                Updates.otaProcess(new LoadedApp(pkg, (String) Points.get(null, "framework.app_bind_data.process_name", data), null, null));
+                                Updates.otaProcess(new LoadedApp(pkg, proc, null, null));
                             }
                         } catch (Throwable t) {
                             e("handleBindApplication before hook", t);
@@ -112,7 +121,9 @@ final class HmgApi {
                             e("handleBindApplication hook", t);
                         }
                     }
-                });
+                };
+        bind.priority = Integer.MIN_VALUE;   // before every mod's hook on it: the protected check comes first
+        Points.hook(null, "framework.activity_thread.handle_bind_application", bind);
         i("zygote: hooked ActivityThread.handleBindApplication");
     }
 
@@ -135,7 +146,11 @@ final class HmgApi {
                 });
     }
 
+    /** this process runs a safety function (hmgapi.engine.Protected): why, or null */
+    static volatile String protectedWhy;
+
     static void appLoaded(LoadedApp app) {
+        if (protectedWhy != null) return;   // logged at the bind: no mods, no live state, no driving guard here
         i("app " + app.packageName + " (" + app.processName + ")");
         if (app.classLoader == null) return;
         try {

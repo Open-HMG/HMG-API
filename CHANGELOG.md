@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+- **No mod reaches the car's safety functions** (the review of 2026-11-26). The rear
+  camera, the 360 view (AVM/SVM), the parking guide lines (PGS) and the emergency calls
+  (SOS, eCall) are built in as off limits (`hmgapi.engine.Protected`), with no owner
+  override. No mod loads in their app processes (`com.hkmc.system.app.rearcamera`,
+  `com.hkmc.telematics.ECall`, `com.hkmc.telematics.service`, and names that look like
+  a camera or eCall app), at boot or live. The hooks mods put on in the zygote pass
+  through there, and HMG-API adds nothing of its own. No mod may hook the camera and
+  telematics classes that run in `system_server` (`com.hkmc.pgs.*`, `PgsService`,
+  `TMUService`, `com.hkmc.tmu.*`, their MICOM protocols), declared or not. A mod that
+  declares `framework.pgs_service*`, `framework.car_services.pgs` or `framework.tmu*` isn't
+  loaded. Names are from the US Ioniq 5 260507's stock files and logs.
+- **Direct hooks are reported.** A mod's `Bridge.hookMethod`/`Hooks.findAndHookMethod`
+  call outside its declared points still works outside the protected processes and
+  classes (egmp-aa-ev 0.8.4 uses one as a fallback). It's logged once per process
+  (`undeclared hook:`), and the Car Report has a `protection` section listing these, the
+  refused hooks and the protected processes it saw start.
+- **Guide lines a mod changed go back after a restart or the mod's removal.** The
+  `guide_lines` command keeps their stock state in `state/guide-lines.stock` before the
+  first change. The vehicle service puts it back at its start (retrying until the
+  camera service answers) and keeps running while the file is there, and the uninstall
+  puts it back too. Before, the state lived only in memory, so a restart while a mod
+  held the lines off left them off.
+
 ## 1.1.0-rc.10 (2026-11-25)
 
 - **No owner-facing way to force an unknown `app_process`, for now.** An empty `HMGAPI/FORCE`
