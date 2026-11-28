@@ -17,7 +17,7 @@ RUNTIME = ['core/runtime/*-test.sh']
 # Java (hook, vehicle) is only compiled by the build and the SDK, and its own tests
 ENGINE = ['core/runtime/engine-test.sh', 'core/runtime/signing-test.sh', 'core/runtime/system-test.sh', 'core/runtime/safety-test.sh', 'core/runtime/journal-test.sh',
           'core/runtime/packages-test.sh', 'core/runtime/map-test.sh', 'core/runtime/local-map-test.sh', 'core/runtime/usb-test.sh', 'core/runtime/hooks-test.sh',
-          'core/runtime/live-test.sh', 'core/runtime/native-test.sh', 'core/runtime/runtime-test.sh', 'core/runtime/net-test.sh', 'core/runtime/homewifi-test.sh',
+          'core/runtime/live-test.sh', 'core/runtime/native-test.sh', 'core/runtime/runtime-test.sh', 'core/runtime/net-test.sh', 'core/runtime/homewifi-test.sh', 'core/runtime/safe-test.sh',
           'core/runtime/overlap-test.sh', 'core/runtime/scriptcheck-test.sh', 'install/nemesis/mod-test.sh', 'install/nemesis/sync-test.sh',
           'tools/catalog-test.sh', 'tools/version-test.sh', 'tools/check-scripts.sh']
 INSTALL = ['install/common/test.sh', 'install/common/install-test.sh', 'install/common/orders-test.sh', 'install/usb/test.sh', 'install/nemesis/mod-test.sh', 'install/nemesis/sync-test.sh']

@@ -188,6 +188,7 @@ public class MainActivity extends Activity {
         final int run = ++statusRun;   // an older check finishing later doesn't add its pill too
         pills.removeAllViews();
         hooksPill(run);
+        if (safeMode()) Ui.pill(pills, "Safe mode: mods off", Ui.WARN);
         if (restartNeeded()) Ui.pill(pills, "Restart needed", Ui.WARN);
         if (planning) return;   // back from Updates: plan() asks already (two at once only wait on each other)
         new Ui.Job<Boolean>() {
@@ -287,6 +288,20 @@ public class MainActivity extends Activity {
                 else message("Couldn't reset the boot guard", e != null ? Hmgapid.unreachable(e) : r.output.trim());
             }
         }.start(this);
+    }
+
+    /** the public state (state.json, written by the engine), or an empty one */
+    static JSONObject publicState() {
+        try {
+            return new JSONObject(SettingsTab.read(new java.io.File("/data/hmgapi/public/state.json")));
+        } catch (Exception e) {
+            return new JSONObject();
+        }
+    }
+
+    /** safe mode on (hmgapi.engine.Safe): every mod off */
+    static boolean safeMode() {
+        return publicState().optBoolean("safe");
     }
 
     /** the boot this process runs in (to the 10 s): a restart flag is only for the boot it was set in */

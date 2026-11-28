@@ -73,6 +73,7 @@ public final class HookPlan {
      */
     public static Map<String, Map<String, Object>> enabled(File modsDir) {
         Map<String, Map<String, Object>> out = new LinkedHashMap<String, Map<String, Object>>();
+        if (Safe.on(modsDir.getParentFile())) return out;   // safe mode: no mod's hooks (Safe)
         File[] dirs = modsDir.listFiles();
         if (dirs == null) return out;
         java.util.Arrays.sort(dirs);

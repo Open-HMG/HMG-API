@@ -52,6 +52,23 @@ typedef long sl;
 #ifndef ROOTDIR
 #define ROOTDIR "/data/hmgapi"
 #endif
+/* Safe mode while this file is there: no mod's service runs (HMG-API's own do), and the
+ * engine publishes every mod as off (no apps, no network rules); the zygote wrapper and the
+ * runtime load no mod's hooks. `engine safe on|off`, or the file by hand. */
+#define SAFEFILE ROOTDIR "/SAFE"
+/* A service's log: LOG_MAX, then .1, checked as its output comes in; at most LOG_RATE bytes
+ * of it kept in each LOG_WINDOW seconds, the rest left out (a loop that logs must not fill
+ * /data or wear the flash). */
+#ifndef LOG_MAX
+#define LOG_MAX (256 * 1024)
+#endif
+#ifndef LOG_RATE
+#define LOG_RATE (256 * 1024)
+#endif
+#ifndef LOG_WINDOW
+#define LOG_WINDOW 60
+#endif
+#define MOD_NICE 10   /* mods' services: nice 10 and the lowest best-effort I/O priority, unless the mod asks for normal */
 #ifndef SH
 #define SH "/system/bin/sh"
 #endif
@@ -168,6 +185,8 @@ static long clock_sec(int clk)
 #define x_setresuid(a, b, c) S3(208, a, b, c)
 #define x_setresgid(a, b, c) S3(210, a, b, c)
 #define x_chown(p, u, g) S3(212, p, u, g)
+#define x_setpriority(w, who, v) S3(97, w, who, v)   /* EABI 97 */
+#define x_ioprio_set(w, who, v) S3(314, w, who, v)   /* EABI 314 */
 #define x_fchmod(fd, m) S2(94, fd, m)
 #define x_fchown(fd, u, g) S3(207, fd, u, g)   /* fchown32 */
 #define MS_BIND 4096
@@ -643,8 +662,9 @@ static int op_engine(int fd, int argc, char **argv)
           || seq(sub, "recover") || seq(sub, "install") || seq(sub, "remove") || seq(sub, "map") || seq(sub, "verify-map")
           || seq(sub, "usb-scan") || seq(sub, "update-hmgapi") || seq(sub, "apps") || seq(sub, "probe")
           || seq(sub, "map-car") || seq(sub, "report") || seq(sub, "problem") || seq(sub, "nemesis-sync")
-          || seq(sub, "boot-guard"))) {
+          || seq(sub, "boot-guard") || seq(sub, "safe"))) {
         say(fd, "usage: engine plan | apply [--trial] [--force] [--gear-unknown-ok] | keep | restore | status | recover | install <zip> | remove <id>"
+                " | safe [on | off]"
                 " | nemesis-sync | map | map-car [--local | --write | --forget] | verify-map | report [--usb]"
                 " | problem record [--no-log] [--crash-dumps] [--crash-reports] [--kernel] [--usb] [--seconds N] | problem stop"
                 " | boot-guard [reset]\n");
@@ -961,12 +981,17 @@ static int op_binds(int fd)
  *   ROOTDIR/state/services.status  what runs now: <mod> <name> <state> <pid> <fails>
  *   ROOTDIR/state/ctl/  requests from ops (workers are forked: they can't touch this
  *     table): "restart|stop|start <mod> <name>"
- *   ROOTDIR/logs/<mod>/<name>.log  its output (256 KB, then .1)
+ *   ROOTDIR/logs/<mod>/<name>.log  its output, through a pipe the daemon reads: LOG_MAX,
+ *     then .1, while it runs; more than LOG_RATE in LOG_WINDOW s is left out (one line says so)
  *   ROOTDIR/run/<mod>/<name>/      its own folder (HMGAPI_DATA, ANDROID_DATA for its
  *     dalvik-cache), owned by its user
+ *   ROOTDIR/state/service-priority.txt  "<mod> <name> normal": runs at normal priority; every
+ *     other mod's service gets nice MOD_NICE and the lowest best-effort I/O class
  * A mod turned off is dropped from services.txt by the engine: stopped here (TERM,
  * then KILL after 5 s); turned on: started. A service that keeps exiting within a
- * minute is started again after 1, 2, 4 ... 300 s, and given up after 10 tries. */
+ * minute is started again after 1, 2, 4 ... 300 s, and given up after 10 tries.
+ * Safe mode (SAFEFILE): only HMG-API's own lines count, so every mod's service stops,
+ * boot-start ones included. */
 #define MAX_SVC 32
 #define SVC_LINE 512
 #define SVC_FIELDS 24
@@ -976,11 +1001,14 @@ struct svc {
     char line[SVC_LINE], buf[SVC_LINE];
     char *f[SVC_FIELDS + 1];
     int nf, state, fails, gone, stopping;
+    int outfd, logfd;   /* its output pipe (read end) and log, -1 when closed */
     sl pid;
     long next, started, kill_at;
+    long logsize, win_start, win_bytes;
+    unsigned long long dropped;   /* left out in this window */
 };
 static struct svc svcs[MAX_SVC];
-static int nsvc, android_up, status_dirty;
+static int nsvc, android_up, status_dirty, safe_mode;
 static long last_android_check;
 static char svc_text[16384], apps_synced[8192];
 static int apps_sync_pending = 1;
@@ -1041,6 +1069,116 @@ static void svc_log(const char *what, struct svc *v, sl n)
     line_t l; l.n = 0; l.b[0] = 0;
     lput(&l, v->f[0]); lput(&l, "/"); lput(&l, v->f[1]);
     logline(what, l.b, n, 0);
+}
+
+/* ---- a service's log, written here from its output pipe */
+static void svc_logpath(struct svc *v, char *p, ul cap)
+{
+    path3(p, cap, ROOTDIR "/logs/", v->f[0], "/");
+    path3(p, cap, p, v->f[1], ".log");
+}
+
+static void svc_log_open(struct svc *v, int fresh)
+{
+    char p[256], old[260];
+    unsigned long long st[16];
+    long long big = 0;
+    svc_logpath(v, p, sizeof p);
+    if (!fresh) {
+        /* far past the cap: grown before logs were capped while running (one release's looping
+         * service: 885 MB in 8 s). Emptied, not kept as .1, so /data gets the room back now. */
+        path3(old, sizeof old, p, ".1", "");
+        if (x_stat64(old, st) == 0 && (long long)st[6] > 2LL * LOG_MAX) x_unlink(old);
+        if (x_stat64(p, st) == 0 && (long long)st[6] > 2LL * LOG_MAX) { big = (long long)st[6]; fresh = 1; }
+    }
+    v->logfd = (int)x_open(p, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC | (fresh ? O_TRUNC : 0), 0600);
+    v->logsize = 0;
+    if (v->logfd >= 0 && !fresh && x_stat64(p, st) == 0) v->logsize = (long)st[6];   /* st_size at 48 */
+    if (v->logfd >= 0 && big) {
+        line_t l; l.n = 0; l.b[0] = 0;
+        lput(&l, "[hmgapid] this log was "); lnum(&l, (sl)(big >> 20)); lput(&l, " MB: emptied\n");
+        if (wall(v->logfd, l.b, l.n) == 0) v->logsize = (long)l.n;
+    }
+}
+
+/* into the log, never past LOG_MAX: a full log becomes .1 (the old .1 goes) */
+static void svc_log_put(struct svc *v, const char *b, ul n)
+{
+    while (n > 0) {
+        ul k;
+        if (v->logfd < 0) svc_log_open(v, 0);
+        if (v->logfd < 0) return;
+        if (v->logsize >= LOG_MAX) {
+            char p[256], old[260];
+            svc_logpath(v, p, sizeof p);
+            path3(old, sizeof old, p, ".1", "");
+            x_close(v->logfd);
+            x_rename(p, old);
+            svc_log_open(v, 1);
+            continue;
+        }
+        k = (ul)(LOG_MAX - v->logsize);
+        if (k > n) k = n;
+        if (wall(v->logfd, b, k)) return;
+        v->logsize += (long)k;
+        b += k;
+        n -= k;
+    }
+}
+
+/* a new window: say how much the last one left out */
+static void svc_log_window(struct svc *v, long now, int force)
+{
+    if (!force && now - v->win_start < LOG_WINDOW) return;
+    if (v->dropped) {
+        line_t l; l.n = 0; l.b[0] = 0;
+        lput(&l, "[hmgapid] "); lnum(&l, (sl)((v->dropped + 1023) / 1024)); lput(&l, " KB of output left out\n");
+        svc_log_put(v, l.b, l.n);
+        svc_log("service output left out (KB)", v, (sl)((v->dropped + 1023) / 1024));
+    }
+    v->win_start = now;
+    v->win_bytes = 0;
+    v->dropped = 0;
+}
+
+static void svc_log_out(struct svc *v, const char *b, ul n, long now)
+{
+    svc_log_window(v, now, 0);
+    if (!v->dropped && v->win_bytes < LOG_RATE) {   /* what fits in this window's budget */
+        ul room = (ul)(LOG_RATE - v->win_bytes), k = n < room ? n : room;
+        v->win_bytes += (long)k;
+        svc_log_put(v, b, k);
+        b += k;
+        n -= k;
+    }
+    if (n == 0) return;
+    if (!v->dropped) {
+        line_t l; l.n = 0; l.b[0] = 0;
+        lput(&l, "\n[hmgapid] more than "); lnum(&l, LOG_RATE / 1024); lput(&l, " KB of output in "); lnum(&l, LOG_WINDOW);
+        lput(&l, " s: the rest is left out until the next "); lnum(&l, LOG_WINDOW); lput(&l, " s\n");
+        svc_log_put(v, l.b, l.n);
+    }
+    v->dropped += n;
+}
+
+static void svc_out_close(struct svc *v, long now)
+{
+    if (v->outfd >= 0) x_close(v->outfd);
+    v->outfd = -1;
+    svc_log_window(v, now, 1);
+    if (v->logfd >= 0) x_close(v->logfd);
+    v->logfd = -1;
+}
+
+/* its pipe is readable: what's there into the log; at EOF (it and everything it started
+ * have closed it) the pipe and the log are closed */
+static void svc_read(struct svc *v, long now)
+{
+    static char b[65536];
+    sl n = x_read(v->outfd, b, sizeof b);
+    if (n == -EINTR || n == -11 /* EAGAIN */) return;
+    if (n <= 0) { svc_out_close(v, now); return; }
+    svc_log_out(v, b, (ul)n, now);
 }
 
 static void write_status(void)
@@ -1122,14 +1260,26 @@ static int svc_gid(const char *mod, int uid)
     return MOD_GID;
 }
 
+/* a service's nice value: HMG-API's own 0; a mod's MOD_NICE unless the engine's
+ * state/service-priority.txt has "<mod> <name> normal" (its mod.json asked) */
+static int svc_nice(const char *mod, const char *name)
+{
+    static char b[4096];
+    char want[96];
+    if (seq(mod, "hmgapi")) return 0;
+    path3(want, sizeof want, mod, " ", name);
+    path3(want, sizeof want, want, " normal", "");
+    if (read_small(ROOTDIR "/state/service-priority.txt", b, sizeof b) < 0) return MOD_NICE;
+    return has_line(b, want) ? 0 : MOD_NICE;
+}
+
 static void svc_start(struct svc *v, long now)
 {
-    char path[256], dir[256], data[256], cache[256], logp[256], old[260], envb[6][300];
+    char path[256], dir[256], data[256], cache[256], logp[256], envb[6][300];
     static char *envp[110];
     char *argv[SVC_FIELDS + 6];
     u32 gids[20];
-    int ng, uid, egid, ne = 0, na = 0, i, go[2];
-    unsigned long long st[16];
+    int ng, uid, egid, ne = 0, na = 0, i, go[2], op[2], nice;
     sl pid, lf;
     const char *mod = v->f[0], *name = v->f[1], *kind = v->f[5], *rel = v->f[6], *cls = v->f[7];
     uid = svc_user(v->f[2], gids, &ng);
@@ -1156,11 +1306,12 @@ static void svc_start(struct svc *v, long now)
     mkdir_owned(logp, 0700, -1, -1);
     path3(logp, sizeof logp, logp, "/", name);
     path3(logp, sizeof logp, logp, ".log", "");
-    if (x_stat64(logp, st) == 0 && (long long)st[6] > 256 * 1024) {   /* st_size at 48 */
-        path3(old, sizeof old, logp, ".1", "");
-        x_rename(logp, old);
-    }
-    lf = x_open(logp, O_WRONLY | O_CREAT | O_APPEND, 0600);
+    if (v->outfd >= 0) svc_out_close(v, now);   /* the last run's pipe, still held by something it started */
+    /* its output through a pipe this daemon reads (svc_read: the log stays capped while it runs);
+     * no pipe: straight into the log, as before */
+    if (x_pipe(op) < 0) { op[0] = -1; lf = x_open(logp, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0600); }
+    else lf = op[1];
+    nice = svc_nice(mod, name);
 
     envp[ne++] = "PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin";
     envp[ne++] = "LD_LIBRARY_PATH=/vendor/lib:/system/lib";
@@ -1194,7 +1345,13 @@ static void svc_start(struct svc *v, long now)
 
     if (x_pipe(go) < 0) { go[0] = go[1] = -1; }
     pid = x_fork();
-    if (pid < 0) { if (lf >= 0) x_close(lf); if (go[0] >= 0) { x_close(go[0]); x_close(go[1]); } v->next = now + 5; return; }
+    if (pid < 0) {
+        if (lf >= 0) x_close(lf);
+        if (op[0] >= 0) x_close(op[0]);
+        if (go[0] >= 0) { x_close(go[0]); x_close(go[1]); }
+        v->next = now + 5;
+        return;
+    }
     if (pid == 0) {
         sl nul = x_open("/dev/null", O_RDONLY, 0);
         char c;
@@ -1206,6 +1363,11 @@ static void svc_start(struct svc *v, long now)
         }
         if (nul >= 0) x_dup2(nul, 0);
         if (lf >= 0) { x_dup2(lf, 1); x_dup2(lf, 2); }
+        for (i = 3; i < 1024; i++) x_close(i);   /* only 0-2: not the other services' pipes, nor the daemon's socket */
+        if (nice) {   /* lower first: a mod's loop must not starve the car's own processes */
+            x_setpriority(0 /* PRIO_PROCESS */, 0, nice);
+            x_ioprio_set(1 /* IOPRIO_WHO_PROCESS */, 0, (2 << 13) | 7);   /* best effort, level 7; errors ignored */
+        }
         x_chdir(data);
         if (x_geteuid() == 0) {   /* off-car tests run unprivileged: no switch */
             /* A mod's service runs with MOD_GID or HOME_GID as its effective group (svc_gid): the
@@ -1220,6 +1382,10 @@ static void svc_start(struct svc *v, long now)
         x_exit(127);
     }
     if (lf >= 0) x_close(lf);
+    v->outfd = op[0];
+    v->win_start = now;
+    v->win_bytes = 0;
+    v->dropped = 0;
     v->pid = pid;
     v->state = S_RUN;
     v->started = now;
@@ -1302,6 +1468,19 @@ static void svc_reload(long now)
     char *p;
     int i;
     if (read_small(ROOTDIR "/state/services.txt", want, sizeof want) < 0) want[0] = 0;
+    if (safe_mode) {   /* HMG-API's own lines only */
+        static char kept[16384];
+        kept[0] = 0;
+        for (p = want; *p; ) {
+            char *e = p;
+            ul n;
+            while (*e && *e != '\n') e++;
+            n = (ul)(e - p);
+            if (n && n < SVC_LINE && spre(p, "hmgapi ")) { mcpy(line, p, n); line[n] = 0; apnd(kept, sizeof kept, line); }
+            p = *e ? e + 1 : e;
+        }
+        mcpy(want, kept, slen(kept) + 1);
+    }
     if (seq(want, svc_text)) return;
     mcpy(svc_text, want, slen(want) + 1);
     for (i = 0; i < nsvc; i++) {   /* no longer wanted (or changed): stop */
@@ -1323,6 +1502,7 @@ static void svc_reload(long now)
             if (!dup && nsvc < MAX_SVC) {
                 struct svc *v = &svcs[nsvc];
                 mset(v, 0, sizeof *v);
+                v->outfd = v->logfd = -1;
                 mcpy(v->line, line, n + 1);
                 svc_parse(v);
                 if (svc_valid(v) && !svc_find(v->f[0], v->f[1])) {
@@ -1408,6 +1588,12 @@ static void svc_tick(void)
             logline("Android is up", 0, -1, 0);
         }
     }
+    if (exists(SAFEFILE) != safe_mode) {   /* turned on or off (the engine, or the file by hand) */
+        safe_mode = !safe_mode;
+        logline(safe_mode ? "safe mode on: mods' services stop" : "safe mode off: mods' services start", 0, -1, 0);
+        publish_state();          /* the engine writes the state for it: apps, network rules, the public state */
+        apps_sync_pending = 1;    /* mods' apps off (or on again) once Android is up */
+    }
     svc_reload(now);
     svc_ctl(now);
     /* the mods' apps, when the list changes (or first after Android is up) */
@@ -1422,7 +1608,14 @@ static void svc_tick(void)
     for (i = 0; i < nsvc; i++) {
         struct svc *v = &svcs[i];
         if (v->pid > 0 && v->kill_at && now >= v->kill_at) { x_kill(-v->pid, SIGKILL); x_kill(v->pid, SIGKILL); v->kill_at = 0; }
+        if (v->outfd >= 0) svc_log_window(v, now, 0);   /* what a quiet minute left out gets said */
         if (v->gone && v->pid == 0) {   /* drop it */
+            if (v->outfd >= 0) {   /* what's in its pipe first */
+                struct { int fd; short ev, rev; } q = { v->outfd, POLLIN, 0 };
+                int k;
+                for (k = 0; k < 16 && v->outfd >= 0 && x_poll(&q, 1, 0) > 0; k++) svc_read(v, now);
+            }
+            svc_out_close(v, now);
             --nsvc;
             if (i != nsvc) mcpy(&svcs[i], &svcs[nsvc], sizeof svcs[i]);
             svc_parse(&svcs[i]);   /* field pointers point into its own buf: rebuild after the copy */
@@ -2014,7 +2207,9 @@ static int daemon_main(void)
     x_close(ready[0]);
 
     for (;;) {
-        struct { int fd; short ev, rev; } p = { (int)s, POLLIN, 0 };
+        static struct { int fd; short ev, rev; } p[MAX_SVC + 1];
+        static int of[MAX_SVC + 1];
+        int np = 1, i;
         sl c;
         for (;;) {   /* children: services and op workers */
             int st = 0;
@@ -2023,7 +2218,16 @@ static int daemon_main(void)
             if (!svc_exited(k, st, x_time()) && workers > 0) workers--;
         }
         svc_tick();
-        if (x_poll(&p, 1, 1000) <= 0) continue;
+        /* the socket, and every service's output pipe */
+        p[0].fd = (int)s; p[0].ev = POLLIN; p[0].rev = 0;
+        for (i = 0; i < nsvc; i++) {
+            if (svcs[i].outfd < 0) continue;
+            p[np].fd = svcs[i].outfd; p[np].ev = POLLIN; p[np].rev = 0;
+            of[np++] = i;
+        }
+        if (x_poll(p, np, 1000) <= 0) continue;
+        for (i = 1; i < np; i++) if (p[i].rev) svc_read(&svcs[of[i]], x_time());
+        if (!(p[0].rev & POLLIN)) continue;
         c = x_accept(s);
         if (c < 0) continue;
         if (workers >= MAX_WORKERS) { done((int)c, 75); x_close(c); continue; }   /* busy */
@@ -2163,7 +2367,7 @@ int main(int argc, char **argv, char **envp)
     if (argc < 2) {
         out(2, "usage: hmgapid daemon | hmgapid boot | hmgapid <op> [args...]\n"
                "ops: ping, version, mods, enable <id>, disable <id>, setting-get <id>,\n"
-               "     setting-set <id> <json>, mod-file <id> mod.json|settings.json, log, reboot [--gear-unknown-ok], engine <plan|apply|keep|restore|status|recover>,\n"
+               "     setting-set <id> <json>, mod-file <id> mod.json|settings.json, log, reboot [--gear-unknown-ok], engine <plan|apply|keep|restore|status|recover|safe [on|off]>,\n"
                "     services [mod], service-restart|service-stop|service-start <mod> <name>, service-log <mod> <name>,\n"
                "     usb [mod], sh <command>, remount rw|ro, binds\n"
                "a mod's own app: whoami, setting-get, setting-set <json>, services, service-restart|stop|start <name>,\n"

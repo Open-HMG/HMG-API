@@ -38,7 +38,7 @@ echo 5e1d0c34-aaaa-4bbb-8ccc-000000000001 > "$T/boot_id"   # one kernel boot, un
 # the watcher's times, in ms: poll 0.2 s, booted after the launcher's 0.6 s, hung with no
 # system_server at 1 s, given up at 3 s
 clang $ARM_STATIC -DPOLL_MS=200 -DUP_MS=600 -DHANG_MS=1000 -DGIVEUP_MS=3000 \
-  -DSTOCK="\"$T/stock\"" -DSTOCKBAK="\"$T/stockbak\"" -DKMSG="\"$T/kmsg\"" -DHOOKDIR="\"$T/hook\"" -DHOOKLIB="\"$T/lib.so\"" -DHMGAPID="\"$T/hmgapid\"" -DBOOTID="\"$T/boot_id\"" \
+  -DSTOCK="\"$T/stock\"" -DSTOCKBAK="\"$T/stockbak\"" -DKMSG="\"$T/kmsg\"" -DHOOKDIR="\"$T/hook\"" -DHOOKLIB="\"$T/lib.so\"" -DHMGAPID="\"$T/hmgapid\"" -DBOOTID="\"$T/boot_id\"" -DSAFEFILE="\"$T/SAFE\"" \
   -DGETPROP="\"$T/getprop\"" -DSYSTEM_SERVER="\"$T/system_server\"" -DLAUNCHER="\"$T/launcher\"" \
   -o "$T/wrap" zygote.c
 fail=0
@@ -83,9 +83,25 @@ check "not zygote: no preload" "PRELOAD:old.so" "$out"
 fresh; echo 1 > "$T/hook/starts"; echo "$(cat "$T/boot_id") 1" > "$T/hook/boot"   # one earlier start, in this boot
 run --zygote >/dev/null; run --zygote >/dev/null
 out=$(run --zygote)
-check "boot guard after 3 starts" "PRELOAD:old.so" "$out"
-check "log says boot guard" "boot guard, starts=3" "$(cat "$T/kmsg")"
+# the first trip: safe mode (no mod loads, none of their services run), HMG-API alone gets a try
+check "boot guard after 3 starts: hooks stay on for HMG-API alone" "PRELOAD:$T/lib.so" "$out"
+check "... logged: safe mode on" "boot guard (starts=3, this boot 3): safe mode on, hooks on without mods" "$(cat "$T/kmsg")"
+check "... the safe mode file says why" "boot guard" "$(cat "$T/SAFE")"
+check "... the counters start again, this start the first" "1" "$(cat "$T/hook/starts")"
+check "... in this boot too" "$(cat "$T/boot_id") 1" "$(cat "$T/hook/boot")"
+run --zygote >/dev/null
+check "safe mode: hooks on, logged" "hooks on, start 2 (this boot 2), safe mode: no mods" "$(cat "$T/kmsg")"
+run --zygote >/dev/null
+out=$(run --zygote)
+check "tripping again in safe mode: hooks off" "PRELOAD:old.so" "$out"
+check "... logged" "hooks off (boot guard, starts=3, this boot 3; in safe mode)" "$(cat "$T/kmsg")"
 check "... and it trips: which limit, the counts" "boot 3 3" "$(cat "$T/hook/tripped" 2>/dev/null)"
+check "... the file stays" "boot guard" "$(cat "$T/SAFE")"
+echo 0 > "$T/hook/starts"; rm -f "$T/hook/boot" "$T/hook/tripped"; echo owner > "$T/SAFE"
+out=$(run --zygote)
+check "safe mode by the owner: hooks on (HMG-API's own)" "PRELOAD:$T/lib.so" "$out"
+check "... the file untouched" "owner" "$(cat "$T/SAFE")"
+rm -f "$T/SAFE"
 
 fresh; touch "$T/hook/disable"
 out=$(run --zygote)
@@ -108,6 +124,8 @@ wait $zp
 check "watcher: logged" "booted ($T/launcher up 0 s, boot completed)" "$(sed 's/up [0-9]* s/up 0 s/' "$T/kmsg")"
 check "watcher: this boot's count kept" "$(cat "$T/boot_id") 1" "$(cat "$T/hook/boot" 2>/dev/null)"
 
+# the trips below are in safe mode (the owner's), so a trip turns the hooks off at once
+echo owner > "$T/SAFE"
 # the review's late crash: Android booted each time, then died (STAY), in one kernel boot
 fresh
 for n in 1 2 3; do
@@ -182,6 +200,7 @@ out=$(run --zygote)
 check "no boot_id: every start counts, off after 3 as before" "PRELOAD:old.so" "$out"
 check "... no boot file written" no "$(there "$T/hook/boot")"
 id 1
+rm -f "$T/SAFE"
 
 # ---- fail closed: a counter that can't be read or written in full means no hooks
 for f in starts.tmp boot.tmp; do

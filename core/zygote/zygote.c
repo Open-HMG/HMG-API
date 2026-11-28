@@ -35,6 +35,13 @@
  * after HANG_MS means the zygote hung before forking it (a mod's zygoteInit): the
  * watcher kills the zygote, init starts it again, and that start counts. Not booted
  * after GIVEUP_MS: the watcher exits and the start stays counted.
+ * Safe mode (SAFEFILE, /data/hmgapi/SAFE): the runtime loads no mod, hmgapid runs no
+ * mod's service, the engine publishes every mod as off. The preload stays, so HMG-API's
+ * own hooks (its tile, its ★ choice, the update block) still run. The boot guard
+ * tripping with no SAFEFILE writes it ("boot guard") and gives the counters a fresh
+ * start: HMG-API alone gets another try. Tripping again in safe mode, or with no way to
+ * write SAFEFILE: hook/tripped, hooks off, as above (turning safe mode off resets the
+ * counters).
  * Stock ARM app_process re-execs /system/bin/app_process once with
  * NO_ADDR_COMPAT_LAYOUT_FIXUP=1 (ADDR_COMPAT_LAYOUT personality), so the zygote
  * passes through here twice per start. Only the first pass counts and sets the
@@ -91,6 +98,9 @@ typedef unsigned long ul;
 #endif
 #ifndef LAUNCHER
 #define LAUNCHER "com.android.launcher3"   /* every Gen5W build mapped so far (maps/base/launcher.json) */
+#endif
+#ifndef SAFEFILE
+#define SAFEFILE "/data/hmgapi/SAFE"
 #endif
 #define MAXSTARTS 3   /* in one kernel boot */
 #define MAXBOOTS 6    /* in a row, across restarts */
@@ -252,6 +262,12 @@ static long bump_starts(long *inboot)
         if (put_file(HOOKDIR "/boot", HOOKDIR "/boot.tmp", saved, w) < 0) return -1;
     }
     return v;
+}
+
+/* safe mode on: SAFEFILE, saying why (written whole, as the counters are); 0 if it can't be */
+static int safe_on(void)
+{
+    return put_file(SAFEFILE, SAFEFILE ".tmp", "boot guard\n", 11) >= 0;
 }
 
 /* the guard tripped: "boot|row <starts> <this boot>", kept until the owner resets it */
@@ -453,13 +469,35 @@ int main(int argc, char **argv, char **envp)
         else if (!exists(HOOKLIB)) put(", hooks off (no " HOOKLIB ")");
         else if (exists(HOOKDIR "/tripped")) put(", hooks off (boot guard tripped earlier: hook/tripped)");
         else {
+            int safe = exists(SAFEFILE);
             starts = bump_starts(&inboot);
             if (starts < 0) put(", hooks off (can't read or write the boot guard's counters)");
-            else if (inboot >= MAXSTARTS || starts >= MAXBOOTS) {
-                put(", hooks off (boot guard, starts="); putn(starts); put(", this boot "); putn(inboot); put(")");
+            else if ((inboot >= MAXSTARTS || starts >= MAXBOOTS) && safe) {
+                /* tripped again with no mod loaded: HMG-API's own hooks are the problem, so none */
+                put(", hooks off (boot guard, starts="); putn(starts); put(", this boot "); putn(inboot); put("; in safe mode)");
                 trip(inboot >= MAXSTARTS ? "boot" : "row", starts, inboot);
             }
-            else { use = 1; put(", hooks on, start "); putn(starts + 1); put(" (this boot "); putn(inboot + 1); put(")"); }
+            else if (inboot >= MAXSTARTS || starts >= MAXBOOTS) {
+                /* the first trip: safe mode (no mod), counters from 0 with this start the first, so
+                   HMG-API alone gets its try; if SAFEFILE or the counters can't be written: tripped */
+                long was = starts, wasin = inboot;
+                put(", boot guard (starts="); putn(starts); put(", this boot "); putn(inboot); put(")");
+                if (safe_on() && put_file(HOOKDIR "/starts", HOOKDIR "/starts.tmp", "0\n", 2) >= 0) {
+                    xunlink(HOOKDIR "/boot");
+                    inboot = 0;
+                    starts = bump_starts(&inboot);
+                }
+                if (starts >= 0 && exists(SAFEFILE) && inboot < MAXSTARTS && starts < MAXBOOTS) {
+                    use = 1; put(": safe mode on, hooks on without mods");
+                } else {
+                    put(": hooks off (can't write " SAFEFILE " or the counters)");
+                    trip(wasin >= MAXSTARTS ? "boot" : "row", was, wasin);
+                }
+            }
+            else {
+                use = 1; put(", hooks on, start "); putn(starts + 1); put(" (this boot "); putn(inboot + 1); put(")");
+                if (safe) put(", safe mode: no mods");
+            }
         }
     }
 

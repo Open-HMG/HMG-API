@@ -315,6 +315,7 @@ final class ProblemLog {
                 .append(", hook/disable: ").append(new File(hook, "disable").exists() ? "yes (hooks switched off)" : "no")
                 .append(", hook/starts: ").append(starts).append('\n');
         for (String l : BootGuard.describe(e)) s.append(l).append('\n');
+        s.append("safe mode: ").append(Safe.on(e.data) ? "on (" + Safe.describe(e.data) + "): no mod runs" : "off").append('\n');
         s.append("hook library: ").append(new File(e.root + "/system/lib/libhmgapi_hook.so").isFile() ? "there" : "absent").append('\n');
         int n = 0;
         for (String l : dmesg.split("\n")) {

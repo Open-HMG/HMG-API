@@ -33,6 +33,8 @@ import hmgapi.engine.SystemCheck;
  *
  * A mod whose "system" requirements this unit doesn't meet isn't loaded
  * (state "unsupported"), unless hmgapi.json overrides.ignore_system names it.
+ * Safe mode (/data/hmgapi/SAFE, hmgapi.engine.Safe): no mod is loaded (state "safe");
+ * HMG-API's own entries are.
  */
 final class Mods {
     private Mods() {}
@@ -121,7 +123,7 @@ final class Mods {
      */
     @SuppressWarnings("unchecked")
     static synchronized void lateLoad(String id, LoadedApp app, Map<String, Object> state, java.util.Set<String> trail) {
-        if (Bridge.modsOff || loaders.containsKey(id) || !trail.add(id)) return;   // never in a protected process
+        if (Bridge.modsOff || loaders.containsKey(id) || !trail.add(id) || Boolean.TRUE.equals(state.get("safe"))) return;   // never in a protected process; safe mode: none
         Map<String, Object> mods = (Map<String, Object>) state.get("mods");
         Map<String, Object> s = (Map<String, Object>) mods.get(id);
         if (s == null || !Boolean.TRUE.equals(s.get("enabled")) || !Boolean.TRUE.equals(s.get("live"))) return;
@@ -249,7 +251,9 @@ final class Mods {
             dirOf.put(id, dir);
         }
         DexCacheCleanup.reconcile(DEX_CACHE, installedIds);
-        Map<String, Map<String, Object>> enabled = hmgapi.engine.HookPlan.enabled(MODS);   // an unreadable mod.json: reported when it's loaded
+        boolean safe = hmgapi.engine.Safe.on(ROOT);
+        if (safe) HmgApi.i("mods: safe mode is on: no mod loads (hmgapid engine safe off, then restart)");
+        Map<String, Map<String, Object>> enabled = hmgapi.engine.HookPlan.enabled(MODS);   // an unreadable mod.json: reported when it's loaded; none in safe mode
         plan = hmgapi.engine.HookPlan.of(enabled, Points.map == null ? null : Points.map.points.keySet(), Points.map == null ? null : Points.map.missing,
                 Points.map == null ? null : Points.map.localOnly());
         List<String> order = new ArrayList<String>(plan.order);
@@ -266,6 +270,11 @@ final class Mods {
             if (new File(dir, ".disabled").exists()) {
                 info.state = "disabled";
                 HmgApi.i("mods: " + id + " is disabled");
+                continue;
+            }
+            if (safe) {
+                info.state = "safe";
+                info.error = "safe mode is on";
                 continue;
             }
             if (plan.refused.containsKey(id)) {

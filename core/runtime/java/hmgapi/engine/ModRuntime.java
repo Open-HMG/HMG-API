@@ -15,7 +15,7 @@ import java.util.Set;
  *   "apps":     [{"apk": "app/Dashcam.apk", "package": "dev.example.dashcam"}]
  *   "services": [{"name": "recorder", "jar": "dashcam.jar", "class": "dev.example.Main",
  *                 "args": ["--quiet"], "user": "root|system|app|app:<package>",
- *                 "start": "boot|android|manual", "restart": true},
+ *                 "start": "boot|android|manual", "restart": true, "priority": "low|normal"},
  *                {"name": "watch", "script": "svc/watch.sh", ...}]
  *   "usb":      ["Dashcam"]
  *   "vehicle":  {"read": ["speed", "gear.park"], "commands": ["charge_door"]}
@@ -37,7 +37,9 @@ import java.util.Set;
  * with the jar (or an APK) as CLASSPATH, "script" runs sh; "user" app means the mod's
  * first app's uid. start "android" waits for sys.boot_completed; "manual" runs only
  * when asked (service-start, e.g. from the mod's app), once Android is up. restart (default
- * true): started again when it exits. usb: folders on a stick the mod's app and
+ * true): started again when it exits. priority (default low): a mod's service runs with nice 10 and
+ * the lowest best-effort I/O priority, so a busy loop can't starve the car's own processes;
+ * "normal" (state/service-priority.txt) runs it like the car's. usb: folders on a stick the mod's app and
  * services can ask about (hmgapid `usb`), and that the launcher announces
  * (hmgapi.intent.action.USB_FOLDER to the mod's apps). vehicle read: the readings
  * (Vehicle.READINGS) the mod's app and services may ask hmgapid for, answered by
@@ -61,7 +63,7 @@ final class ModRuntime {
 
     static final class Service {
         String mod, name, user, start, kind, path, cls;
-        boolean restart;
+        boolean restart, normal;   // normal: "priority": "normal"
         List<String> args = new ArrayList<String>();
 
         /** hmgapid's line: <mod> <name> <user> <start> <restart> <kind> <path> <class|-> [args...] */
@@ -188,6 +190,12 @@ final class ModRuntime {
                     continue;
                 }
                 v.restart = !Boolean.FALSE.equals(s.get("restart"));
+                Object pr = s.get("priority");
+                if (pr != null && !"low".equals(pr) && !"normal".equals(pr)) {
+                    d.errors.add(what + ": priority must be low (the default) or normal");
+                    continue;
+                }
+                v.normal = "normal".equals(pr);
                 Object args = s.get("args");
                 boolean bad = false;
                 if (args instanceof List) {
@@ -417,7 +425,8 @@ final class ModRuntime {
 
     /** state/apps.txt, services.txt, usb.txt for hmgapid; the service files made readable by their user. */
     static void publish(Engine e, Map<String, Map<String, Object>> json, Set<String> on) throws Exception {
-        StringBuilder apps = new StringBuilder(), svcs = new StringBuilder(), usb = new StringBuilder(), veh = new StringBuilder(), cmd = new StringBuilder(), evs = new StringBuilder();
+        StringBuilder apps = new StringBuilder(), svcs = new StringBuilder(), usb = new StringBuilder(), veh = new StringBuilder(), cmd = new StringBuilder(), evs = new StringBuilder(),
+                prio = new StringBuilder();
         Map<String, String> owner = new LinkedHashMap<String, String>();
         for (String id : on) {
             File dir = new File(e.data, "mods/" + id);
@@ -433,6 +442,7 @@ final class ModRuntime {
             }
             for (Service s : d.services) {
                 svcs.append(s.line()).append('\n');
+                if (s.normal) prio.append(s.mod).append(' ').append(s.name).append(" normal\n");
                 if (!"root".equals(s.user)) readable(dir, new File(dir, s.path));
             }
             for (String f : d.usb) usb.append(id).append(' ').append(f).append('\n');
@@ -447,11 +457,18 @@ final class ModRuntime {
         svcs.append(VEHICLE_SERVICE).append('\n');
         svcs.append(LOG_SERVICE).append('\n');
         e.stateDir.mkdirs();
-        String net = Network.publish(e, json, on);   // the network keeper, while a mod has network asks (or some are still in)
+        Map<String, Map<String, Object>> netJson = json;
+        Set<String> netOn = on;
+        if (Safe.on(e.data)) {   // safe mode: only a rule that keeps adb reachable (Safe.adbOnly)
+            netOn = new java.util.LinkedHashSet<String>();
+            netJson = Safe.adbOnly(e, netOn);
+        }
+        String net = Network.publish(e, netJson, netOn);   // the network keeper, while a mod has network asks (or some are still in)
         if (net != null) svcs.append(net).append('\n');
         String wifi = HomeWifi.service(e, json, on);   // the Wi-Fi keeper: home Wi-Fi, the projection AP
         if (wifi != null) svcs.append(wifi).append('\n');
         writeIfChanged(new File(e.stateDir, "apps.txt"), apps.toString());
+        writeIfChanged(new File(e.stateDir, "service-priority.txt"), prio.toString());   // before services.txt: hmgapid reads it at each start
         writeIfChanged(new File(e.stateDir, "services.txt"), svcs.toString());
         writeIfChanged(new File(e.stateDir, "usb.txt"), usb.toString());
         writeIfChanged(new File(e.stateDir, "vehicle.txt"), veh.toString());
@@ -468,7 +485,7 @@ final class ModRuntime {
             for (Service s : d.services) {
                 if (s.name.startsWith("on-") && "manual".equals(s.start) && s.args.size() == 1 && Vehicle.EVENTS.containsKey(s.args.get(0))) continue;   // an event script: below
                 out.add("service  " + id + "/" + s.name + " as " + s.user + ", at " + s.start
-                        + (s.restart ? ", restarted if it stops" : "") + " [" + id + "]");
+                        + (s.restart ? ", restarted if it stops" : "") + (s.normal ? ", normal priority" : "") + " [" + id + "]");
             }
             for (Event x : d.events) {
                 int secs = "shutdown".equals(x.event) ? Vehicle.SHUTDOWN_SECONDS : Vehicle.EVENT_SECONDS;
