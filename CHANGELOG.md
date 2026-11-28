@@ -622,6 +622,17 @@ NEMESIS in the app menu.
   isn't loaded, and the app shows why. This also keeps such a mod from winning a
   conflict it then can't use.
 
+### Mod SDK
+
+- **A plan test for mods, with HMG-API's hook maps in the SDK.** The SDK now carries
+  `maps/`, and `test/lib.sh` has `plan_test <mod> [<required mod>...]`: for each car the
+  mod's `"system"` names that has a map, it makes a fake head unit (stand-ins for the stock
+  files, no car files) with the mod and the mods it requires, and runs `engine plan` as
+  that car. It checks that the plan has no problems, the `"system"` takes the unit, every
+  hook point the mod declares is mapped, its hooks load, which points it shares with other
+  mods, and that its native recipes stay clear of a required mod's recipes for the same
+  library build. Mod repos no longer need HMG-API's source for its maps.
+
 ## 1.1.0-rc.2 (2026-11-15)
 
 The second release candidate: fixes from a review of rc.1, nothing new in HMG-API itself.

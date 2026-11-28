@@ -90,6 +90,8 @@ installs `android.jar` and `d8` as core's CI does).
 | `bin/check-scripts.sh`, `unit-commands.txt` | `tools/check-scripts.sh`, `core/runtime/unit-commands.txt` | unit-only commands in mod scripts |
 | `bin/mkrecipe.py`, `bin/mkdelta.py`, `bin/mkmemrecipe.py`, `bin/mkicon.sh`, `bin/mod-draft.py` | `tools/` | recipes, delta sets, tile pictures, new mod drafts |
 | `test/lib.sh` | the `check`/`has`/`eng` helpers every mod `test.sh` copies today | mod tests |
+| `test/plan.py`, `test/hmgapi-engine-test.jar` (`RecipeCheck`, `MemRecipeTest`) | `tools/sdk/plan.py`, `core/runtime/test` | `test/lib.sh`'s plan test, native recipes |
+| `maps/` | `maps/` (without `coverage.json`) | the plan test: a fake head unit per car with a map |
 | `points.txt`, `catalogue/*.json` | `core/hookpoints` | check the mod's `hooks.points` exist |
 | `VERSION` | `Engine.HMGAPI_VERSION` | |
 

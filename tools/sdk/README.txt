@@ -18,10 +18,25 @@ the Android SDK (build-tools, a platform android.jar) and set ANDROID_HOME.
   bin/lpatch-host, src/lpatch/  lpatch for host tests (src/lpatch/build.sh builds it elsewhere)
   bin/mkrecipe.py, mkdelta.py, mkmemrecipe.py, mkicon.sh, mod-draft.py   as in HMG-API's tools/
   test/lib.sh                   check/has/eng/tree for a mod's test.sh; car_tree/car_prop: the
-                                stock car files tools/cars.py test runs it on (HMGAPI_CAR)
-  test/hmgapi-engine-test.jar   hmgapi.engine.MemRecipeTest: native recipes on real libraries
+                                stock car files tools/cars.py test runs it on (HMGAPI_CAR);
+                                plan_test <mod> [<required mod>...]: the plan test (below)
+  test/plan.py                  the fake head units plan_test makes from maps/
+  test/hmgapi-engine-test.jar   hmgapi.engine.MemRecipeTest: native recipes on real libraries;
+                                hmgapi.engine.RecipeCheck: without them, against other mods'
+  maps/                         HMG-API's hook maps (public: point names and the md5s of the
+                                stock files each map was made from; no car files)
   points.txt, catalogue/        the hook points this release has, and their catalogue
   nemesis/                      the NEMESIS package templates
+
+The plan test: in a mod's test.sh, after `. "$HMGAPI_SDK/test/lib.sh"`,
+  plan_test <mod folder> [<folder of each mod it requires>...]
+makes a fake head unit for each car the mod's "system" names that has a map here, puts
+the mods on it and runs engine plan as that car: no problems in the plan, the "system"
+takes the unit, HMG-API uses the car's map, every hook point the mod declares (and those
+in PLAN_POINTS) is mapped, its hooks load, which points it shares with other mods (info),
+and its native recipes stay clear of the required mods' recipes for the same library
+build. File changes aren't tested there (the unit has stand-ins, not stock files): test
+them on stock files with car_tree. HMGAPI_MAPS: other maps (a newer HMG-API's maps/).
 
 A key: java -cp lib/hmgapi-engine.jar hmgapi.engine.Signing keygen <key file>
 How mods are built outside HMG-API: docs/mod-reference.md in the HMG-API repo,
