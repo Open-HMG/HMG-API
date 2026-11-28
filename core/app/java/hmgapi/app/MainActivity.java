@@ -24,7 +24,7 @@ import org.json.JSONObject;
  * by category), Car Report, Logs.
  */
 public class MainActivity extends Activity {
-    static final String[] TABS = { "Mods", "Catalogue", "Updates", "Settings", "Car Report", "Logs" };
+    static final String[] TABS = { "Installed mods", "Catalogue", "Updates", "Settings", "Car Report", "Logs" };
     static final int MODS = 0, CATALOGUE = 1, UPDATES_TAB = 2, SETTINGS = 3, REPORT = 4, LOGS = 5;
     private LinearLayout pills;
     private FrameLayout content;
