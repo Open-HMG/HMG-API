@@ -156,6 +156,8 @@
   is refused. Files recorded by an earlier HMG-API get Android's defaults on restore (755
   root:shell in `/system/bin` and `/system/xbin`, 644 root:root elsewhere).
   Tested off-car only.
+- **A root service can read its own settings** (`HmgApi.settings()`, `saveSettings()`): the
+  daemon sees such a service as root, so the client names its mod (`HMGAPI_MOD`).
 
 ## 1.1.0-rc.10 (2026-11-25)
 
