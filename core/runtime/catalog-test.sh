@@ -7,7 +7,9 @@
 # per mod), every download checked before the first install (SHA-256, the package being what the entry
 # says, the author key), the owner's any-car choice per mod, updates (mods and HMG-API's own release,
 # its pre-releases, mods it would leave behind), the automatic check (every 6 hours, staging only pure
-# updates aside until apply), and a removal's warning.
+# updates aside until apply), mods outside the catalogue updated from their own GitHub releases (by
+# the installed key only; SHA-256 when given; withdrawn versions; the owner's choice of source; the
+# API limit), and a removal's warning.
 # GitHub is played by files (HMGAPI_TEST_WEB: NativeFetch.Web).
 set -e
 cd "$(dirname "$0")/../.."
@@ -466,6 +468,157 @@ touch "$W/raw.githubusercontent.com.down"
 eng catalog --refresh
 has "GitHub not answering: said, the old catalogue kept" "no connection" "$out"
 rm "$W/raw.githubusercontent.com.down"
+
+# ---- mods outside the catalogue: updates from their own GitHub releases (mod.json "repo")
+rm -f "$CAT/index.json"; listing
+# rpkg <owner/repo> <id> <version> <mod.json extras> [key]: a signed package as a release asset; sets $ZSHA, $ZSIZE
+rpkg() {
+    rm -rf $T/m; mkdir -p $T/m
+    printf '{"id": "%s", "name": "%s mod", "version": "%s", "hmgapi": ">=1.0.0", "repo": "https://github.com/%s"%s}\n' "$2" "$2" "$3" "$1" "$4" > $T/m/mod.json
+    sig sign $T/m ${5:-$T/author.key} > /dev/null
+    z=$W/objects.githubusercontent.com/r/$1/$2-$3.zip; mkdir -p "$(dirname "$z")" "$W/github.com/$1/releases/download/v$3"
+    (cd $T/m && rm -f "$z" && zip -q -r -X "$z" .)
+    echo "https://objects.githubusercontent.com/r/$1/$2-$3.zip" > "$W/github.com/$1/releases/download/v$3/$2-$3.zip.redirect"
+    ZSHA=$(python3 -c "import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest())" "$z")
+    ZSIZE=$(wc -c < "$z" | tr -d ' ')
+}
+# rel <owner/repo> <tag> <prerelease> <assets json>: one release's JSON
+rel() { printf '{"tag_name": "%s", "draft": false, "prerelease": %s, "html_url": "https://github.com/%s/releases/tag/%s", "body": "notes for %s", "assets": [%s]}' "$2" "$3" "$1" "$2" "$2" "$4"; }
+asset() { printf '{"name": "%s", "browser_download_url": "https://github.com/%s/releases/download/%s/%s", "size": %s%s}' "$3" "$1" "$2" "$3" "$4" "$5"; }
+releases() { r=$1; shift; mkdir -p "$W/api.github.com/repos/$r"; (IFS=,; echo "[$*]") > "$W/api.github.com/repos/$r/releases_per_page=10"; }
+u() { printf '%s' "$out" | python3 -c "import json,sys; t=sys.stdin.read(); d=json.loads(t[t.index('{'):]); m=[x for x in d['mods'] if x['id']==sys.argv[1]]; print(eval(sys.argv[2]) if m else None)" "$1" "$2"; }
+
+rpkg dev/side side 1.0.0 ''
+eng install $W/objects.githubusercontent.com/r/dev/side/side-1.0.0.zip
+check "an unlisted mod with a repo, installed by hand" 1.0.0 "$(installed side)"
+rpkg dev/side side 1.1.0 ''; S11=$ZSHA; A11=$(asset dev/side v1.1.0 side-1.1.0.zip $ZSIZE ", \"digest\": \"sha256:$ZSHA\"")
+rpkg dev/side side 1.2.0-beta.1 ''; A12=$(asset dev/side v1.2.0-beta.1 side-1.2.0-beta.1.zip $ZSIZE '')
+releases dev/side "$(printf '{"tag_name": "v2.0.0", "draft": true, "prerelease": false, "assets": []}')" "$(rel dev/side v1.2.0-beta.1 true "$A12")" \
+    "$(rel dev/side v1.1.0 false "$A11,$(asset dev/side v1.1.0 other-1.1.0.zip 10 '')")" "$(rel dev/side v0.9.0 false '')"
+: > $W/requests.log
+eng updates --refresh
+check "its releases: the newest final, not the draft or the beta" 1.1.0 "$(u side 'm[0]["version"]')"
+check "... said where from" "release https://github.com/dev/side" "$(u side 'm[0]["source"]+" "+m[0]["repo"]')"
+check "... with the release's notes" "notes for v1.1.0" "$(u side 'm[0]["notes"]')"
+check "... its source: releases" releases "$(j 'd["sources"]["side"]["source"]')"
+check "... one API call for its repo" 1 "$(grep -c 'api.github.com/repos/dev/side/releases?per_page=10' $W/requests.log)"
+hasnt "... none for mods with no repo" "repos/test/" "$(cat $W/requests.log)"
+check "... the release's SHA-256 kept (its digest)" "$S11" "$(python3 -c "import json,sys; print([m for m in json.load(open(sys.argv[1]))['mods'] if m['id']=='side'][0]['sha256'])" $D/catalog/releases.json)"
+eng catalog
+hasnt "... not in the Catalogue tab" '"side"' "$out"
+eng update side
+check "update from its release" 0 $rc
+has "... checked against the release's SHA-256" "downloaded side 1.1.0 from its release (SHA-256 as the release's)" "$out"
+check "... installed" 1.1.0 "$(installed side)"
+
+# a release whose zip isn't what its digest says; one with no SHA-256 at all (the signature decides)
+rpkg dev/side side 1.3.0 ''
+releases dev/side "$(rel dev/side v1.3.0 false "$(asset dev/side v1.3.0 side-1.3.0.zip $ZSIZE ", \"digest\": \"sha256:$(printf '%064d' 0)\"")")"
+eng updates --refresh
+eng update side
+check "a digest that doesn't match: refused" 1 $rc
+has "... why" "the download's SHA-256 is $ZSHA, its release says" "$out"
+releases dev/side "$(rel dev/side v1.3.0 false "$(asset dev/side v1.3.0 side-1.3.0.zip $ZSIZE '')")"
+eng updates --refresh
+eng update side
+check "no SHA-256 given: the signature decides" "0 1.3.0" "$rc $(installed side)"
+has "... said so" "no SHA-256 given: its signature decides" "$out"
+
+# SHA256SUMS in the release, a zip by another key (as a key change), a package that isn't the tag's version
+rpkg dev/side side 1.4.0 '' $T/other.key
+printf '%s  side-1.4.0.zip\n' "$ZSHA" > "$W/github.com/dev/side/releases/download/v1.4.0/SHA256SUMS"
+releases dev/side "$(rel dev/side v1.4.0 false "$(asset dev/side v1.4.0 side-1.4.0.zip $ZSIZE ''),$(asset dev/side v1.4.0 SHA256SUMS 80 '')")"
+eng updates --refresh
+check "SHA256SUMS: its SHA-256 used" "$ZSHA" "$(python3 -c "import json,sys; print([m for m in json.load(open(sys.argv[1]))['mods'] if m['id']=='side'][0]['sha256'])" $D/catalog/releases.json)"
+eng update side
+check "a release by another author key (a key change): refused" "3 1.3.0" "$rc $(installed side)"
+has "... why" "signed by a different author (uuid $O, installed mod has $U)" "$out"
+rpkg dev/side side 1.6.0 ''
+mkdir -p $W/github.com/dev/side/releases/download/v1.5.0; mv $W/github.com/dev/side/releases/download/v1.6.0/side-1.6.0.zip.redirect $W/github.com/dev/side/releases/download/v1.5.0/side-1.5.0.zip.redirect
+releases dev/side "$(rel dev/side v1.5.0 false "$(asset dev/side v1.5.0 side-1.5.0.zip $ZSIZE '')")"
+eng updates --refresh
+eng update side
+check "a package that isn't the release's version: refused" 1 $rc
+has "... why" "the package is side 1.6.0" "$out"
+
+# too large, no matching zip, a download from elsewhere: not offered, with a note
+releases dev/side "$(rel dev/side v1.7.0 false "$(asset dev/side v1.7.0 side-1.7.0.zip 99999999999 '')")"
+eng catalog --refresh
+has "a zip larger than HMG-API takes: noted" "side 1.7.0: its zip is 99999999999 bytes" "$(j '" ".join(d.get("notes", []))')"
+releases dev/side "$(rel dev/side v1.7.0 false "$(asset dev/side v1.7.0 notes.txt 10 '')")"
+eng catalog --refresh
+has "no zip for it: noted" "side 1.7.0: its release has no side-....zip asset" "$(j '" ".join(d.get("notes", []))')"
+releases dev/side "$(rel dev/side v1.7.0 false '{"name": "side-1.7.0.zip", "browser_download_url": "https://example.com/side-1.7.0.zip", "size": 10}')"
+eng updates --refresh
+check "a zip from outside its repo's releases: not offered" None "$(u side 'm[0]["version"]')"
+
+# withdrawn by a maintainer: skipped for the newest one that isn't
+rpkg dev/side side 1.7.0 ''; A17=$(asset dev/side v1.7.0 side-1.7.0.zip $ZSIZE '')
+rpkg dev/side side 1.8.0 ''; A18=$(asset dev/side v1.8.0 side-1.8.0.zip $ZSIZE '')
+releases dev/side "$(rel dev/side v1.8.0 false "$A18")" "$(rel dev/side v1.7.0 false "$A17")"
+echo '{"withdrawn": [{"id": "side", "versions": ">=1.8.0", "why": "breaks the camera"}, {"id": "base", "versions": "2.0.0", "why": "test"}]}' > "$CAT/withdrawn.json"
+listing
+eng catalog --refresh
+hasnt "withdrawn.json isn't taken for an entry" "withdrawn: left out" "$out"
+eng updates
+check "a withdrawn release: the one before it offered" 1.7.0 "$(u side 'm[0]["version"]')"
+check "... an installed version that's withdrawn: said" "base 2.0.0 test" "$(j '" ".join(w["id"]+" "+w["version"]+" "+w["why"] for w in d.get("withdrawn", []))')"
+eng catalog
+check "... and in the Catalogue tab" test "$(j '[m for m in d["mods"] if m["id"]=="base"][0].get("withdrawn")')"
+rm "$CAT/withdrawn.json"; listing
+
+# staged by the automatic check, like a catalogue update
+: > "$D/settings/allow/auto_stage_updates"
+GAP=0 eng update-check
+has "staged from its release" "staged: side 1.3.0 -> 1.8.0" "$(cat $D/logs/hmgapi/updates.log)"
+check "... in pending/" 1.8.0 "$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['version'])" $D/pending/side/mod.json)"
+rm -rf "$D/pending/side" "$D/settings/allow/auto_stage_updates"
+
+# the owner's choice: off, then back; a listed mod from its releases instead
+eng update-source side off
+has "updates off" "side: updates from nowhere" "$out"
+eng updates
+check "... not offered" None "$(u side 'm[0]["version"]')"
+eng update side
+has "... updating it says why not" "side's updates are turned off" "$out"
+eng update-source side default
+has "... default again: its releases" "side: updates from dev/side's releases" "$out"
+eng update-source base releases
+check "releases for a mod with no repo: refused" 1 $rc
+has "... why" "names no GitHub repo" "$out"
+eng update-source side catalogue
+has "the catalogue for a mod it doesn't list: refused" "side isn't in the catalogue" "$out"
+eng update-source nosuch off
+has "a mod that isn't installed: refused" "nosuch isn't installed" "$out"
+ENTRY=; pkg both 1.0.0 ', "repo": "https://github.com/dev/both"'; listing
+eng catalog --refresh
+eng catalog-install both
+check "a listed mod with a repo" 1.0.0 "$(installed both)"
+rpkg dev/both both 1.1.0 ''; releases dev/both "$(rel dev/both v1.1.0 false "$(asset dev/both v1.1.0 both-1.1.0.zip $ZSIZE '')")"
+: > $W/requests.log
+eng updates --refresh
+check "... from the catalogue: no update, its releases not asked" "None 0" "$(u both 'm[0]["version"]') $(grep -c 'repos/dev/both' $W/requests.log || true)"
+eng update-source both releases
+eng updates --refresh
+check "... its releases, chosen: offered" "1.1.0 release" "$(u both 'm[0]["version"]+" "+m[0]["source"]')"
+eng update-source both default
+
+# a beta tester stays on that mod's betas
+rpkg dev/beta beta 2.0.0-beta.1 ''
+eng install $W/objects.githubusercontent.com/r/dev/beta/beta-2.0.0-beta.1.zip
+rpkg dev/beta beta 2.0.0-beta.2 ''; releases dev/beta "$(rel dev/beta v2.0.0-beta.2 true "$(asset dev/beta v2.0.0-beta.2 beta-2.0.0-beta.2.zip $ZSIZE '')")"
+eng updates --refresh
+check "a beta installed: its next beta offered" 2.0.0-beta.2 "$(u beta 'm[0]["version"]')"
+
+# GitHub's API limit: said, the last answer kept
+echo 403 > "$W/api.github.com/repos/dev/beta/releases_per_page=10.status"
+echo 403 > "$W/api.github.com/repos/dev/side/releases_per_page=10.status"
+eng catalog --refresh
+has "the API limit: said" "GitHub's API limit (60 an hour) is reached" "$(j '" ".join(d.get("notes", []))')"
+eng updates
+check "... the last answers kept" "2.0.0-beta.2 1.8.0" "$(u beta 'm[0]["version"]') $(u side 'm[0]["version"]')"
+rm "$W/api.github.com/repos/dev/beta/releases_per_page=10.status" "$W/api.github.com/repos/dev/side/releases_per_page=10.status"
+eng remove beta; eng remove side; eng remove both
 
 # ---- removing a mod others require: warned
 eng remove base
