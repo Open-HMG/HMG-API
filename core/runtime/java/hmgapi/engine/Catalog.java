@@ -29,6 +29,8 @@ import java.util.zip.ZipFile;
  *                                           update them (with any new requires); hmgapi: HMG-API itself
  *   engine update-check                     wifi.sh, each time home Wi-Fi comes up (at most every 6 hours):
  *                                           refresh, and stage the mods' updates if the owner allowed it
+ *   engine update-source <id> catalogue | releases | off | default
+ *                                           where an installed mod's updates come from (the owner's choice)
  *   overrides, the owner's own choice, per mod: --any-car=<id>,... (not listed for this head unit),
  *   --any-author=<id>,... (a first install by an author key that isn't on this unit's trusted list);
  *   --any-car alone: every mod in the batch
@@ -44,6 +46,10 @@ import java.util.zip.ZipFile;
  * HMG-API itself needs the release key (UsbUpdates). Every package is checked (Packages.check)
  * before the first one goes in. Nothing is applied here: the owner applies (engine apply) as after
  * any install.
+ *
+ * Mods outside the catalogue: their own GitHub releases (Releases), when their mod.json names the
+ * repo. Each installed mod has one update source (source()): the catalogue, its releases, or none.
+ * A maintainer can stop a version on both: catalog/withdrawn.json (withdrawn()).
  *
  * Dependencies: a mod's "requires" come from its entry (catalog.py copies them) and from the
  * downloaded package's mod.json (kept in learned.json, so the next plan has them); each is met by
@@ -64,10 +70,11 @@ final class Catalog {
     static final String ID = "[a-z0-9][a-z0-9-]{0,63}";
     /** a plan or install refreshes a catalogue older than this when it can */
     static final long STALE_MS = 15 * 60 * 1000L;
-    /** update-check: at most one every 6 hours (each is 2 of GitHub's 60 API calls an hour) */
+    /** update-check: at most one every 6 hours (each is 2 of GitHub's 60 API calls an hour, and one per repo of mods updated from their releases) */
     static final long CHECK_GAP_S = 6 * 3600;
     /** catalog-install / update: the packages require more than the plan said; the new plan is in the output */
     static final int PLAN_CHANGED = 5;
+    static final String FROM_CATALOGUE = "catalogue", FROM_RELEASES = "releases", FROM_NONE = "off";
 
     final Engine e;
     final File dir, cacheFile, updatesFile, learnedFile;
@@ -124,6 +131,7 @@ final class Catalog {
             return 0;
         }
         if ("update-check".equals(cmd)) return c.updateCheck();
+        if ("update-source".equals(cmd)) return c.setSource(args);
         // planning and installing: the catalogue as it is now, when home Wi-Fi is up
         String stale = null;
         if (c.cache == null || (c.offline() == null && c.stale())) {
@@ -301,7 +309,7 @@ final class Catalog {
                 for (Object o : (List<Object>) list) {
                     if (!(o instanceof Map)) continue;
                     String name = String.valueOf(((Map<String, Object>) o).get("name"));
-                    if (!name.matches(ID + "\\.json") || "index.json".equals(name)) continue;
+                    if (!name.matches(ID + "\\.json") || "index.json".equals(name) || "withdrawn.json".equals(name)) continue;
                     if (mods.size() >= MAX_ENTRIES) break;
                     File ef = new File(tmp, name);
                     Http.Result er = http.get(base + name, ef, MAX_ENTRY);
@@ -340,9 +348,36 @@ final class Catalog {
             if (rel != null) c.put("hmgapi", rel);
             else if (relErr != null && cache != null && cache.get("hmgapi") != null) c.put("hmgapi", cache.get("hmgapi"));   // kept
             if (relErr != null) notes.add("HMG-API's releases: " + relErr);
+            // what maintainers withdrew: a 404 is none; anything else keeps the last check's
+            File wf = new File(tmp, "withdrawn.json");
+            Http.Result wr = http.get(base + "withdrawn.json", wf, MAX_JSON);
+            Object wd = null;
+            if (wr.ok()) {
+                try {
+                    Object w = Json.parse(Engine.read(wf));
+                    wd = w instanceof Map ? ((Map<String, Object>) w).get("withdrawn") : w;
+                } catch (Exception x) {
+                    wd = null;
+                }
+                if (!(wd instanceof List)) notes.add("the catalogue's withdrawn.json isn't a list: the last check's kept");
+            } else if (wr.status == 404) {
+                wd = new ArrayList<Object>();
+            } else {
+                notes.add("the catalogue's withdrawn.json: " + wr + " (the last check's kept)");
+            }
+            if (!(wd instanceof List) && cache != null && cache.get("withdrawn") instanceof List) wd = cache.get("withdrawn");
+            if (wd instanceof List) c.put("withdrawn", wd);
+            cache = c;   // the new catalogue first: which mods it lists decides their source
+            Set<String> listed = new HashSet<String>();
+            for (Object o : mods) listed.add(String.valueOf(((Map<String, Object>) o).get("id")));
+            List<Releases.Mod> fromReleases = new ArrayList<Releases.Mod>();
+            for (String id : installed().keySet()) {
+                Releases.Mod m = Releases.mod(e, id);
+                if (m != null && FROM_RELEASES.equals(source(id, m, listed))) fromReleases.add(m);
+            }
+            Releases.check(this, http, tmp, fromReleases, notes);
             if (!notes.isEmpty()) c.put("notes", notes);
             writeWhole(cacheFile, Json.write(c), false);
-            cache = c;
             writeUpdates();
             return null;
         } finally {
@@ -473,12 +508,132 @@ final class Catalog {
         return m;
     }
 
+    /** the catalogue's own entries, as listed (the Catalogue tab) */
     @SuppressWarnings("unchecked")
-    Map<String, Map<String, Object>> entries() {
+    Map<String, Map<String, Object>> listed() {
         Map<String, Map<String, Object>> m = new LinkedHashMap<String, Map<String, Object>>();
         if (cache == null || !(cache.get("mods") instanceof List)) return m;
         for (Object o : (List<Object>) cache.get("mods")) m.put(String.valueOf(((Map<String, Object>) o).get("id")), (Map<String, Object>) o);
         return m;
+    }
+
+    /**
+     * What planning and updates go by: the catalogue's entries, none that's withdrawn, with each mod whose
+     * update source is its releases taking its release entry instead (by the installed key; none if no
+     * newer release was found).
+     */
+    Map<String, Map<String, Object>> entries() {
+        Map<String, Map<String, Object>> m = listed();
+        for (String id : new ArrayList<String>(m.keySet())) {
+            if (withdrawn(id, String.valueOf(m.get(id).get("version"))) != null) m.remove(id);
+        }
+        Map<String, Map<String, Object>> rel = Releases.entries(this);
+        Set<String> ids = listed().keySet();
+        for (String id : installed().keySet()) {
+            Releases.Mod mod = Releases.mod(e, id);
+            if (mod == null || !FROM_RELEASES.equals(source(id, mod, ids))) continue;
+            m.remove(id);
+            Map<String, Object> en = rel.get(id);
+            if (en != null && mod.uuid != null && mod.uuid.equalsIgnoreCase(String.valueOf(en.get("uuid")))
+                    && withdrawn(id, String.valueOf(en.get("version"))) == null) m.put(id, en);
+        }
+        return m;
+    }
+
+    /** why a maintainer withdrew id's version (catalog/withdrawn.json: [{"id", "versions": range, "why"}]), or null */
+    @SuppressWarnings("unchecked")
+    String withdrawn(String id, String version) {
+        Object l = cache == null ? null : cache.get("withdrawn");
+        for (Object o : l instanceof List ? (List<Object>) l : new ArrayList<Object>()) {
+            if (!(o instanceof Map)) continue;
+            Map<String, Object> w = (Map<String, Object>) o;
+            if (!id.equals(w.get("id"))) continue;
+            Object r = w.get("versions");
+            if (r != null && !sat(version, String.valueOf(r))) continue;
+            return w.get("why") instanceof String ? (String) w.get("why") : "withdrawn by HMG-API's maintainers";
+        }
+        return null;
+    }
+
+    // ---- where each installed mod's updates come from
+
+    /** the owner's choices: hmgapi.json "catalog": {"update_source": {"<id>": "catalogue" | "releases" | "off"}} */
+    @SuppressWarnings("unchecked")
+    Map<String, Object> choices() {
+        Object c = e.hmgapi.get("catalog");
+        Object u = c instanceof Map ? ((Map<String, Object>) c).get("update_source") : null;
+        return u instanceof Map ? (Map<String, Object>) u : new LinkedHashMap<String, Object>();
+    }
+
+    /**
+     * id's update source: the owner's choice, else the catalogue when it lists the mod, else its releases
+     * when its mod.json names a GitHub repo, else none. A choice that can't be met (the catalogue for a
+     * mod it doesn't list, releases with no GitHub repo) is none.
+     */
+    String source(String id, Releases.Mod m, Set<String> listed) {
+        Object ch = choices().get(id);
+        String s = ch instanceof String ? (String) ch : listed.contains(id) ? FROM_CATALOGUE : FROM_RELEASES;
+        if (FROM_CATALOGUE.equals(s)) return listed.contains(id) ? FROM_CATALOGUE : FROM_NONE;
+        if (FROM_RELEASES.equals(s)) return m != null && m.repo != null ? FROM_RELEASES : FROM_NONE;
+        return FROM_NONE;
+    }
+
+    /** each installed mod's update source, for the app: {id: {"source", "choice"?, "repo"?, "listed"}} */
+    Map<String, Object> sources() {
+        Map<String, Object> out = new TreeMap<String, Object>();
+        Set<String> ids = listed().keySet();
+        Map<String, Object> ch = choices();
+        for (String id : installed().keySet()) {
+            Releases.Mod m = Releases.mod(e, id);
+            Map<String, Object> x = new LinkedHashMap<String, Object>();
+            x.put("source", source(id, m, ids));
+            if (ch.get(id) instanceof String) x.put("choice", ch.get(id));
+            if (m != null && m.repo != null) x.put("repo", m.repo);
+            x.put("listed", ids.contains(id));
+            out.put(id, x);
+        }
+        return out;
+    }
+
+    /** engine update-source <id> catalogue | releases | off | default: the owner's choice, kept in hmgapi.json */
+    @SuppressWarnings("unchecked")
+    int setSource(String[] args) throws IOException {
+        if (args.length != 3 || !args[1].matches(ID) || !Arrays.asList(FROM_CATALOGUE, FROM_RELEASES, FROM_NONE, "default").contains(args[2])) {
+            e.out.add("usage: engine update-source <id> catalogue | releases | off | default");
+            return 2;
+        }
+        String id = args[1], to = args[2];
+        Map<String, Inst> inst = installed();
+        if (!inst.containsKey(id)) {
+            e.out.add(id + " isn't installed");
+            return 1;
+        }
+        Releases.Mod m = Releases.mod(e, id);
+        if (FROM_RELEASES.equals(to) && (m == null || m.repo == null)) {
+            e.out.add(id + "'s mod.json names no GitHub repo (\"repo\": \"https://github.com/<owner>/<repo>\"), so it has no releases to check");
+            return 1;
+        }
+        if (FROM_CATALOGUE.equals(to) && !listed().containsKey(id)) {
+            e.out.add(id + " isn't in the catalogue" + (cache == null ? " (it hasn't been checked yet)" : ""));
+            return 1;
+        }
+        Object c = e.hmgapi.get("catalog");
+        Map<String, Object> cat = c instanceof Map ? (Map<String, Object>) c : new LinkedHashMap<String, Object>();
+        Map<String, Object> ch = new TreeMap<String, Object>(choices());
+        for (String k : new ArrayList<String>(ch.keySet())) if (!inst.containsKey(k)) ch.remove(k);   // removed mods' choices go
+        if ("default".equals(to)) ch.remove(id);
+        else ch.put(id, to);
+        if (ch.isEmpty()) cat.remove("update_source");
+        else cat.put("update_source", ch);
+        e.hmgapi.put("catalog", cat);
+        File lj = new File(e.data, "settings/hmgapi.json");
+        lj.getParentFile().mkdirs();
+        Engine.write(lj, Json.write(e.hmgapi));
+        String now = source(id, m, listed().keySet());
+        e.out.add(id + ": updates from " + (FROM_CATALOGUE.equals(now) ? "the catalogue" : FROM_RELEASES.equals(now) ? m.repo + "'s releases" : "nowhere (not checked)")
+                + (FROM_RELEASES.equals(now) ? " (checked at the next refresh)" : ""));
+        if (cache != null) writeUpdates();
+        return 0;
     }
 
     /** a dependency list (requires or conflicts), optional ones left out (only NEMESIS's package builder honours them) */
@@ -559,7 +714,7 @@ final class Catalog {
         rep.put("checked", cache.get("checked"));
         Map<String, Inst> inst = installed();
         List<Object> out = new ArrayList<Object>();
-        for (Map<String, Object> en : entries().values()) {
+        for (Map<String, Object> en : listed().values()) {
             Map<String, Object> m = new LinkedHashMap<String, Object>();
             String id = String.valueOf(en.get("id"));
             for (String k : new String[] {"id", "name", "version", "description", "authors", "license", "repo", "uuid"}) {
@@ -578,6 +733,8 @@ final class Catalog {
             for (Version.Dep d : deps(en.get("requires"))) req.add(d.toString());
             if (!req.isEmpty()) m.put("requires", req);
             m.put("trusted", Packages.trustedAuthor(e, String.valueOf(en.get("uuid"))) != null);
+            String wd = withdrawn(id, String.valueOf(en.get("version")));
+            if (wd != null) m.put("withdrawn", wd);
             out.add(m);
         }
         rep.put("mods", out);
@@ -607,9 +764,12 @@ final class Catalog {
         if (cache != null) {
             rep.put("checked", cache.get("checked"));
             Map<String, Map<String, Object>> cat = entries();
+            Map<String, Object> src = sources();
             for (Map.Entry<String, Inst> i : installed().entrySet()) {
                 Map<String, Object> en = cat.get(i.getKey());
                 if (en == null || !"update".equals(status(i.getValue().version, String.valueOf(en.get("version"))))) continue;
+                Object s = src.get(i.getKey());
+                if (s instanceof Map && FROM_NONE.equals(((Map<?, ?>) s).get("source"))) continue;   // the owner turned its updates off
                 String unfit = unfit(en);
                 if (unfit != null && !unfit.startsWith("car: ")) continue;   // not for this HMG-API: not offered
                 Map<String, Object> m = new LinkedHashMap<String, Object>();
@@ -622,8 +782,24 @@ final class Catalog {
                 for (Version.Dep d : deps(en.get("requires"))) req.add(d.toString());
                 if (!req.isEmpty()) m.put("requires", req);
                 if (String.valueOf(en.get("version")).equals(stagedVersion(e, i.getKey()))) m.put("staged", true);
+                if ("release".equals(en.get("source"))) {   // from the mod's own releases: said so, with its notes
+                    m.put("source", "release");
+                    for (String k : new String[] {"repo", "page", "notes", "prerelease"}) if (en.get(k) != null) m.put(k, en.get(k));
+                }
                 list.add(m);
             }
+            List<Object> wd = new ArrayList<Object>();   // what's installed that a maintainer withdrew
+            for (Map.Entry<String, Inst> i : installed().entrySet()) {
+                String why = withdrawn(i.getKey(), i.getValue().version);
+                if (why == null) continue;
+                Map<String, Object> w = new LinkedHashMap<String, Object>();
+                w.put("id", i.getKey());
+                w.put("version", i.getValue().version);
+                w.put("why", why);
+                wd.add(w);
+            }
+            if (!wd.isEmpty()) rep.put("withdrawn", wd);
+            rep.put("sources", src);
             Map<String, Object> h = hmgapiOffer();
             if (h != null) rep.put("hmgapi", h);
         }
@@ -806,7 +982,11 @@ final class Catalog {
             Map<String, Object> en = cat.get(id);
             Inst i = inst.get(id);
             if (en == null) {
-                problem(id + " isn't in the catalogue");
+                Releases.Mod m = i == null ? null : Releases.mod(e, id);
+                String src = m == null ? null : source(id, m, listed().keySet());
+                problem(FROM_RELEASES.equals(src) ? id + ": no newer release in " + m.repo + "'s releases (as last checked)"
+                        : FROM_NONE.equals(src) && i != null && choices().get(id) != null ? id + "'s updates are turned off (update-source)"
+                        : id + " isn't in the catalogue");
                 return;
             }
             String st = status(i == null ? null : i.version, String.valueOf(en.get("version")));
@@ -1025,8 +1205,12 @@ final class Catalog {
         File z = new File(dl, s.id + "-" + s.version + ".zip");
         Http.Result r = http.get(String.valueOf(s.entry.get("download")), z, (int) Packages.MAX_BYTES);
         if (!r.ok()) return "can't download " + s.id + " " + s.version + ": " + r;
-        String sha = Sha256.hex(z), want = String.valueOf(s.entry.get("sha256"));
-        if (!sha.equals(want)) return "refused " + s.id + " " + s.version + ": the download's SHA-256 is " + sha + ", the catalogue says " + want;
+        boolean rel = "release".equals(s.entry.get("source"));
+        String sha = Sha256.hex(z), want = s.entry.get("sha256") == null ? null : String.valueOf(s.entry.get("sha256"));
+        if (want == null && !rel) return "refused " + s.id + " " + s.version + ": its catalogue entry has no SHA-256";
+        if (want != null && !sha.equals(want)) {
+            return "refused " + s.id + " " + s.version + ": the download's SHA-256 is " + sha + ", " + (rel ? "its release says " : "the catalogue says ") + want;
+        }
         File u = new File(dl, s.id + "-" + s.version);
         Map<String, Object> mj = null;
         try {
@@ -1042,7 +1226,8 @@ final class Catalog {
             return "refused " + s.id + " " + s.version + ": the package is " + (mj == null ? "not a mod" : mj.get("id") + " " + mj.get("version"));
         }
         pkgs.put(s.id, mj);
-        e.out.add("downloaded " + s.id + " " + s.version + " (SHA-256 as the catalogue's)");
+        e.out.add("downloaded " + s.id + " " + s.version + (!rel ? " (SHA-256 as the catalogue's)" : want != null ? " from its release (SHA-256 as the release's)"
+                : " from its release (no SHA-256 given: its signature decides)"));
         return null;
     }
 

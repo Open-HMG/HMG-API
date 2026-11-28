@@ -226,4 +226,15 @@ has "page escapes text" 'Says \<b\>hi\</b\> \[x\]\(https://evil\)' "$P"
 has "page links the download" "(<$DL>)" "$P"
 has "page shows the key" "\`$UA\`" "$P"
 
+# catalog/withdrawn.json: not an entry; its form checked
+echo '{"withdrawn": [{"id": "hello", "versions": ">=1.0.0", "why": "breaks things"}]}' > $R/catalog/withdrawn.json
+C check
+check "withdrawn.json: not taken for an entry, and fine" 0 $rc
+echo '{"withdrawn": [{"id": "hello"}, {"id": "Bad"}, {"id": "x", "why": "y", "versions": ">>1"}]}' > $R/catalog/withdrawn.json
+C check
+has "withdrawn.json: a why is needed" 'hello: say "why"' "$out"
+has "... an id" 'entry 2 has no mod "id"' "$out"
+has "... a readable range" 'x: "versions"' "$out"
+rm $R/catalog/withdrawn.json
+
 [ $fail = 0 ] && echo "catalog: all ok" || { echo "catalog: FAILED"; exit 1; }

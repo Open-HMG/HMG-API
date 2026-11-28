@@ -378,7 +378,7 @@ public final class Engine {
         if ("problem".equals(cmd)) return ProblemLog.run(this, args);
         if ("usb-scan".equals(cmd)) return UsbUpdates.scan(this);
         if ("catalog".equals(cmd) || "catalog-plan".equals(cmd) || "catalog-install".equals(cmd) || "updates".equals(cmd)
-                || "update".equals(cmd) || "update-check".equals(cmd)) return Catalog.run(this, args);
+                || "update".equals(cmd) || "update-check".equals(cmd) || "update-source".equals(cmd)) return Catalog.run(this, args);
         if ("publish-state".equals(cmd)) return LiveState.publish(this);
         if ("apps".equals(cmd)) return ModApps.sync(this);
         if ("probe".equals(cmd)) {   // a mod's install-time probe again (its answer is kept until then)

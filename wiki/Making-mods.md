@@ -82,6 +82,12 @@ request changes only its own author's entry in the trusted list. Listing means t
 package is whole and signed by you; the maintainer reviews each new author before
 merging.
 
+Not listed (yet)? Put `"repo": "https://github.com/you/my-mod"` in `mod.json` and
+tag your releases `vX.Y.Z` with the zip attached as `my-mod-X.Y.Z.zip`: owners who
+installed it by hand are offered your new releases in the Updates tab, signed by
+your key only. Listing is still how owners find your mod and how its first install
+is trusted.
+
 ## Scripts on the head unit
 
 The head unit's shell is mksh with a small toolbox: no `sed`, `tr`, `awk`, `head`,

@@ -50,6 +50,10 @@ GITHUB = {'github.com', 'api.github.com', 'raw.githubusercontent.com', 'objects.
 # a version range as the engine reads it (Version.one): each part an operator and a version, or "" / "*"
 RANGE_PART = re.compile(r'^(>=|<=|>|<|=|\^|~)?v?\d+(\.\d+){0,2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$')
 INDEX = os.path.join(CATALOG, 'index.json')
+# catalog/withdrawn.json: versions maintainers stopped ([{"id", "versions": range, "why"}]); head units skip
+# them, from the catalogue or a mod's own releases. A maintainer's change: never part of a submission.
+WITHDRAWN = os.path.join(CATALOG, 'withdrawn.json')
+NOT_ENTRIES = ('index.json', 'withdrawn.json')
 NEEDED = ['id', 'name', 'description', 'authors', 'uuid', 'version', 'repo', 'download', 'sha256']
 
 
@@ -191,7 +195,7 @@ def index_of(es):
 def entries():
     if not os.path.isdir(CATALOG):
         return {}
-    return {f[:-5]: load(os.path.join(CATALOG, f)) for f in sorted(os.listdir(CATALOG)) if f.endswith('.json') and f != 'index.json'}
+    return {f[:-5]: load(os.path.join(CATALOG, f)) for f in sorted(os.listdir(CATALOG)) if f.endswith('.json') and f not in NOT_ENTRIES}
 
 
 # ---- add
@@ -318,6 +322,18 @@ def check_all(es, au, index=True):
         p += check_entry(name, e, authors)
     if index and os.path.exists(INDEX) and load(INDEX) != index_of(es):
         p.append('catalog/index.json isn\'t the entries: write it again (tools/catalog.py index)')
+    if os.path.exists(WITHDRAWN):
+        w = load(WITHDRAWN)
+        w = w.get('withdrawn') if isinstance(w, dict) else w
+        if not isinstance(w, list):
+            p.append('catalog/withdrawn.json: {"withdrawn": [{"id", "versions", "why"}, ...]}')
+        for i, x in enumerate(w if isinstance(w, list) else []):
+            if not isinstance(x, dict) or not ID.fullmatch(str(x.get('id', ''))):
+                p.append(f'catalog/withdrawn.json: entry {i + 1} has no mod "id"')
+            elif not isinstance(x.get('why'), str) or not x['why'].strip():
+                p.append(f'catalog/withdrawn.json: {x["id"]}: say "why" (owners see it)')
+            elif 'versions' in x and range_error(str(x['versions'])):
+                p.append(f'catalog/withdrawn.json: {x["id"]}: "versions" {range_error(str(x["versions"]))}')
     return p
 
 
@@ -343,7 +359,7 @@ def check_base(es, au, ref):
     r = subprocess.run(['git', '-C', REPO, 'ls-tree', '--name-only', ref, 'catalog/'], capture_output=True, text=True)
     for f in r.stdout.split():
         n = os.path.basename(f)[:-5]
-        if f.endswith('.json') and n not in es:
+        if f.endswith('.json') and n not in es and os.path.basename(f) not in NOT_ENTRIES:
             changed.add(str((git_show(ref, f) or {}).get('uuid', '')).lower())   # a removal: its author's to make
     old_au = (git_show(ref, 'maps/authors.json') or {}).get('authors', {})
     new_au = au.get('authors', {})
@@ -394,7 +410,7 @@ def cmd_bump(a):
         head = {}
         lt = subprocess.run(['git', '-C', REPO, 'ls-tree', '--name-only', a.head, 'catalog/'], capture_output=True, text=True)
         for f in lt.stdout.split():
-            if f.endswith('.json') and f != 'catalog/index.json':
+            if f.endswith('.json') and os.path.basename(f) not in NOT_ENTRIES:
                 head[os.path.basename(f)[:-5]] = git_show(a.head, f)
         if git_show(a.head, 'catalog/index.json') != index_of(head):
             no.append('catalog/index.json isn\'t the entries')
