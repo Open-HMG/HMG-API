@@ -1,0 +1,15 @@
+{
+  "id": "per-source-volume",
+  "name": "Per-source volume",
+  "description": "Remember volume separately for each media source (FM, AM, Bluetooth, Android Auto, CarPlay...) on builds that link them to the same volume.",
+  "authors": [
+    "AMDHome"
+  ],
+  "license": "AGPL-3.0",
+  "uuid": "654180e6-0ac7-8376-8912-fc9faa99378b",
+  "version": "1.0.0",
+  "repo": "https://github.com/AMDHome/hmgapi-per-source-volume",
+  "download": "https://github.com/AMDHome/hmgapi-per-source-volume/releases/download/v1.0.0/per-source-volume-1.0.0.zip",
+  "sha256": "bf7c4fd98107cf6ef7bf87773e17eccb6ce7f8669cc01fe876c7ff6015f6cef2",
+  "hmgapi": ">=0.1.0"
+}
