@@ -10,6 +10,11 @@
 # only, over adb, for now: no USB stick file sets it and no message names it.
 # ROOT prefixes every path, for off-car tests only.
 umask 077
+# a cut-off uninstall can leave /system half changed: a dropped reader of its output (adb, the
+# NEMESIS Manager or Engineering Mode screen closed, say by the reverse camera taking over) or a
+# hang-up doesn't end it. Each file still goes back whole (copied beside, synced, renamed), for a
+# reset or a SIGKILL.
+trap '' HUP PIPE INT TERM
 H=${0%/*}
 ROOT=${ROOT:-}
 . "$H/lib.sh"
@@ -32,6 +37,7 @@ capcheck() {
 }
 capcheck
 log "HMG-API uninstall $(date)"
+gear_gate "the uninstall"   # only in P, before anything changes (lib.sh)
 
 # the zygote binaries the install wrapped: app_process unless it's NEMESIS 1.17's LivePatch script,
 # and app_process.real whenever it's there (lib.sh, zygote_files). The stock bytes go back into each,
@@ -99,8 +105,10 @@ if [ -n "$RESET" ]; then
     [ -f "$D/state/files.json" ] && log "mods' file changes went with the firmware update. Settings mods changed stay as they are: to put them back too, install HMG-API again, then uninstall it"
 elif [ -z "$ROOT" ] && [ -f "$D/state/files.json" ]; then
     /system/bin/hmgapid ping >/dev/null 2>&1 || /system/bin/hmgapid daemon >/dev/null 2>&1   # the engine runs through it
-    [ -f "$D/state/journal.json" ] && /system/bin/hmgapid engine recover
-    if ! r=$(/system/bin/hmgapid engine restore 2>&1); then
+    # an unfinished apply rolled back, and apps an apply left stopped started again
+    if [ -f "$D/state/journal.json" ] || [ -f "$D/state/held.txt" ]; then /system/bin/hmgapid engine recover; fi
+    # --gear-unknown-ok: gear_gate above checked (not in P stops there), and warned when it couldn't
+    if ! r=$(/system/bin/hmgapid engine restore --gear-unknown-ok 2>&1); then
         echo "$r"
         fail "engine restore didn't finish, so HMG-API stays installed (mods' files must go back first). See the lines above."
     fi
@@ -118,6 +126,14 @@ if [ -z "$ROOT" ] && [ "$(getprop sys.boot_completed)" = 1 ]; then
     if [ "$(getprop persist.sys.hmgapi.otaoff)" = 1 ]; then pm enable com.hkmc.system.app.OTAClient >/dev/null && setprop persist.sys.hmgapi.otaoff ""; fi
     p=$(getprop persist.sys.hmgapi.autoupd)
     [ -n "$p" ] && settings put system gen_auto_update "$p" && setprop persist.sys.hmgapi.autoupd ""
+    # the parking guide lines a mod changed (vehicle command guide_lines): their stock state back
+    if [ -f "$D/state/guide-lines.stock" ]; then
+        if r=$(CLASSPATH=/system/framework/hmgapi-hook.jar app_process /system/bin hmgapi.vehicle.Hub restore-lines 2>&1); then
+            log "parking guide lines: back to stock ($r)"
+        else
+            log "parking guide lines: couldn't put them back ($r); set them in the camera settings"
+        fi
+    fi
     # the side panel's page lists: HMG-API's page (slot 22) out
     for k in ss_list ss_list_dr1 ss_list_dr2 ss_setting ss_setting_dr1 ss_setting_dr2; do
         v=$(settings get system $k)
@@ -136,6 +152,9 @@ if [ -f "$D/state/services.txt" ]; then
     log "mods' services stopped"
 fi
 # mods' network rules, routes and settings out (the keeper does it when stopped; again in case it couldn't)
+if [ -z "$ROOT" ] && [ -f "$D/state/wifi.sh" ]; then
+    sh "$D/state/wifi.sh" down >/dev/null 2>&1 && log "home Wi-Fi off, its routes out"
+fi
 if [ -z "$ROOT" ] && [ -f "$D/state/net.sh" ]; then
     sh "$D/state/net.sh" down >/dev/null 2>&1 && log "mods' network rules out"
 fi
@@ -155,6 +174,7 @@ else
             cp "$SRC" "$b.hmgapi-new" || fail "copy the stock app_process"
             chmod 755 "$b.hmgapi-new"; chown root:shell "$b.hmgapi-new" 2>/dev/null
             [ "$(sum "$b.hmgapi-new")" = "$ORIG" ] || { rm -f "$b.hmgapi-new"; fail "app_process md5 mismatch after copy"; }
+            sync   # on disk before the rename: a reset right after it never leaves an empty file (no zygote)
             mv "$b.hmgapi-new" "$b" || { rm -f "$b.hmgapi-new"; fail "rename onto ${z#/system/bin/}"; }
         fi
         log "${z#/system/bin/}: stock again ($ORIG)"

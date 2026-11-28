@@ -159,8 +159,20 @@ public class UpdatesActivity extends Activity {
                 }).show();
     }
 
+    static final String INSTALLING = "Installing a mod";
+
+    /** a mod's install leads to an apply (Apply changes), so it starts only in P too (Park) */
     private void install(final JSONObject p, final String uuid, final boolean anyCar) {
-        message.setText("Installing " + p.optString("name") + "…");
+        Park.then(this, INSTALLING, new Park.Go() {
+            @Override
+            public void go(boolean unknownOk) {
+                installNow(p, uuid, anyCar);
+            }
+        });
+    }
+
+    private void installNow(final JSONObject p, final String uuid, final boolean anyCar) {
+        message.setText("Installing " + p.optString("name") + "… " + Park.STAY);
         new Ui.Job<Hmgapid.Result>() {
             @Override
             Hmgapid.Result work() throws Exception {
@@ -187,22 +199,30 @@ public class UpdatesActivity extends Activity {
         new AlertDialog.Builder(this)
                 .setTitle("Update HMG-API to " + p.optString("version") + "?")
                 .setMessage("HMG-API's installer runs (it takes a minute; leave the head unit on), then the head unit "
-                        + "needs a restart. Your mods and settings stay.")
+                        + "needs a restart. Your mods and settings stay.\n\nIt changes system files, so it only starts with "
+                        + "the car in P. " + Park.STAY)
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Update", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int which) {
-                        updateHmgApi(p);
+                        Park.then(UpdatesActivity.this, UPDATING, new Park.Go() {
+                            @Override
+                            public void go(boolean unknownOk) {
+                                updateHmgApi(p, unknownOk);
+                            }
+                        });
                     }
                 }).show();
     }
 
-    private void updateHmgApi(final JSONObject p) {
-        message.setText("Updating HMG-API…");
+    static final String UPDATING = "Updating HMG-API";
+
+    private void updateHmgApi(final JSONObject p, final boolean unknownOk) {
+        message.setText("Updating HMG-API… " + Park.STAY);
         new Ui.Job<Hmgapid.Result>() {
             @Override
             Hmgapid.Result work() throws Exception {
-                return Hmgapid.call(900000, "engine", "update-hmgapi", p.optString("file"));
+                return Hmgapid.call(900000, Park.with(unknownOk, "engine", "update-hmgapi", p.optString("file")));
             }
 
             @Override
@@ -212,21 +232,22 @@ public class UpdatesActivity extends Activity {
                             + "own; restart the head unit once it's done.");
                     return;
                 }
+                if (Park.refused(UpdatesActivity.this, r, UPDATING, new Park.Go() {
+                    @Override
+                    public void go(boolean ok) {
+                        updateHmgApi(p, ok);
+                    }
+                })) {
+                    message.setText("Not updated yet: the car must be in P.");
+                    return;
+                }
                 AlertDialog.Builder d = new AlertDialog.Builder(UpdatesActivity.this)
                         .setTitle(r.code == 0 ? "HMG-API updated" : "Not updated").setMessage(r.output.trim());
                 if (r.code == 0) {
                     d.setNegativeButton("Later", null).setPositiveButton("Restart now", new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface x, int which) {
-                            new Ui.Job<Hmgapid.Result>() {
-                                @Override
-                                Hmgapid.Result work() throws Exception {
-                                    return Hmgapid.call("reboot");
-                                }
-
-                                @Override
-                                void done(Hmgapid.Result rr, Exception ee) {}
-                            }.start(UpdatesActivity.this);
+                            Park.restart(UpdatesActivity.this);   // only in P
                         }
                     });
                 } else {

@@ -3,9 +3,9 @@
 # HMG-API
 
 HMG-API is a mod manager for Hyundai, Kia and Genesis head units with navigation
-(Gen5W). Mods add features to the head unit: wireless CarPlay and Android Auto with
-turn-by-turn on the cluster and HUD, buttons that do more, pages in the side panel,
-and more. You can install as many as you like; they don't overwrite each other, and
+(Gen5W). Mods add features to the head unit: wireless CarPlay and Android Auto, your
+phone's turn-by-turn on the cluster and HUD, buttons that do more, pages in the side
+panel, and more. You can install as many as you like; they don't overwrite each other, and
 removing one puts back exactly what it changed.
 
 ![The HMG-API app](images/mods.png)

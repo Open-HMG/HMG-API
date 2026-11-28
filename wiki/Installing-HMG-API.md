@@ -13,6 +13,11 @@ Takes about 10 minutes. Park the car and keep it on (the head unit restarts once
 All three install the same thing, and [uninstalling](Uninstalling) puts every file
 back exactly as it was.
 
+**Put the car in P first, and keep it there until the install is done and the head unit
+has restarted.** Shifting into reverse while an install runs can cut it off half done.
+Once HMG-API is installed it checks the gear itself: restarts, applying changes and
+updates only start in P (on a car that gives no gear reading, the app asks you first).
+
 ## USB stick
 
 1. Unzip `hmgapi-<version>-usb.zip` onto an empty USB stick (FAT32), at the top level.
@@ -51,7 +56,8 @@ other way round. Uninstall that package in NEMESIS Manager first:
 | Package | Can't be installed with |
 |---|---|
 | HMG-API | HMG Leafia Plus (`wireless.carplay.aa`), `carplay.session`, `voicehandler.vr-gates` (the last two until we know they don't clash) |
-| Wireless CarPlay + Android Auto (mod) | NEMESIS's Wireless Projection (`wireless.projection`) and Projection TBT (`projection.tbt`) |
+| Wireless CarPlay + Android Auto (mod) | NEMESIS's Wireless Projection (`wireless.projection`), Projection TBT (`projection.tbt`) and Enhanced Projection (`enhanced.projection`) |
+| Phone Turn-by-Turn (mod) | NEMESIS's Projection TBT (`projection.tbt`) and Enhanced Projection (`enhanced.projection`) |
 | adb (mod) | NEMESIS's ADB over TCP (`adb.tcp`) |
 
 ## adb

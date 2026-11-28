@@ -93,6 +93,9 @@ final class NativePatch {
     }
 
     static synchronized void tryAll() {
+        // a protected process (hmgapi.engine.Protected): no mod's patch, not even one asked for in the
+        // zygote and inherited here (HMG-API's own load hooks below still run there)
+        if (Bridge.modsOff) return;
         Map<String, long[]> maps = null;
         for (Want w : wants) {
             if (w.done) continue;

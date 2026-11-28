@@ -63,6 +63,17 @@ final class Commands {
 
         void setGuideLines(int state);
 
+        /**
+         * The guide lines as they were before a mod first changed them, kept on disk
+         * (state/guide-lines.stock) until they're back: 1 off, 2 on, or 0 when nothing is
+         * kept. So a restart of the vehicle service or the unit, or the mod's removal,
+         * while a mod holds them doesn't leave the owner's lines changed.
+         */
+        int linesKept();
+
+        /** keeps that state (0: forget it) */
+        void keepLines(int state, String mod);
+
         void hideStartupNotice();
 
         /** the owner's switch (HMG-API app, or hmgapid allow startup_notice on) */
@@ -145,6 +156,9 @@ final class Commands {
     long conditioningAt, conditioningCloseAt;
     boolean timedOut;   // automatic starts wait for a manual one after a timeout (no retry loop)
     int linesBefore;
+    /** the stock state from before a restart (Car.linesKept), still to put back: 0 none */
+    int linesPending;
+    boolean linesWaitSaid;   // "trying again" logged once per wait
     int[] lightSaved;   // the owner's light, taken when a mod first changes it
     /** mods that let go of the light when the owner changes it in the menu (default: they keep it) */
     final Set<String> lightYield = new java.util.HashSet<String>();
@@ -292,7 +306,10 @@ final class Commands {
                 int now = car.guideLines();
                 // a 360-view car (the EV6 GT-Line) draws its own guide lines: the rear camera's state isn't on/off there
                 if (now != LINES_ON && now != LINES_OFF) return "refused: this car's guide lines aren't the rear camera's (a 360 view draws its own)";
-                linesBefore = now;
+                // the stock state from before a restart that couldn't go back yet is still the one to restore
+                linesBefore = linesPending != 0 ? linesPending : now;
+                linesPending = 0;
+                car.keepLines(linesBefore, mod);   // on disk first: a restart from here on still puts it back
                 linesBy = mod;
             }
             car.setGuideLines("on".equals(a0) ? LINES_ON : LINES_OFF);
@@ -524,8 +541,54 @@ final class Commands {
     void restoreLines() {
         String by = linesBy;
         linesBy = null;
-        if (linesBefore == LINES_ON || linesBefore == LINES_OFF) car.setGuideLines(linesBefore);
+        if (linesBefore != LINES_ON && linesBefore != LINES_OFF) {
+            car.keepLines(0, null);
+            return;
+        }
+        try {
+            car.setGuideLines(linesBefore);
+        } catch (RuntimeException e) {
+            linesPending = linesBefore;   // kept on disk still: tried again every tick and at the next start
+            linesWaitSaid = true;
+            car.log("guide lines: couldn't put them back to " + linesBefore + " (" + by + "): " + e + "; trying again");
+            return;
+        }
+        car.keepLines(0, null);
         car.log("guide lines back to " + linesBefore + " (" + by + ")");
+    }
+
+    /**
+     * At the vehicle service's start: a stock state kept from before a restart (a mod held
+     * the lines when the service or the unit stopped, or the mod was removed since) goes
+     * back now, or on a later tick if the car's camera service isn't up yet.
+     */
+    synchronized void start() {
+        int k = car.linesKept();
+        if (k == 0) return;
+        if (k != LINES_ON && k != LINES_OFF) {
+            car.log("guide lines: kept state " + k + " isn't on or off; forgotten");
+            car.keepLines(0, null);
+            return;
+        }
+        linesPending = k;
+        restorePending();
+    }
+
+    /** puts back linesPending, if any and no mod holds the lines now; true when nothing is left to do */
+    boolean restorePending() {
+        if (linesPending == 0 || linesBy != null) return true;
+        try {
+            car.setGuideLines(linesPending);
+        } catch (RuntimeException e) {
+            if (!linesWaitSaid) car.log("guide lines: the camera service isn't answering yet (" + e + "); trying again");
+            linesWaitSaid = true;
+            return false;
+        }
+        car.log("guide lines back to " + linesPending + " (stock, kept from before a restart)");
+        linesPending = 0;
+        linesWaitSaid = false;
+        car.keepLines(0, null);
+        return true;
     }
 
     /**
@@ -558,6 +621,7 @@ final class Commands {
         if (lightLostBy != null && !has(declared, lightLostBy, "ambient_light")) lightLostBy = null;
         for (java.util.Iterator<String> i = lightYield.iterator(); i.hasNext();) if (!has(declared, i.next(), "ambient_light")) i.remove();
         if (linesBy != null && !has(declared, linesBy, "guide_lines")) restoreLines();
+        restorePending();
         if (cameraBy != null && !has(declared, cameraBy, "rear_camera")) {
             car.log("rear camera: " + cameraBy + " is off; free again");
             cameraBy = null;

@@ -123,7 +123,7 @@ printf 'Process: com.daudio.app.dipo\n\njava.lang.IllegalStateException: older\n
 printf 'Process: com.android.settings\nSubject: Input dispatching timed out\n' > "$R/data/system/dropbox/system_app_anr@1795114600000.txt"
 cp "$R/data/tombstones/tombstone_00" "$R/data/system/dropbox/system_app_native_crash@1795114500000.txt"
 printf 'unrelated' > "$R/data/system/dropbox/event_data@1795114400000.txt"
-printf '3\n' > "$D/hook/starts"; : > "$D/hook/enable"
+printf '3\n' > "$D/hook/starts"; printf 'boot 3 3\n' > "$D/hook/tripped"; : > "$D/hook/enable"
 cat > "$R/system/bin/dmesg" <<'X'
 #!/bin/sh
 echo "<6>[   10.1] hmgapi-hook: zygote pid 120, hooks on, start 3"
@@ -140,7 +140,8 @@ has "collect only: said so" "kept: no log lines (collected only)" "$out"
 f=$(cat "$D"/public/reports/problem-*.txt)
 hasnt "collect only: no log section" "== Log (" "$f"
 has "state: boot guard" "hook/starts: 3" "$f"
-has "state: explained" "boot guard: hooks off" "$f"
+has "state: explained" "boot guard: tripped" "$f"
+has "state: why" "Android had to start again 3 times in one boot" "$f"
 has "state: HMG-API's kernel lines" "hooks off (boot guard, starts=3)" "$f"
 has "mods: the files it adds, absent here" "adds /system/lib/libleafiaaac.so absent" "$f"
 has "reports: counted by type" "system_server_crash=1" "$f"
@@ -163,6 +164,24 @@ has "default: HMG-API's kernel lines" "hmgapi-hook: zygote pid 340" "$f"
 hasnt "default: no crash reports" "WifiApService" "$f"
 hasnt "default: no other kernel lines" "wlan0: associated" "$f"
 has "default: said so" "crash reports: not included" "$f"
+
+# engine boot-guard: what the app shows when its hooks aren't running, and the owner's reset
+eng() { HMGAPI_ROOT=$R HMGAPI_HOST=1 HMGAPI_TEST_ANY_CAR=1 java -cp "$CP" hmgapi.engine.Engine "$@" 2>&1; }
+mkdir -p "$R/proc/sys/kernel/random"; echo 5e1d0c34-aaaa-4bbb-8ccc-000000000009 > "$R/proc/sys/kernel/random/boot_id"
+echo "5e1d0c34-aaaa-4bbb-8ccc-000000000009 4" > "$D/hook/boot"
+out=$(eng boot-guard)
+has "boot-guard: tripped" "boot guard: tripped" "$out"
+has "boot-guard: why, for the owner" "why: Android had to start again 3 times in one boot" "$out"
+has "boot-guard: this boot's starts (by the current boot_id)" "starts this boot: 4" "$out"
+printf 'row 6 0\n' > "$D/hook/tripped"
+has "boot-guard: the other limit" "6 starts in a row with HMG-API's hooks didn't get to the home screen" "$(eng boot-guard)"
+out=$(eng boot-guard reset)
+has "boot-guard reset: said" "reset: hooks on again from the next restart" "$out"
+has "... ok now" "boot guard: ok" "$out"
+check "... starts 0, boot and tripped gone" "0 no no" "$(cat "$D/hook/starts") $([ -e "$D/hook/boot" ] && echo yes || echo no) $([ -e "$D/hook/tripped" ] && echo yes || echo no)"
+printf '7\n' > "$D/hook/starts"
+has "boot-guard: 6 in a row not yet tripped by the wrapper counts as tripped" "boot guard: tripped" "$(eng boot-guard)"
+rm -rf "$R/proc"
 rm -rf "$R/data/system/dropbox" "$D/hook" "$R/system/bin/dmesg"
 
 # without --crash-dumps: none

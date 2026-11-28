@@ -11,6 +11,11 @@
 # off in troubleshooter and the NEMESIS package's postinstall, for putting back later).
 # ROOT prefixes every path, for off-car tests only.
 umask 077
+# a cut-off install can leave /system half changed: a dropped reader of its output (adb, the
+# NEMESIS Manager or Engineering Mode screen closed, say by the reverse camera taking over) or a
+# hang-up doesn't end it. Each file still goes in whole (copied beside, synced, renamed), for a
+# reset or a SIGKILL.
+trap '' HUP PIPE INT TERM
 P=${1:-${0%/*}}
 ROOT=${ROOT:-}
 . "$P/lib.sh"
@@ -49,6 +54,7 @@ put() {
     cp "$src" "$dst.hmgapi-new" || fail "copy $1"
     chmod "$3" "$dst.hmgapi-new"; chown root:"$4" "$dst.hmgapi-new" 2>/dev/null
     [ "$(sum "$dst.hmgapi-new")" = "$want" ] || { rm -f "$dst.hmgapi-new"; fail "md5 mismatch after copying $1"; }
+    sync   # on disk before the rename: a reset right after it never leaves an empty file (no zygote)
     mv "$dst.hmgapi-new" "$dst" || { rm -f "$dst.hmgapi-new"; fail "rename onto $2"; }
     log "installed $2"
 }
@@ -75,6 +81,7 @@ backup() {
 
 capcheck
 log "HMG-API $VERSION install $(date)"
+gear_gate "the install"   # only in P, before anything changes (lib.sh)
 
 # the payload is whole
 while read m f; do
@@ -157,6 +164,25 @@ if [ -n "$LPFIX" ]; then
 elif [ -f "$KEEP" ] && { [ "$HAVE" = "$WRAP" ] || [ -f "$BAK" ] || is_wrapper "$B"; }; then
     log "app_process: HMG-API's wrapper is in place (stock kept as app_process.hmgapi-stock)"
     UPDATE=1
+    # the stock copy by the md5 of the whole file, as a new install checks app_process: not_stock
+    # below only sees whether it starts like a binary, and a copy cut short, zero-filled or
+    # otherwise damaged would pass that, then start no zygote. One that isn't a known stock build
+    # comes back from the backup when that is one (as RESCUE does for a missing copy); with
+    # neither known, refused as a new install is (HMGAPI_FORCE: maintainers only)
+    KS=$(sum "$KEEP"); kk=
+    while read m label; do [ "$m" = "$KS" ] && kk=$label; done < "$P/stock.txt"
+    RBAK=$(sum "$BAK"); rk=
+    [ -n "$RBAK" ] && while read m label; do [ "$m" = "$RBAK" ] && rk=$label; done < "$P/stock.txt"
+    if [ -n "$kk" ]; then
+        log "app_process.hmgapi-stock: stock ($kk)"
+    elif [ -n "$rk" ]; then
+        log "app_process.hmgapi-stock md5 $KS isn't a known stock build (a copy cut short or damaged?): putting it back from the stock backup ($rk)"
+        RESCUE=1
+    elif [ "$HMGAPI_FORCE" = 1 ]; then
+        log "WARNING: app_process.hmgapi-stock md5 $KS isn't a known stock build, and there's no stock backup to put back; HMGAPI_FORCE=1, going on at your own risk"
+    else
+        fail "app_process.hmgapi-stock, the stock copy HMG-API's wrapper runs, has md5 $KS, which isn't a known stock build (it may have been cut short or damaged), and there's no stock backup to put it back from, so nothing was changed. $ASK_BUILD, and we'll add your build."
+    fi
 elif [ ! -f "$KEEP" ] && { [ "$HAVE" = "$WRAP" ] || is_wrapper "$B"; }; then
     # an HMG-API wrapper (this release's, or an older one: every version names
     # app_process.hmgapi-stock) with its stock copy gone: what an older uninstall leaves on NEMESIS
@@ -254,6 +280,13 @@ fi
 [ -s "$BAK" ] && not_stock "$BAK" && fail "the app_process backup isn't a stock binary (an HMG-API wrapper, NEMESIS LivePatch's script or not a binary), so nothing on /system was changed. Please send this line to the HMG-API maintainers."
 backup /system/etc/install-recovery.sh
 backup /system/etc/qb_runtime.sh
+# the engine's HTTPS (the catalogue and updates over home Wi-Fi, Catalog): in /data, nothing on
+# /system for it. Before /system changes: a failure here would otherwise stop the install with
+# the wrapper and boot hook in but the maps, the app and the records after it skipped
+if [ -f "$P/libhmgapi_fetch.so" ]; then
+    mkdir -p "$D/lib" && cp "$P/libhmgapi_fetch.so" "$D/lib/libhmgapi_fetch.so.new" && chmod 644 "$D/lib/libhmgapi_fetch.so.new" \
+        && mv "$D/lib/libhmgapi_fetch.so.new" "$D/lib/libhmgapi_fetch.so" || fail "keep the engine's HTTPS library in $D/lib, so nothing on /system was changed"
+fi
 
 remount rw || fail "can't remount /system rw (needs NEMESIS or a running hmgapid)"
 REMOUNTED=1
@@ -267,14 +300,22 @@ if [ -z "$UPDATE" ]; then
     cp "$B" "$KEEP.hmgapi-new" || fail "copy app_process"
     chmod 755 "$KEEP.hmgapi-new"; chown root:shell "$KEEP.hmgapi-new" 2>/dev/null
     [ "$(sum "$KEEP.hmgapi-new")" = "$HAVE" ] || { rm -f "$KEEP.hmgapi-new"; fail "app_process copy md5 mismatch"; }
+    sync
     mv "$KEEP.hmgapi-new" "$KEEP" || fail "keep stock app_process"
 elif [ -n "$RESCUE" ]; then
     cp "$BAK" "$KEEP.hmgapi-new" || fail "copy the app_process backup"
     chmod 755 "$KEEP.hmgapi-new"; chown root:shell "$KEEP.hmgapi-new" 2>/dev/null
     [ "$(sum "$KEEP.hmgapi-new")" = "$RBAK" ] || { rm -f "$KEEP.hmgapi-new"; fail "app_process backup copy md5 mismatch"; }
+    sync
     mv "$KEEP.hmgapi-new" "$KEEP" || fail "keep stock app_process"
     log "app_process.hmgapi-stock: back from the stock backup ($RBAK)"
 fi
+# on storage before anything runs it: a new file's data can stay in memory for up to ~30 s
+# (the kernel's writeback; a rename onto a new name doesn't force it out, a rename over an
+# existing file does). The wrapper below goes over app_process (or .real) and so reaches
+# storage at once; a hard reset (Reset pinhole, power loss) before this sync could then leave
+# the wrapper running an empty stock copy: no zygote, and no stock app_process left on /system
+sync
 # the last word before the wrapper goes in: it runs app_process.hmgapi-stock, which must be a
 # stock binary, or no zygote starts
 [ -f "$KEEP" ] && ! not_stock "$KEEP" || fail "app_process.hmgapi-stock isn't a stock binary, so the wrapper wasn't written (HMG-API's other files are, harmless without it). Please send this line to the HMG-API maintainers."
@@ -287,7 +328,7 @@ REMOUNTED=
 
 # hooks on at the next restart (the zygote wrapper's boot guard counts from 0)
 echo 0 > "$D/hook/starts"
-rm -f "$D/hook/boot" "$D/hook/disable"
+rm -f "$D/hook/boot" "$D/hook/tripped" "$D/hook/disable"
 : > "$D/hook/enable"
 
 # what's installed, for uninstall.sh and the app

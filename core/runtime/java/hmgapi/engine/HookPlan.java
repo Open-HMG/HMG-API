@@ -28,7 +28,8 @@ import java.util.TreeSet;
  * Order: mods a mod requires come before it, otherwise by id. On one method, every
  * observe/change hook runs before a replace hook, so a replacement never hides
  * another mod's hook. Going down that order, a mod isn't loaded (the reason says why) when:
- *   - a hook point it declares has an unknown mode, or isn't on this car's map;
+ *   - a hook point it declares reaches a safety function (Protected.point: the cameras,
+ *     guide lines, telematics), has an unknown mode, or isn't on this car's map;
  *   - a mod it requires isn't installed and turned on, isn't in the version range
  *     it asks for, or isn't loaded;
  *   - it and a mod before it that loads can't run together: either lists the other
@@ -72,6 +73,7 @@ public final class HookPlan {
      */
     public static Map<String, Map<String, Object>> enabled(File modsDir) {
         Map<String, Map<String, Object>> out = new LinkedHashMap<String, Map<String, Object>>();
+        if (Safe.on(modsDir.getParentFile())) return out;   // safe mode: no mod's hooks (Safe)
         File[] dirs = modsDir.listFiles();
         if (dirs == null) return out;
         java.util.Arrays.sort(dirs);
@@ -183,6 +185,8 @@ public final class HookPlan {
     /** a declared point this mod can't hook here, or replaces after a loaded mod: why, or null */
     String pointProblem(String id, Map<String, Object> decl, Set<String> known, Map<String, String> missing, Set<String> observeOnly) {
         for (Map.Entry<String, Object> e : decl.entrySet()) {
+            String safety = Protected.point(e.getKey());   // first: on every car, mapped there or not
+            if (safety != null) return "hook point " + e.getKey() + " reaches " + safety + ": a safety function, no mod hooks it (built in, no override)";
             String mode = String.valueOf(e.getValue());
             if (!OBSERVE.equals(mode) && !CHANGE.equals(mode) && !REPLACE.equals(mode)) {
                 return "hook point " + e.getKey() + ": mode \"" + mode + "\" (observe, change or replace)";

@@ -1,6 +1,8 @@
 #!/bin/sh
 # Off-car test of the live state (engine publish-state): what running apps may read
-# about the mods, and that private settings and anything else stay root-only.
+# about the mods, and that private settings and anything else stay root-only; live loads
+# never reach a safety function (engine.Protected), and the guide lines' kept stock state
+# keeps the vehicle service running until they're back.
 set -e
 cd "$(dirname "$0")/../.."
 CP=$(mktemp -d); T=$(mktemp -d); trap 'rm -rf "$T" "$CP"' EXIT
@@ -83,4 +85,20 @@ check "a recipe path out of the mod: the owner's settings stay private" "-rw----
 check "... and the settings folder closed" "drwx------" "$(ls -ld "$R/data/hmgapi/settings" | cut -c1-10)"
 check "a recipe symlink to another mod's file: stays private" "-rw-------" "$(ls -l "$R/data/hmgapi/mods/base/private.bin" | cut -c1-10)"
 check "an absolute recipe path: stays private" "-rw-------" "$(ls -l "$R/data/hmgapi/mods/private.jar" | cut -c1-10)"
+
+# safety functions (engine.Protected): a live mod is never loaded in a protected process, nor one
+# that declares a protected point (what Mods.lateLoad decides, HookPlan.late)
+javac --release 8 -Xlint:-options -nowarn -cp "$CP" -d "$CP" core/runtime/test/hmgapi/engine/ProtectedTest.java
+java -cp "$CP" hmgapi.engine.ProtectedTest core/hookpoints live || fail=1
+# the guide lines a mod changed go back to stock after a restart or the mod's removal: the vehicle
+# service puts them back. It runs whatever the mods use: the gear check before a restart, an apply
+# or an install reads gear.park through it (Gear)
+eng publish-state
+check "no mod uses the car: the vehicle service runs anyway (the gear check)" "hmgapi vehicle root android yes jar /system/framework/hmgapi-hook.jar hmgapi.vehicle.Hub" "$(grep '^hmgapi vehicle ' $R/data/hmgapi/state/services.txt)"
+echo "2 cam" > $R/data/hmgapi/state/guide-lines.stock
+eng publish-state
+check "guide lines kept (their mod gone): the vehicle service runs to put them back" "hmgapi vehicle root android yes jar /system/framework/hmgapi-hook.jar hmgapi.vehicle.Hub" "$(grep '^hmgapi vehicle ' $R/data/hmgapi/state/services.txt)"
+rm $R/data/hmgapi/state/guide-lines.stock
+eng publish-state
+check "... and keeps running once they're back" "hmgapi vehicle root android yes jar /system/framework/hmgapi-hook.jar hmgapi.vehicle.Hub" "$(grep '^hmgapi vehicle ' $R/data/hmgapi/state/services.txt)"
 exit $fail

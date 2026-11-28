@@ -24,6 +24,8 @@ printf '#!/bin/sh\necho "setprop $*" >> "%s/calls.log"\n' "$T" > $T/bin/setprop
 # INSTALL_FAILED_INVALID_URI, as on the car (#187)
 printf '#!/bin/sh\necho "pm $*" >> "%s/calls.log"\ncase "$1" in path) [ -n "$FAKE_HAVE_APP" ] && echo package:/data/app/hmgapi.app-1.apk ;; install) case "$(ls -l "$3" | cut -c8)" in r) echo "${FAKE_PM:-Success}" ;; *) echo "Failure [INSTALL_FAILED_INVALID_URI]" ;; esac ;; esac\nexit 0\n' "$T" > $T/bin/pm
 printf '#!/bin/sh\necho "am $*" >> "%s/calls.log"\n' "$T" > $T/bin/am
+# sync: what was on /system when it ran (the stock copy, and whether a wrapper was in yet)
+printf '#!/bin/sh\nk=$(md5sum < "%s/system/bin/app_process.hmgapi-stock" 2>/dev/null | cut -c1-32)\na=$(md5sum < "%s/system/bin/app_process" | cut -c1-32)\necho "keep=${k:-none} app_process=$a" >> "%s/sync.log"\n' "$R" "$R" "$T" > $T/bin/sync
 chmod +x $T/bin/*
 calls() { cat $T/calls.log 2>/dev/null || true; : > $T/calls.log; }
 run() { set +e; out=$(cd $T && env PATH="$T/bin:$PATH" ROOT=$R CAPCHECK=0 $SH "$@" 2>&1); rc=$?; set -e; }
@@ -62,7 +64,7 @@ rm -rf $P/nemesis; mkdir -p $P/nemesis/mod $P/nemesis/bin
 cp -r install/nemesis/scripts $P/nemesis/scripts; cp -r install/nemesis/mod/scripts $P/nemesis/mod/scripts
 cp install/nemesis/bin/open.sh install/nemesis/bin/start.sh $P/nemesis/bin/; cp install/nemesis/conflicts.txt $P/nemesis/
 [ -f "$STOCK" ] || echo "$(md5sum < $R/system/bin/app_process | cut -c1-32) test stock" > $P/stock.txt
-(cd $P && md5sum hmgapid lpatch app_process libhmgapi_hook.so hmgapi-hook.jar HmgApi.apk install.sh uninstall.sh lib.sh stock.txt app-pending.sh app-open.sh hook-check.sh boot.sh MAPS.md5 > MANIFEST)
+(cd $P && md5sum hmgapid lpatch app_process libhmgapi_hook.so libhmgapi_fetch.so hmgapi-hook.jar HmgApi.apk install.sh uninstall.sh lib.sh stock.txt app-pending.sh app-open.sh hook-check.sh boot.sh MAPS.md5 > MANIFEST)
 
 # refusals first: nothing may change
 cp $R/system/bin/app_process $T/real; echo x >> $R/system/bin/app_process
@@ -82,16 +84,35 @@ run $P/install.sh $P
 has "payload without its hook maps refused" "the hook maps folder (payload/maps) is missing" "$out"
 has "... before anything changed" "Nothing was changed." "$out"
 mv $T/maps.away $P/maps
+# the engine's HTTPS library goes into /data before /system changes: when it can't, the
+# install stops with /system as it was (not with the wrapper in and the maps and app skipped)
+if [ -f $P/libhmgapi_fetch.so ]; then
+    mkdir -p $R/data/hmgapi; : > $R/data/hmgapi/lib   # a file where its folder goes
+    run $P/install.sh $P
+    check "HTTPS library can't be kept: refused" 1 $rc
+    has "... said, before /system" "keep the engine's HTTPS library in $R/data/hmgapi/lib, so nothing on /system was changed" "$out"
+    check "... /system unchanged" "$BEFORE" "$(tree)"
+    rm -rf $R/data/hmgapi
+else
+    echo "skip  HTTPS library before /system (no libhmgapi_fetch.so in the payload)"
+fi
 check "still stock after refusals" "$BEFORE" "$(tree)"
 
+rm -f $T/sync.log
 run $P/install.sh $P
 has "install finishes" "installed. Restart the head unit" "$out"
+# (other syncs come before it: every file put() writes, and the stock copy's own rename)
+check "the stock copy reaches storage (sync) before the wrapper is written" yes \
+    "$(grep -qx "keep=$(md5sum < $T/real | cut -c1-32) app_process=$(md5sum < $T/real | cut -c1-32)" $T/sync.log && echo yes || echo no)"
 check "app_process is the wrapper" "$(md5sum < $P/app_process)" "$(md5sum < $R/system/bin/app_process)"
 check "stock app_process kept beside it" "$(md5sum < $T/real)" "$(md5sum < $R/system/bin/app_process.hmgapi-stock)"
 check "stock app_process backed up" "$(md5sum < $T/real)" "$(md5sum < $R/data/hmgapi/stock/system/bin/app_process)"
 for f in bin/hmgapid bin/lpatch lib/libhmgapi_hook.so framework/hmgapi-hook.jar; do
     check "installed $f" "$(md5sum < $P/${f##*/})" "$(md5sum < $R/system/$f 2>/dev/null)"
 done
+check "the engine's HTTPS library in /data (nothing on /system for it)" "$(md5sum < $P/libhmgapi_fetch.so)" "$(md5sum < $R/data/hmgapi/lib/libhmgapi_fetch.so 2>/dev/null)"
+check "... readable, not writable by others" "-rw-r--r--" "$(ls -l $R/data/hmgapi/lib/libhmgapi_fetch.so | cut -c1-10)"
+check "... not under /system" no "$([ -e $R/system/lib/libhmgapi_fetch.so ] && echo yes || echo no)"
 check "boot hook in install-recovery.sh" 1 "$(grep -c 'HMGAPI_HOOK begin' $R/system/etc/install-recovery.sh)"
 check "boot hook in qb_runtime.sh" 1 "$(grep -c 'HMGAPI_HOOK begin' $R/system/etc/qb_runtime.sh)"
 check "boot hook: only hmgapid boot, which returns at once (NEMESIS's start comes after it)" "if [ -x /system/bin/hmgapid ]; then /system/bin/hmgapid boot; fi" "$(sed -n 3p $R/system/etc/install-recovery.sh)"
@@ -120,6 +141,43 @@ has "update over itself" "HMG-API's wrapper is in place" "$out"
 check "update keeps the stock copy" "$(md5sum < $T/real)" "$(md5sum < $R/system/bin/app_process.hmgapi-stock)"
 check "update keeps one boot hook" 1 "$(grep -c 'HMGAPI_HOOK begin' $R/system/etc/install-recovery.sh)"
 check "update keeps the owner's settings" '{"updates": true}' "$(cat $R/data/hmgapi/settings/hmgapi.json)"
+has "... checks the stock copy by md5" "app_process.hmgapi-stock: stock (" "$out"
+
+# an update checks the stock copy by the md5 of the whole file, as a new install checks
+# app_process: one that only starts like a binary (cut short, zero-filled, changed) comes back
+# from the stock backup, and with no stock backup it's refused, nothing changed
+K=$R/system/bin/app_process.hmgapi-stock; KB=$R/data/hmgapi/stock/system/bin/app_process
+dd if=$T/real of=$T/bad.short bs=1024 count=2 2>/dev/null                  # cut short: still starts with ELF
+dd if=/dev/zero of=$T/bad.zero bs=1 count=$(($(wc -c < $T/real))) 2>/dev/null   # zero-filled, the same size
+{ cat $T/real; echo x; } > $T/bad.elf                                      # ELF, the wrong md5
+for bad in short zero elf; do
+    cp $T/bad.$bad $K
+    run $P/install.sh $P
+    check "update, stock copy $bad: works" 0 $rc
+    has "... said: put back from the stock backup" "app_process.hmgapi-stock md5 $(md5sum < $T/bad.$bad | cut -c1-32) isn't a known stock build (a copy cut short or damaged?): putting it back from the stock backup (" "$out"
+    check "... the stock copy is stock again" "$(md5sum < $T/real)" "$(md5sum < $K)"
+    check "... the backup kept" "$(md5sum < $T/real)" "$(md5sum < $KB)"
+    check "... the wrapper in place" "$(md5sum < $P/app_process)" "$(md5sum < $R/system/bin/app_process)"
+done
+mv $KB $T/bak.away
+for bad in short zero elf; do
+    cp $T/bad.$bad $K; B4=$(tree)
+    run $P/install.sh $P
+    check "update, stock copy $bad, no stock backup: refused" 1 $rc
+    has "... said" "app_process.hmgapi-stock, the stock copy HMG-API's wrapper runs, has md5 $(md5sum < $T/bad.$bad | cut -c1-32), which isn't a known stock build (it may have been cut short or damaged), and there's no stock backup to put it back from, so nothing was changed." "$out"
+    check "... names no way to force it" "" "$(echo "$out" | grep -i force || true)"
+    check "... /system unchanged" "$B4" "$(tree)"
+done
+cp $T/bad.short $T/bak.bad; mv $T/bak.bad $KB; cp $T/bad.elf $K   # a backup that isn't stock either
+run $P/install.sh $P
+check "update, stock copy and backup both unknown: refused" 1 $rc
+cp $T/bad.elf $KB   # a forced install of a build stock.txt doesn't know: both copies the same
+export HMGAPI_FORCE=1; run $P/install.sh $P; unset HMGAPI_FORCE
+check "... HMGAPI_FORCE=1 (maintainers, over adb): goes on" 0 $rc
+has "... with a warning" "WARNING: app_process.hmgapi-stock md5 $(md5sum < $T/bad.elf | cut -c1-32) isn't a known stock build" "$out"
+mv $T/bak.away $KB; cp $T/real $K
+run $P/install.sh $P
+check "stock copy and backup stock again: update works" "0|$(md5sum < $T/real)" "$rc|$(md5sum < $K)"
 
 # the app's install with Android up (stand-ins for pm and the rest)
 rm -f $R/data/hmgapi/public/HmgApi.apk; calls >/dev/null
@@ -209,7 +267,7 @@ firmware_update() {
 }
 { printf '\177ELF'; head -c 9000 /dev/urandom; } > $T/newfw; chmod 755 $T/newfw
 echo "$(md5sum < $T/newfw | cut -c1-32) test new firmware" >> $P/stock.txt
-(cd $P && md5sum hmgapid lpatch app_process libhmgapi_hook.so hmgapi-hook.jar HmgApi.apk install.sh uninstall.sh lib.sh stock.txt app-pending.sh app-open.sh hook-check.sh boot.sh MAPS.md5 > MANIFEST)
+(cd $P && md5sum hmgapid lpatch app_process libhmgapi_hook.so libhmgapi_fetch.so hmgapi-hook.jar HmgApi.apk install.sh uninstall.sh lib.sh stock.txt app-pending.sh app-open.sh hook-check.sh boot.sh MAPS.md5 > MANIFEST)
 export HMGAPI_TEST_ENGINE=$T/bin/engine
 run $P/install.sh $P
 mkdir -p $R/data/hmgapi/state; echo '{"files": {}, "settings": {}}' > $R/data/hmgapi/state/files.json
@@ -306,7 +364,7 @@ nemesis_boot
 check "HMG-API, then NEMESIS 1.17: the zygote start ends at stock" "$STK" "$(chain)"
 # an update under NEMESIS's script: the new wrapper goes where NEMESIS runs it
 cp $P/app_process $T/wrapper.old; echo update >> $P/app_process; WRAPPERS="$WRAPPERS $(md5sum < $P/app_process | cut -c1-32)"
-(cd $P && md5sum hmgapid lpatch app_process libhmgapi_hook.so hmgapi-hook.jar HmgApi.apk install.sh uninstall.sh lib.sh stock.txt app-pending.sh app-open.sh hook-check.sh boot.sh MAPS.md5 > MANIFEST)
+(cd $P && md5sum hmgapid lpatch app_process libhmgapi_hook.so libhmgapi_fetch.so hmgapi-hook.jar HmgApi.apk install.sh uninstall.sh lib.sh stock.txt app-pending.sh app-open.sh hook-check.sh boot.sh MAPS.md5 > MANIFEST)
 run $P/install.sh $P
 has "... an update under NEMESIS's script finishes" "installed. Restart the head unit" "$out"
 check "... the new wrapper is app_process.real" "$(md5sum < $P/app_process)" "$(md5sum < $R/system/bin/app_process.real)"
@@ -343,14 +401,14 @@ check "... and after NEMESIS's next boot the zygote still starts: stock" "$STK" 
 # release's update, and then its uninstall, with no boot in between
 mkdir -p $R/data/hmgapi; rm -rf $R/data/hmgapi
 cp $T/wrapper.old $P/app_process   # an older wrapper first
-(cd $P && md5sum hmgapid lpatch app_process libhmgapi_hook.so hmgapi-hook.jar HmgApi.apk install.sh uninstall.sh lib.sh stock.txt app-pending.sh app-open.sh hook-check.sh boot.sh MAPS.md5 > MANIFEST)
+(cd $P && md5sum hmgapid lpatch app_process libhmgapi_hook.so libhmgapi_fetch.so hmgapi-hook.jar HmgApi.apk install.sh uninstall.sh lib.sh stock.txt app-pending.sh app-open.sh hook-check.sh boot.sh MAPS.md5 > MANIFEST)
 run $P/install.sh $P                                       # into .real, under NEMESIS's script
 cp $P/app_process $T/wrapper.older; echo older >> $T/wrapper.older
 cp $T/wrapper.older $R/system/bin/app_process.real          # the wrapper before the old update...
 cp $P/app_process $R/system/bin/app_process                 # ...and the old update's, over NEMESIS's script
 WRAPPERS="$WRAPPERS $(md5sum < $T/wrapper.older | cut -c1-32)"
 echo update >> $P/app_process; WRAPPERS="$WRAPPERS $(md5sum < $P/app_process | cut -c1-32)"
-(cd $P && md5sum hmgapid lpatch app_process libhmgapi_hook.so hmgapi-hook.jar HmgApi.apk install.sh uninstall.sh lib.sh stock.txt app-pending.sh app-open.sh hook-check.sh boot.sh MAPS.md5 > MANIFEST)
+(cd $P && md5sum hmgapid lpatch app_process libhmgapi_hook.so libhmgapi_fetch.so hmgapi-hook.jar HmgApi.apk install.sh uninstall.sh lib.sh stock.txt app-pending.sh app-open.sh hook-check.sh boot.sh MAPS.md5 > MANIFEST)
 run $P/install.sh $P
 has "older update over NEMESIS's script, then this one: finishes" "installed. Restart the head unit" "$out"
 check "... app_process.real gets the new wrapper (not left stale)" "$(md5sum < $P/app_process)" "$(md5sum < $R/system/bin/app_process.real)"

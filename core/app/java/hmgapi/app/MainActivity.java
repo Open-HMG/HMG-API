@@ -24,7 +24,8 @@ import org.json.JSONObject;
  * by category), Car Report, Logs.
  */
 public class MainActivity extends Activity {
-    static final String[] TABS = { "Mods", "Settings", "Car Report", "Logs" };
+    static final String[] TABS = { "Installed mods", "Catalogue", "Updates", "Settings", "Car Report", "Logs" };
+    static final int MODS = 0, CATALOGUE = 1, UPDATES_TAB = 2, SETTINGS = 3, REPORT = 4, LOGS = 5;
     private LinearLayout pills;
     private FrameLayout content;
     private final TextView[] tabs = new TextView[TABS.length];
@@ -77,7 +78,7 @@ public class MainActivity extends Activity {
         Ui.button(actions, "Restart unit", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                confirmRestart();
+                Park.confirmRestart(MainActivity.this);
             }
         });
         top.addView(actions);
@@ -90,7 +91,7 @@ public class MainActivity extends Activity {
             final int n = i;
             LinearLayout t = Ui.column(this);
             tabs[i] = new TextView(this);
-            tabs[i].setText(TABS[i]);
+            tabs[i].setText(i == UPDATES_TAB ? updatesLabel() : TABS[i]);
             Ui.size(tabs[i], 21);
             tabs[i].setPadding(Ui.dp(this, 4), Ui.dp(this, 6), Ui.dp(this, 4), Ui.dp(this, 8));
             t.addView(tabs[i]);
@@ -166,9 +167,21 @@ public class MainActivity extends Activity {
             marks[i].setVisibility(i == n ? View.VISIBLE : View.INVISIBLE);
         }
         content.removeAllViews();
-        View v = n == 0 ? new ModsTab(this).view() : n == 1 ? new SettingsTab(this).view()
-                : n == 2 ? new ReportTab(this).view() : new LogsTab(this).view();
+        tabs[UPDATES_TAB].setText(updatesLabel());
+        View v = n == MODS ? new ModsTab(this).view() : n == CATALOGUE ? new CatalogTab(this).view()
+                : n == UPDATES_TAB ? new UpdatesTab(this).view() : n == SETTINGS ? new SettingsTab(this).view()
+                : n == REPORT ? new ReportTab(this).view() : new LogsTab(this).view();
         content.addView(v);
+    }
+
+    /** "Updates (n)" when the last check found any (public/updates.json, written by the engine) */
+    static String updatesLabel() {
+        try {
+            int n = new org.json.JSONObject(UsbFolders.read(new java.io.File("/data/hmgapi/public/updates.json"))).optInt("count");
+            return n > 0 ? "Updates (" + n + ")" : "Updates";
+        } catch (Exception e) {
+            return "Updates";
+        }
     }
 
     /** "1.0.0 · Kia EV6 (usa 260507)" from the hook runtime's status */
@@ -187,7 +200,8 @@ public class MainActivity extends Activity {
     void refreshStatus() {
         final int run = ++statusRun;   // an older check finishing later doesn't add its pill too
         pills.removeAllViews();
-        hooksPill();
+        hooksPill(run);
+        if (safeMode()) Ui.pill(pills, "Safe mode: mods off", Ui.WARN);
         if (restartNeeded()) Ui.pill(pills, "Restart needed", Ui.WARN);
         if (planning) return;   // back from Updates: plan() asks already (two at once only wait on each other)
         new Ui.Job<Boolean>() {
@@ -206,15 +220,101 @@ public class MainActivity extends Activity {
         }.start(this);
     }
 
-    private void hooksPill() {
+    private void hooksPill(int run) {
         try {
             JSONObject map = new JSONObject(HmgApiStatus.json).optJSONObject("map");
             if (map == null || !map.optBoolean("on")) Ui.pill(pills, "Hooks off for this car", Ui.WARN);
             else Ui.pill(pills, "Hooks on" + (map.optBoolean("checked_here") || "verified".equals(map.optString("status"))
                     ? " (map checked)" : ""), Ui.ACCENT);
         } catch (Exception e) {
-            Ui.pill(pills, "Hooks not running", Ui.ERROR);
+            whyNotRunning(run, Ui.pill(pills, "Hooks not running", Ui.ERROR));
         }
+    }
+
+    /**
+     * Hooks not running: the boot guard says whether it turned them off and why (engine
+     * boot-guard). Tapping the pill shows that, with a reset (then a restart) when it tripped.
+     */
+    private void whyNotRunning(final int run, final TextView pill) {
+        new Ui.Job<Hmgapid.Result>() {
+            @Override
+            Hmgapid.Result work() throws Exception {
+                return Hmgapid.call("engine", "boot-guard");
+            }
+
+            @Override
+            void done(Hmgapid.Result r, Exception e) {
+                if (run != statusRun || e != null || r.code != 0) return;
+                final String out = r.output.trim();
+                final boolean tripped = out.contains("boot guard: tripped");
+                TextView p = pill;
+                if (tripped) {
+                    pills.removeView(pill);
+                    p = Ui.pill(pills, "Hooks off: boot guard", Ui.ERROR);
+                }
+                p.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        bootGuard(out, tripped);
+                    }
+                });
+            }
+        }.start(this);
+    }
+
+    private void bootGuard(String out, boolean tripped) {
+        String why = null;
+        StringBuilder counts = new StringBuilder();
+        for (String l : out.split("\n")) {
+            if (l.startsWith("why: ")) why = l.substring(5);
+            else if (l.startsWith("starts ") || l.startsWith("hook/disable")) counts.append(l).append('\n');
+        }
+        AlertDialog.Builder d = new AlertDialog.Builder(this).setTitle(tripped ? "HMG-API's boot guard turned its hooks off" : "Hooks not running");
+        if (tripped) {
+            d.setMessage((why != null ? why + "\n\n" : "")
+                    + "Mods with code don't run until you reset it. Turn off or remove the mod you added or changed last, "
+                    + "then reset: hooks are back on after the restart. If Android fails again, the guard turns them off again.\n\n"
+                    + counts.toString().trim())
+                    .setNegativeButton("Not now", null)
+                    .setPositiveButton("Reset and restart", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface di, int which) {
+                            resetBootGuard();
+                        }
+                    });
+        } else {
+            d.setMessage("The boot guard didn't turn them off.\n\n" + counts.toString().trim()).setPositiveButton("OK", null);
+        }
+        d.show();
+    }
+
+    private void resetBootGuard() {
+        new Ui.Job<Hmgapid.Result>() {
+            @Override
+            Hmgapid.Result work() throws Exception {
+                return Hmgapid.call("engine", "boot-guard", "reset");
+            }
+
+            @Override
+            void done(Hmgapid.Result r, Exception e) {
+                if (e == null && r.code == 0) restart();
+                else message("Couldn't reset the boot guard", e != null ? Hmgapid.unreachable(e) : r.output.trim());
+            }
+        }.start(this);
+    }
+
+    /** the public state (state.json, written by the engine), or an empty one */
+    static JSONObject publicState() {
+        try {
+            return new JSONObject(SettingsTab.read(new java.io.File("/data/hmgapi/public/state.json")));
+        } catch (Exception e) {
+            return new JSONObject();
+        }
+    }
+
+    /** safe mode on (hmgapi.engine.Safe): every mod off */
+    static boolean safeMode() {
+        return publicState().optBoolean("safe");
     }
 
     /** the boot this process runs in (to the 10 s): a restart flag is only for the boot it was set in */
@@ -223,6 +323,8 @@ public class MainActivity extends Activity {
     }
 
     boolean restartNeeded() {
+        // boot.sh rolled a cut-off apply back and waits for the car to be parked to restart, or left it to the owner
+        if (new java.io.File("/data/hmgapi/public/restart-needed").isFile()) return true;
         return getSharedPreferences("hmgapi", MODE_PRIVATE).getLong("restart_boot", -1) == boot();
     }
 
@@ -239,6 +341,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onActivityResult(int request, int result, Intent data) {
+        if (request == UPDATES && current == MODS) show(MODS);   // the Mods tab again: new mods, versions, the updates count
         if (request == UPDATES && result == RESULT_OK) plan();   // mods were installed: apply them (plan first)
     }
 
@@ -273,25 +376,38 @@ public class MainActivity extends Activity {
                             : "Everything is applied.");
                     return;
                 }
-                new AlertDialog.Builder(MainActivity.this).setTitle("Apply these changes?").setMessage(shown)
+                final boolean files = filesChange(r.output);
+                new AlertDialog.Builder(MainActivity.this).setTitle("Apply these changes?")
+                        .setMessage(files ? shown + "\n\nThis changes system files, so it only starts with the car in P. " + Park.STAY : shown)
                         .setNegativeButton("Cancel", null)
                         .setPositiveButton("Apply", new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface d, int which) {
-                                apply();
+                                if (!files) {
+                                    apply(false);
+                                    return;
+                                }
+                                Park.then(MainActivity.this, APPLYING, new Park.Go() {
+                                    @Override
+                                    public void go(boolean unknownOk) {
+                                        apply(unknownOk);
+                                    }
+                                });
                             }
                         }).show();
             }
         }.start(this);
     }
 
-    private void apply() {
+    static final String APPLYING = "Applying changes to system files";
+
+    private void apply(final boolean unknownOk) {
         final AlertDialog wait = new AlertDialog.Builder(this)
                 .setMessage("Applying… (rebuilding apps can take a few minutes; leave the head unit on)").setCancelable(false).show();
         new Ui.Job<Hmgapid.Result>() {
             @Override
             Hmgapid.Result work() throws Exception {
-                return Hmgapid.call(900000, "engine", "apply");
+                return Hmgapid.call(900000, Park.with(unknownOk, "engine", "apply"));
             }
 
             @Override
@@ -301,6 +417,13 @@ public class MainActivity extends Activity {
                     message("Lost contact while applying", e.getMessage() + ". The apply finishes on its own; open HMG-API again to check.");
                     return;
                 }
+                // the car left P since the check (or gives no reading): nothing was changed
+                if (Park.refused(MainActivity.this, r, APPLYING, new Park.Go() {
+                    @Override
+                    public void go(boolean ok) {
+                        apply(ok);
+                    }
+                })) return;
                 boolean restart = restartNeeded() || r.output.contains("restart the head unit");
                 if (r.output.contains("restart the head unit")) needRestart();
                 AlertDialog.Builder d = new AlertDialog.Builder(MainActivity.this)
@@ -327,6 +450,14 @@ public class MainActivity extends Activity {
         new AlertDialog.Builder(this).setTitle(title).setMessage(text).setPositiveButton("OK", null).show();
     }
 
+    /** Does an engine plan change files on /system (only in P: hmgapi.engine.Gear)? */
+    static boolean filesChange(String out) {
+        for (String l : out.split("\n")) {
+            if (l.startsWith("change ") || l.startsWith("update ") || l.startsWith("restore ")) return true;
+        }
+        return false;
+    }
+
     /** Does an engine plan change anything? */
     static boolean changes(String out) {
         for (String l : out.split("\n")) {
@@ -347,32 +478,7 @@ public class MainActivity extends Activity {
         return b.toString().trim();
     }
 
-    private void confirmRestart() {
-        new AlertDialog.Builder(this)
-                .setTitle("Restart the head unit?")
-                .setMessage("The screen goes dark for about a minute. Don't use this while driving with navigation or a call active.")
-                .setNegativeButton("Cancel", null)
-                .setPositiveButton("Restart", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int which) {
-                        restart();
-                    }
-                })
-                .show();
-    }
-
     void restart() {
-        new Ui.Job<Hmgapid.Result>() {
-            @Override
-            Hmgapid.Result work() throws Exception {
-                return Hmgapid.call("reboot");
-            }
-
-            @Override
-            void done(Hmgapid.Result r, Exception e) {
-                if (e == null && r.code == 0) return;
-                message("Couldn't restart", e != null ? "hmgapid isn't running (" + e.getMessage() + ")" : r.output.trim());
-            }
-        }.start(this);
+        Park.restart(this);
     }
 }

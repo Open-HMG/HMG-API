@@ -64,6 +64,12 @@ has "update in place" '"version": "2.0.0"' "$(cat $R/data/hmgapi/mods/beta/mod.j
 
 eng update-hmgapi $U/HMGAPI/updates/hmgapi-fake.zip; check "fake release not run" 3 $rc
 check "its installer didn't run" no "$([ -e $R/installed-9.9.9 ] && echo yes || echo no)"
+echo '{"trial": true, "committed": true, "entries": [], "state": {}}' > $R/data/hmgapi/state/journal.json
+eng update-hmgapi $U/HMGAPI/updates/hmgapi-9.9.9.zip; check "a trial in place: no self-update" 1 $rc
+has "... saying what to do first" "refused: an earlier apply isn't finished or is a trial: run \`engine keep\` (trial) or \`engine recover\` first" "$out"
+eng update-hmgapi $U/HMGAPI/updates/hmgapi-9.9.9.zip --force; check "... --force doesn't step around it" 1 $rc
+check "... its installer didn't run" no "$([ -e $R/installed-9.9.9 ] && echo yes || echo no)"
+rm $R/data/hmgapi/state/journal.json
 eng update-hmgapi $U/HMGAPI/updates/hmgapi-9.9.9.zip; check "genuine release runs its installer" 0 $rc
 has "installer output passed on" "fake installer ran" "$out"
 check "installer ran" yes "$([ -e $R/installed-9.9.9 ] && echo yes)"

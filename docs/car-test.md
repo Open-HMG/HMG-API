@@ -174,9 +174,22 @@ Run each as the owner (`adb shell hmgapid vehicle-do ...`). Each answers `ok ...
    on release? (Unknown: the car has no getter for it.)
 6. Guide lines: `vehicle-do guide_lines off`, shift to R and look at the camera view
    (lines gone?), back to P, `vehicle-do guide_lines restore`, R again (lines back?).
-7. Rear camera turns: `vehicle-do rear_camera take` → ok; a second take by another
+   Kept across a restart: `vehicle-do guide_lines off`, then `adb shell cat
+   /data/hmgapi/state/guide-lines.stock` (**expect** `2 <mod>` with the lines on before).
+   Restart the vehicle service (`adb shell hmgapid service-restart hmgapi vehicle`) or the head
+   unit, then shift to R: **expect** the lines back. The log says `guide lines back to 2
+   (stock, kept from before a restart)`, and the file is gone. Do it once more and
+   remove the mod (`hmgapid engine remove <id>`) instead of restarting: the lines come
+   back once the vehicle service starts.
+7. Safety functions, with mods installed (Wireless CarPlay/AA, Car Check and any hook
+   mods): shift to R. **Expect** the rear camera (and the 360 view on a car that has
+   one) with its guide lines, as on a stock car. `adb shell grep 'protected: '
+   /data/hmgapi/logs/hmgapi/log.log` shows `protected: com.hkmc.system.app.rearcamera runs
+   …` and no `refused` line from a mod you didn't expect. `hmgapid engine report`
+   prints a `safety:` line; its numbers match what the log shows.
+8. Rear camera turns: `vehicle-do rear_camera take` → ok; a second take by another
    mod would be refused (the owner always can); `release`.
-8. Startup notice (optional; it has no known undo): `adb shell hmgapid allow
+9. Startup notice (optional; it has no known undo): `adb shell hmgapid allow
    startup_notice on` (the app's switch shows it on), then at the next start, while
    the notice shows, `vehicle-do startup_notice dismiss`. **Note** whether it went
    away. Then `adb shell hmgapid allow startup_notice off`.
@@ -293,6 +306,39 @@ adb shell "while true; do hmgapid service-log hmgapi vehicle; sleep 5; done" | g
      see it work.
 3. Optional, at the very end: `./hmgapi-adb.sh uninstall`, then `adb reboot`: the
    unit is stock (the menu has no HMG-API tile; CarPlay/AA wired as stock).
+
+## 10b. Only in P, and what reverse does to a running install
+
+Car on, foot on the brake, somewhere you can shift to R safely. Log capture running
+(`carlog.sh`, plus `adb shell logcat -v time` for the activity manager).
+
+1. The gear checks (fast, nothing changes):
+   - In D (or N): `adb shell hmgapid reboot` → exit 75, "not restarting: the car isn't
+     in P". `adb shell hmgapid engine apply` with a change pending → exit 75, nothing
+     changed (`engine status`). The app's Restart unit and Apply say "Shift to P first".
+   - In P: `adb shell hmgapid vehicle gear.park` → `gear.park 1`; Restart works.
+2. Is there a kernel early camera? Power the unit on (cold, not QuickBoot) and shift to
+   R at once: a camera picture before Android's boot animation ends is the kernel's
+   (`earlycamlog.sh` on the unit hints at one). Note how long the picture is missing
+   after an `hmgapid reboot` in P, then shifting to R: the "about a minute" HMG-API
+   warns of.
+3. **Not tested yet: what reverse does to a running install.** Run each in P, then
+   shift to R a few seconds in, and back to P. For each, write down: does the camera
+   cover the screen; does the screen that started it close (Engineering Mode's OTA
+   screen, NEMESIS Manager, the HMG-API app); does the activity manager kill its process
+   (`am_kill`, `am_proc_died` in the log); does the head unit reset; and does the
+   install finish (its log ends with "installed", `engine status` clean, no
+   `state/journal.json`, no `state/held.txt`).
+   - The app's Apply with a mod that changes an app (so apps are held).
+   - The USB stick route (Engineering Mode > USB Copy > DSP > Update OTA), an update over
+     an installed HMG-API: with the vehicle service running it refuses out of P, so
+     start it in P and shift during "installing".
+   - NEMESIS Manager's install of an HMG-API mod package.
+   HMG-API's own steps are built to survive a closed screen (the engine runs under
+   hmgapid, and the installers ignore a closed pipe or hang-up) and a reset (each file
+   synced, then renamed; a cut-off apply rolled back at the next start, its held apps
+   turned on again). NEMESIS's own installs are not HMG-API's: report what you see to
+   NEMESIS too.
 
 ## Results
 

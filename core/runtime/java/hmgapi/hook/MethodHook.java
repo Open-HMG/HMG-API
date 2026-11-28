@@ -12,6 +12,8 @@ import java.lang.reflect.Member;
 public abstract class MethodHook {
     /** order on one method: lower runs first; HMG-API core and observe/change 0, replace 1 */
     int priority;
+    /** whose hook this is: a mod's id, or null for HMG-API's own (Bridge.hookMethod sets it) */
+    String owner;
 
     protected void beforeHookedMethod(Param param) throws Throwable {}
 

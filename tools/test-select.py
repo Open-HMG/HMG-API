@@ -15,9 +15,9 @@ ALL = 'ALL'
 RUNTIME = ['core/runtime/*-test.sh']
 # the tests that compile hmgapi.engine (tools/engine-classes.sh): the rest of core/runtime's
 # Java (hook, vehicle) is only compiled by the build and the SDK, and its own tests
-ENGINE = ['core/runtime/engine-test.sh', 'core/runtime/signing-test.sh', 'core/runtime/system-test.sh', 'core/runtime/safety-test.sh',
+ENGINE = ['core/runtime/engine-test.sh', 'core/runtime/signing-test.sh', 'core/runtime/system-test.sh', 'core/runtime/safety-test.sh', 'core/runtime/journal-test.sh',
           'core/runtime/packages-test.sh', 'core/runtime/map-test.sh', 'core/runtime/local-map-test.sh', 'core/runtime/usb-test.sh', 'core/runtime/hooks-test.sh',
-          'core/runtime/live-test.sh', 'core/runtime/native-test.sh', 'core/runtime/runtime-test.sh', 'core/runtime/net-test.sh', 'core/runtime/homewifi-test.sh',
+          'core/runtime/live-test.sh', 'core/runtime/native-test.sh', 'core/runtime/runtime-test.sh', 'core/runtime/net-test.sh', 'core/runtime/homewifi-test.sh', 'core/runtime/safe-test.sh',
           'core/runtime/overlap-test.sh', 'core/runtime/scriptcheck-test.sh', 'install/nemesis/mod-test.sh', 'install/nemesis/sync-test.sh',
           'tools/catalog-test.sh', 'tools/version-test.sh', 'tools/check-scripts.sh']
 INSTALL = ['install/common/test.sh', 'install/common/install-test.sh', 'install/common/orders-test.sh', 'install/usb/test.sh', 'install/nemesis/mod-test.sh', 'install/nemesis/sync-test.sh']
@@ -54,7 +54,7 @@ RULES = [
     (['install/*'], INSTALL + ['core/runtime/packages-test.sh']),
     (['tools/zygote-orders.py'], ['install/common/orders-test.sh']),
     (['install/nemesis/mod/*', 'install/nemesis/bin/open.sh'], SDK),
-    (['tools/mkdelta.py', 'tools/mkrecipe.py', 'tools/mkmemrecipe.py'], ['core/runtime/engine-test.sh', 'core/runtime/safety-test.sh', 'tools/lpatch/test.sh']),
+    (['tools/mkdelta.py', 'tools/mkrecipe.py', 'tools/mkmemrecipe.py'], ['core/runtime/engine-test.sh', 'core/runtime/safety-test.sh', 'core/runtime/journal-test.sh', 'tools/lpatch/test.sh']),
     (['tools/mkinstallers.sh', 'tools/mkrelease.sh', 'tools/mkmodpkg.sh', 'tools/mknemesismod.sh', 'tools/nemesis-version.py', 'tools/nemesis-meta.py', 'tools/release-mods.txt'], INSTALL + ['core/runtime/signing-test.sh', 'core/runtime/usb-test.sh'] + SDK + MODS),
     # the mod SDK and the reusable mod workflow
     (['tools/build-mod.sh', 'tools/check-points.py', 'tools/sdk/*', 'tools/sdk-test.sh', 'tools/mkrecipe.py', 'tools/mkdelta.py', 'tools/mkmemrecipe.py', 'tools/mkicon.sh', 'tools/mod-draft.py', 'tools/check-scripts.sh', '.github/workflows/mod.yml'], SDK),

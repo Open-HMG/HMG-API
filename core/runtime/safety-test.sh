@@ -78,6 +78,16 @@ printf '{"overrides": {"allow_critical": ["/system/build.prop:ro.build.version.r
 mod a '{"type": "props", "path": "/system/build.prop", "set": {"ro.build.version.release": "4.4.4"}, "stock": "any"}'
 eng plan; check "ro.* key allowed by override" 0 $rc
 rm $R/data/hmgapi/settings/hmgapi.json
+mod a '{"type": "props", "path": "/system/build.prop", "set": {"dalvik.vm.heapsize": "512m"}, "stock": "any"}'
+eng plan; has "dalvik.* key refused" "dalvik.vm.heapsize; dalvik.* and persist.sys.dalvik.* properties set how Dalvik starts" "$out"; check "... refusal exit" 3 $rc
+mod a '{"type": "props", "path": "/system/build.prop", "set": {"persist.sys.dalvik.vm.lib": "libart.so"}, "stock": "any"}'
+eng plan; has "persist.sys.dalvik.* key in build.prop refused (the runtime switch)" "changes persist.sys.dalvik.vm.lib" "$out"
+printf '{"overrides": {"allow_critical": ["/system/build.prop:dalvik.vm.heapsize"]}}\n' > $R/data/hmgapi/settings/hmgapi.json
+mod a '{"type": "props", "path": "/system/build.prop", "set": {"dalvik.vm.heapsize": "512m"}, "stock": "any"}'
+eng plan; check "dalvik.* key allowed by override" 0 $rc
+has "... with a warning" "WARNING: /system/build.prop: dalvik.vm.heapsize can keep the unit from booting" "$out"
+rm $R/data/hmgapi/settings/hmgapi.json
+check "build.prop still untouched" "$STOCK_PROP" "$(md5 $R/system/build.prop)"
 
 # ---- boot-critical and HMG-API's own files
 mod a '{"type": "add", "path": "/system/lib/libc.so", "src": "a.xml", "stock": "any"}'
@@ -89,10 +99,53 @@ eng plan; has "HMG-API's own files refused even with overrides" "belongs to HMG-
 rm $R/data/hmgapi/settings/hmgapi.json
 mod a '{"type": "add", "path": "/system/framework/framework.jar", "src": "a.xml"}'
 eng plan; has "boot class path jar refused" "framework.jar: the unit needs this file to boot" "$out"
+for p in /system/framework/framework-res.apk /system/lib/libz.so /system/lib/libcrypto.so /system/lib/libicuuc.so \
+         /system/usr/icu/icudt51l.dat /system/lib/libgui.so /system/lib/libEGL.so /system/lib/hw/gralloc.tcc803x.so \
+         /system/lib/egl/libGLES_mali.so /system/bin/netd /system/bin/mediaserver; do
+    mod a '{"type": "add", "path": "'$p'", "src": "a.xml", "stock": "any"}'
+    eng plan; has "boot-critical: $p refused" "$p: the unit needs this file to boot" "$out"
+done
+printf '{"overrides": {"allow_critical": ["/system/lib/hw/gralloc.tcc803x.so"]}}\n' > $R/data/hmgapi/settings/hmgapi.json
+mod a '{"type": "add", "path": "/system/lib/hw/gralloc.tcc803x.so", "src": "a.xml", "stock": "any"}'
+eng plan; has "a hardware module allowed by override, with a warning" "WARNING: /system/lib/hw/gralloc.tcc803x.so is boot-critical" "$out"
+rm $R/data/hmgapi/settings/hmgapi.json
+mod a '{"type": "add", "path": "/system/lib/hwx/x.so", "src": "a.xml", "stock": "any"}'
+eng plan; check "a folder that only starts like hw/ isn't critical" 0 $rc
+
+# ---- /system/bin and /system/xbin: a change must say its mode; stock modes, owners and labels come back
+# (off the unit: the file's own mode, owners and labels in $R/meta.txt)
+head -c 2048 /dev/urandom > $R/system/bin/netd; chmod 755 $R/system/bin/netd
+echo "/system/bin/netd 0 2000 u:object_r:netd_exec:s0" > $R/meta.txt
+NETD=$(md5 $R/system/bin/netd)
+# netd is boot-critical (checked above): the owner's override, so these checks are about modes alone
+printf '{"overrides": {"allow_critical": ["/system/bin/netd"]}}\n' > $R/data/hmgapi/settings/hmgapi.json
+own() { echo "$(python3 -c 'import os, sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o7777)[2:])' $R$1) $(grep "^$1 " $R/meta.txt | sed "s#^$1 ##")"; }
+mod a '{"type": "add", "path": "/system/bin/netd", "src": "a.xml", "stock": "any"}'
+eng plan; has "a /system/bin change with no mode refused" '/system/bin/netd: a: a change in /system/bin or /system/xbin needs a "mode"' "$out"; check "... refusal exit" 3 $rc
+mod a '{"type": "add", "path": "/system/xbin/tool", "src": "a.xml"}'
+eng plan; has "... /system/xbin too, a new file as well" '/system/xbin/tool: a: a change in /system/bin or /system/xbin needs a "mode"' "$out"
+mod a '{"type": "add", "path": "/system/bin/netd", "src": "a.xml", "stock": "any", "mode": "750"}'
+eng apply; check "with a mode: applies" 0 $rc
+check "... the mod's mode, the stock owner and label" "750 0 2000 u:object_r:netd_exec:s0" "$(own /system/bin/netd)"
+eng restore
+check "restore: stock bytes" "$NETD" "$(md5 $R/system/bin/netd)"
+check "restore: stock mode, owner and label (executable again)" "755 0 2000 u:object_r:netd_exec:s0" "$(own /system/bin/netd)"
+mod a '{"type": "add", "path": "/system/xbin/tool", "src": "a.xml", "mode": "755"}'
+eng apply; check "a new /system/xbin file with a mode" "755 0 2000 -" "$(own /system/xbin/tool)"
+eng restore; check "... removed again" absent "$(md5 $R/system/xbin/tool)"
+rm -f $R/meta.txt
+rm -f $R/data/hmgapi/settings/hmgapi.json
 
 # ---- live props
 mod a '{"type": "prop", "key": "ro.secure", "value": "0"}'
 eng plan; has "non-persist prop refused" "only persist.* properties can be set" "$out"
+mod a '{"type": "prop", "key": "persist.sys.dalvik.vm.lib", "value": "libart.so"}'
+eng plan; has "the runtime switch refused" "prop persist.sys.dalvik.vm.lib: dalvik.* and persist.sys.dalvik.* properties" "$out"
+has "... naming the override" "overrides.allow_critical \"prop:persist.sys.dalvik.vm.lib\"" "$out"; check "... refusal exit" 3 $rc
+printf '{"overrides": {"allow_critical": ["prop:persist.sys.dalvik.vm.lib"]}}\n' > $R/data/hmgapi/settings/hmgapi.json
+eng plan; check "... allowed by override" 0 $rc
+has "... with a warning" "WARNING: prop persist.sys.dalvik.vm.lib can keep the unit from booting" "$out"
+rm $R/data/hmgapi/settings/hmgapi.json
 printf 'prop/persist.sys.iap2.wifi=f\n' > $R/settings.txt
 mod a '{"type": "prop", "key": "persist.sys.iap2.wifi", "value": "t"}, {"type": "prop", "key": "persist.iap2.iden.wireless", "value": "t"}'
 eng apply; has "persist prop set live" "prop/persist.sys.iap2.wifi=t" "$(cat $R/settings.txt)"
@@ -123,6 +176,9 @@ has "hmgapid told to do it" "binds" "$(cat $R/actions.log 2>/dev/null)"
 mod a '{"type": "bind", "src": "files/x", "target": "/system/bin/linker", "service": "x"}'
 mkdir -p $R/data/hmgapi/mods/a/files; echo bin > $R/data/hmgapi/mods/a/files/x
 eng plan; has "bind over a boot-critical binary refused" "the unit needs /system/bin/linker to boot" "$out"
+mod a '{"type": "bind", "src": "files/x", "target": "/system/bin/netd", "service": "netd"}'
+mkdir -p $R/data/hmgapi/mods/a/files; echo bin > $R/data/hmgapi/mods/a/files/x
+eng plan; has "bind over a boot daemon refused" "the unit needs /system/bin/netd to boot" "$out"
 mod a '{"type": "add", "path": "/system/etc/permissions/b.xml", "src": "a.xml"}'
 eng apply; has "binds dropped with the mod: unbind planned" "binds" "$(cat $R/actions.log)"
 check "binds.txt empty again" "" "$(cat $R/data/hmgapi/state/binds.txt)"

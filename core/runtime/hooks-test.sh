@@ -1,6 +1,7 @@
 #!/bin/sh
 # Off-car test of hook plans (hmgapi.engine.HookPlan through `engine plan`): load
-# order, declared modes, and conflicts when two mods replace the same hook point.
+# order, declared modes, and conflicts when two mods replace the same hook point; the
+# safety functions no mod touches (hmgapi.engine.Protected) and the Car Report's account of them.
 # (The runtime guard and ordering are in the on-car self-test.)
 set -e
 cd "$(dirname "$0")/../.."
@@ -62,6 +63,37 @@ rm $R/data/hmgapi/mods/wire/.disabled
 : > $R/data/hmgapi/mods/full/.disabled
 eng plan; hasnt "the first turned off: the other loads" "won't load" "$out"
 rm -r $R/data/hmgapi/mods/*
+
+# safety functions (engine.Protected): the cameras, guide lines and telematics, no mod, built in
+eng plan; has "plan lists the protected processes" "safety   process com.hkmc.system.app.rearcamera: the rear camera, 360 view (AVM/SVM) and parking guide lines (no mod, built in)" "$out"
+has "... and classes" "safety   class com.hkmc.micom.PgsService: the camera and guide line service (system_server) (no mod, built in)" "$out"
+mod lines '{"framework.pgs_service.request_guide_lines": "observe"}'
+mod fine '{"launcher.menu_list.load": "observe"}'
+eng plan; has "a mod declaring the guide line point won't load" "hooks    lines won't load: hook point framework.pgs_service.request_guide_lines reaches the parking guide lines and cameras (use the vehicle commands guide_lines and rear_camera): a safety function, no mod hooks it (built in, no override)" "$out"
+hasnt "... the other one loads" "fine won't load" "$out"
+printf '{"overrides": {"ignore_system": ["lines"]}}\n' > $R/data/hmgapi/settings/hmgapi.json
+eng plan; has "... no owner override changes that" "hooks    lines won't load: hook point framework.pgs_service.request_guide_lines" "$out"
+rm $R/data/hmgapi/settings/hmgapi.json
+rm -r $R/data/hmgapi/mods/*
+# the Car Report: what the runtime logged (a protected process started, a refused hook, an undeclared one)
+mkdir -p $R/data/hmgapi/logs/hmgapi
+cat > $R/data/hmgapi/logs/hmgapi/log.log <<'L'
+11-27 10:00:01.000 I/HMG-API( 1163): protected: com.hkmc.system.app.rearcamera runs the rear camera, 360 view (AVM/SVM) and parking guide lines: no mod loads here, mods' hooks pass through, HMG-API adds nothing (built in, no override)
+11-27 10:00:02.000 W/HMG-API(  624): protected: refused cam's hook on com.hkmc.micom.PgsService.requestGuideLineState in system_server: the camera and guide line service (system_server) is a safety function; no mod hooks it (built in, no override)
+11-27 10:00:03.000 W/HMG-API( 2900): undeclared hook: egmp-aa-ev hooked X.shutdown in com.google.android.projection.sink directly, not through a hook point it declared in mod.json
+11-27 10:05:03.000 W/HMG-API( 3100): undeclared hook: egmp-aa-ev hooked X.shutdown in com.google.android.projection.sink directly, not through a hook point it declared in mod.json
+L
+eng report; check "report" 0 $rc
+has "report: the safety summary" "safety: 1 protected process(es) started with no mod, 1 mod hook(s) refused, 1 direct hook(s) outside declared points" "$out"
+md=$(cat $R/data/hmgapi/public/reports/*.md)
+has "report: protected processes seen" "Protected processes that started here, with no mod loaded: \`com.hkmc.system.app.rearcamera\`" "$md"
+has "report: the refused hook" "  - refused cam's hook on com.hkmc.micom.PgsService.requestGuideLineState in system_server" "$md"
+has "report: the undeclared hook, once" "Direct hooks outside a mod's declared points: 1
+  - egmp-aa-ev hooked X.shutdown in com.google.android.projection.sink directly" "$md"
+has "report json: the rules" '"process com.hkmc.system.app.rearcamera: the rear camera' "$(cat $R/data/hmgapi/public/reports/*.json)"
+rm -r $R/data/hmgapi/logs $R/data/hmgapi/public
+javac --release 8 -Xlint:-options -nowarn -cp "$CP" -d "$CP" core/runtime/test/hmgapi/engine/ProtectedTest.java
+java -cp "$CP" hmgapi.engine.ProtectedTest core/hookpoints || fail=1
 
 # the mod loader's own decisions (hook.Mods: boot and live loads), on a mods folder
 javac --release 8 -Xlint:-options -nowarn -cp "$CP" -d "$CP" core/runtime/test/hmgapi/engine/HookPlanTest.java

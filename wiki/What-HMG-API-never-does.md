@@ -9,6 +9,13 @@
 - **It never flashes firmware:** not the MICOM, the bootloader or the modem.
 - **It never changes the car's feature level** (`stepofspec`).
 - **It never takes SOS or power away** from the car's own buttons.
+- **It never lets a mod into the car's safety functions:** the rear camera, the 360
+  view, the parking guide lines and the emergency calls (SOS, eCall). No mod loads in
+  their apps, and no mod may hook the services behind them, declared or not. This is
+  built in, and no setting or override turns it off. Mods that use the rear camera
+  take turns through HMG-API and never change it. Guide lines a mod turned off go
+  back to how you had them, even after a restart or the mod's removal. The Car
+  Report shows what was refused, and any mod that hooks something it didn't declare.
 - **It ships no manufacturer files.** Changes are made from your own head unit's
   stock files, and every file it changes can be put back byte for byte.
 - **It doesn't update itself over the internet.** Updates come from a USB stick or

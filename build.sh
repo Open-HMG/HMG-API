@@ -34,6 +34,17 @@ loader() {
     md5sum "$OUT/libhmgapi_hook.so"
 }
 
+fetchlib() {
+    # libhmgapi_fetch.so (core/fetch/fetch.c): the engine's HTTPS through the unit's own libssl; no libc
+    # or system headers, only dlopen/dlsym from the unit's libdl (the loader's stand-in)
+    sh core/loader/syslib-stubs.sh "$OUT/syslib" >/dev/null
+    clang --target=armv7a-linux-androideabi -mthumb -march=armv7-a -mfloat-abi=softfp -Os -fPIC \
+      -ffreestanding -fno-builtin -nostdlib -shared -fno-stack-protector -fno-exceptions -fno-asynchronous-unwind-tables -fuse-ld=lld \
+      -Wl,-z,now -Wl,--no-rosegment -Wl,--hash-style=sysv -Wl,-z,defs -Wl,--build-id=none -Wl,-soname,libhmgapi_fetch.so \
+      -o "$OUT/libhmgapi_fetch.so" core/fetch/fetch.c "$OUT/syslib/libdl.so"
+    md5sum "$OUT/libhmgapi_fetch.so"
+}
+
 runtime() {
     rm -rf "$OUT/classes" "$OUT/runtime-stubs" && mkdir -p "$OUT/classes" "$OUT/runtime-stubs"
     # stubs/: signatures of the car's own classes the runtime extends (compile only, never in the jar)
@@ -95,7 +106,7 @@ lpatch() { OUT="$OUT" sh tools/lpatch/build.sh; }
 payload() {
     P="$OUT/payload"
     rm -rf "$P" && mkdir -p "$P"
-    for f in hmgapid lpatch app_process libhmgapi_hook.so hmgapi-hook.jar HmgApi.apk; do
+    for f in hmgapid lpatch app_process libhmgapi_hook.so libhmgapi_fetch.so hmgapi-hook.jar HmgApi.apk; do
         [ -f "$OUT/$f" ] || { echo "payload: no out/$f (build it first)"; exit 1; }
         cp "$OUT/$f" "$P/"
     done
@@ -120,7 +131,7 @@ payload() {
     (cd "$P" && find maps -type f | LC_ALL=C sort | xargs md5sum > MAPS.md5)
     sed -n 's/.*HMGAPI_VERSION = "\(.*\)";/\1/p' core/runtime/java/hmgapi/engine/Engine.java > "$P/VERSION"
     echo "$(git rev-parse --short HEAD 2>/dev/null || echo local)$(git diff --quiet HEAD 2>/dev/null || echo +) $(date -u +%Y-%m-%d)" > "$P/BUILD"
-    (cd "$P" && md5sum hmgapid lpatch app_process libhmgapi_hook.so hmgapi-hook.jar HmgApi.apk install.sh uninstall.sh lib.sh stock.txt app-pending.sh app-open.sh hook-check.sh boot.sh MAPS.md5 $(find nemesis -type f | LC_ALL=C sort) > MANIFEST)
+    (cd "$P" && md5sum hmgapid lpatch app_process libhmgapi_hook.so libhmgapi_fetch.so hmgapi-hook.jar HmgApi.apk install.sh uninstall.sh lib.sh stock.txt app-pending.sh app-open.sh hook-check.sh boot.sh MAPS.md5 $(find nemesis -type f | LC_ALL=C sort) > MANIFEST)
     echo "payload $(cat "$P/VERSION") ($(cat "$P/BUILD")): $P"
 }
 
@@ -166,11 +177,11 @@ sdk() {
 }
 
 if [ $# -eq 0 ]; then
-    set -- hmgapid zygote loader runtime client mods app lpatch payload
+    set -- hmgapid zygote loader fetchlib runtime client mods app lpatch payload
 fi
 for part in "$@"; do
     case $part in
-        hmgapid|zygote|loader|runtime|client|mods|app|lpatch|payload|sdk) $part ;;
+        hmgapid|zygote|loader|fetchlib|runtime|client|mods|app|lpatch|payload|sdk) $part ;;
         *) echo "unknown part: $part"; exit 2 ;;
     esac
 done

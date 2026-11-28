@@ -28,7 +28,7 @@ setting). It never edits your code.
 | your own APK | `"apps": [{"apk": "…", "package": "…"}]`: installed with the signature workaround, data kept on update, turned off with the mod, removed with it |
 | a tile in the app menu | `"provides": {"launcher": [{"package": "pkg", "class": ".Main"}]}`, with optional day/night pictures (`icon`, `icon_night`) and greyed-out ones (`icon_disabled`, `icon_disabled_night`); `tools/mkicon.sh <picture> <dir>` makes all four in the stock style from any shape (PNG or SVG; add a size and the shape's colour for a logo on its own background, e.g. `66 '#41ae45'`) |
 | to change how the car's own apps behave | `"hooks": {"jar": "hooks.jar", "entry": "my.Entry"}`: your code runs in their processes and hooks them by stable hook point names, mapped per car; the list, and which cars have each: [hook-points.md](hook-points.md) (example: `mods/examples/hello`) |
-| a background process | `"services": [{"name": "…", "script": "…", "user": "root\|system\|app"}]`, or `{"jar": "x.jar", "class": "my.Main", "args": […]}` (`BOOTCLASSPATH` already set); `"restart": true` (default) or `false`; `"start": "android"` (default), `"boot"`, or `"manual"` (only when your app or `hmgapid service-start` asks) |
+| a background process | `"services": [{"name": "…", "script": "…", "user": "root\|system\|app"}]`, or `{"jar": "x.jar", "class": "my.Main", "args": […]}` (`BOOTCLASSPATH` already set); `"restart": true` (default) or `false`; `"start": "android"` (default), `"boot"`, or `"manual"` (only when your app or `hmgapid service-start` asks); `"priority": "low"` (default: nice 10, lowest I/O priority) or `"normal"` |
 | files and settings on the unit | `patches.json` changes (`add`, `lines`, `props`, `setting`, `codecs`, …): merged with other mods, put back on removal |
 | a folder on a USB stick | `"usb": ["MyFolder"]`: your apps get `hmgapi.intent.action.USB_FOLDER`; services ask `hmgapid usb` |
 | to read the car | `"vehicle": {"read": ["battery12v.soc", "gear.park", "hv.soc"]}`, then `hmgapid vehicle <name>…` or `api.vehicle(…)`: no root, one read shared by every mod (see Vehicle readings) |
@@ -58,6 +58,12 @@ A service's environment: `HMGAPI_MOD`, `HMGAPI_MOD_DIR` (the mod's folder),
 service-start|stop|restart <name>` and read their output with `hmgapid service-log
 <name>`.
 
+hmgapid keeps a service's log at 256 KB, then `.1`, while it runs, and keeps at most
+256 KB of its output a minute (a line in the log says how much it left out). A service
+runs at a low priority (nice 10, the lowest best-effort I/O priority) unless it asks for
+`"priority": "normal"`; ask only for work the driver waits on. In safe mode (the wiki's
+Troubleshooting page) no mod's service runs, `"boot"` ones included.
+
 ### Points mapped on the car itself
 
 A point newer than HMG-API's map for a car is listed as missing there until a maintainer
@@ -79,6 +85,40 @@ For a mod:
 
 The owner can turn local points off ("Use points mapped on this car"), and
 `map-car --forget` deletes them.
+
+### Safety functions: no mod, ever
+
+The rear camera, the 360 view (AVM/SVM), the parking guide lines (PGS) and the
+telematics emergency calls (SOS, eCall) are off limits to every mod. This is built in.
+No setting, override (`overrides.ignore_system` included), stick file or mod.json turns
+it off (`hmgapi.engine.Protected`; `hmgapid engine plan` lists every rule under `safety`):
+
+- **Processes no mod loads in:** `com.hkmc.system.app.rearcamera` (rear camera, 360
+  view, guide lines' screen), `com.hkmc.telematics.ECall` (eCall, where installed) and
+  `com.hkmc.telematics.service` (telematics), with every other process of those
+  packages. So does any stock process (`com.hkmc.`, `com.mobis.`, `com.daudio.` …, never
+  a mod's own app) whose name looks like a camera or emergency-call app (`rearcamera`,
+  `.avm`, `.svm`, `.pgs`, `ecall`, `.sos` …), for builds not checked yet.
+  There, at boot or live, no mod's `zygoteInit`/`appLoaded` runs. The hooks mods put on
+  in the zygote pass straight through, and HMG-API adds nothing of its own. The log
+  says `protected: <process> runs …` once per start.
+- **Classes no mod hooks, in any process:** the camera and telematics services run
+  inside `system_server`, so they're protected by class instead: `com.hkmc.pgs.*`,
+  `com.hkmc.micom.PgsService` (and `PgsServiceV2`), `com.hkmc.micom.TMUService`,
+  `com.hkmc.micom.protocol.AVM`/`Camera`/`PGS`/`TMU` and `…protocol.camera.*`,
+  `com.hkmc.tmu.*`. A hook there, declared or not, throws `IllegalStateException`
+  and is logged as `protected: refused …`.
+- **Hook points no mod declares:** `framework.pgs_service*`, `framework.car_services.pgs`
+  and `framework.tmu*`. A mod that declares one isn't loaded (the plan says why). Use
+  the vehicle commands `guide_lines` and `rear_camera` instead.
+
+**Direct hooks.** `Hooks.findAndHookMethod` and `Bridge.hookMethod` are public, but a mod
+should hook through `ModContext.hook` and the points it declares. A direct call works
+outside the protected processes and classes. Each one is logged once per process:
+`undeclared hook: <mod> hooked <class>.<method> in <process> directly …`. The Car Report
+lists them (`protection.undeclared_hooks`) next to the refused hooks and the protected
+processes it saw start. If you need a method HMG-API has no point for, ask for a new
+hook point instead.
 
 ## Talking to HMG-API from your app or service
 
@@ -362,8 +402,17 @@ is switched on again, the client goes off and the hotspot comes back as it was. 
 next to the hotspot, on a second interface, didn't hold up on these units' Wi-Fi driver.)
 While joined, the traffic of the mods that ask (their apps, and their services) goes through
 home Wi-Fi; the car's own stays on mobile data. A mod that asks while the switch is off has no
-internet (the plan says so). IPv4 only for now. This is also how HMG-API itself is meant to
-check for updates.
+internet (the plan says so). IPv4 only for now. HMG-API itself checks its catalogue and
+updates this way (`Catalog`), each time home Wi-Fi comes up.
+
+How it's routed, for a mod that wants to know: its packets are marked (`0x2951`) and go out by
+table 95 (home Wi-Fi's default; an unreachable default while home Wi-Fi is down), masqueraded
+to `wlan0`'s address; anything marked never leaves on `rmnet` (checked after the reroute,
+`mangle POSTROUTING`). A service's own lookups (its resolver asks 127.0.0.1:53) are redirected
+to home Wi-Fi's DNS server. A root service may also mark its own sockets (`SO_MARK` 0x2951) so
+their route is table 95's from the start; it should bind them to `wlan0` too (`SO_BINDTODEVICE`)
+and give up if either is refused, as HMG-API's own downloads do: with the mark alone, a socket
+uses the main table (mobile data) until the network keeper's fwmark rule is in.
 
 - Check before a download: `HmgApi.homeWifiUp()`, or `HmgApi.homeWifi()`
   (`{"state": "up", "rssi": -61, "freq": 2437}`; `state` up, waiting (the car is on),
@@ -427,6 +476,11 @@ check for updates.
   "type": "video/x-vnd.on2.vp9", "kind": "decoder"}]}`. Added codecs go last
   (lowest priority); comments are never touched; one mod adding what another
   removes is a conflict, with the reason.
+- **File modes** (patches.json): a change's `"mode"` (`"644"`, `"755"`; no setuid,
+  setgid or sticky bits) is the mode the file is written with. Without one, a file
+  keeps the mode, owner and SELinux label it had before HMG-API first wrote it (a new
+  file gets 644 root:root, or root:shell under `/system/bin`). A change under `/system/bin` or `/system/xbin` must give a
+  `"mode"`. Restore and rollback put back each file's own mode, owner and label.
 - **List settings** (enabled keyboards): `{"type": "setting", "namespace": "secure",
   "key": "enabled_input_methods", "add": ["org.pocketworkstation.pckeyboard/.LatinIME"]}`
   (separator `:` by default). Every mod's entries on top of the stock list; the stock
@@ -439,7 +493,8 @@ check for updates.
 - **Rear camera turns:** `"vehicle": {"commands": ["rear_camera"]}`, then
   `vehicle-do rear_camera take|release` before and after opening the camera; one mod
   at a time, freed when it's turned off. The car's reverse view always comes first
-  (`com.hkmc.intent.action.CAMERA_APP_START`, the gear).
+  (`com.hkmc.intent.action.CAMERA_APP_START`, the gear). It's coordination only: no
+  mod hooks the camera app or its service (see Safety functions).
 
 ## Vehicle commands
 
@@ -448,6 +503,13 @@ charge_door open` or `api.command("seat_heat", "driver", "low")`, without root. 
 review gave it (park only, one holder of the ambient light, conditioning stopped
 when its mod is turned off ...): the list, arguments and guards are in
 `vehicle-commands.md`.
+
+`guide_lines on|off` keeps the lines' stock state on disk (`state/guide-lines.stock`)
+before the first change. So they go back to stock on `restore`, when the mod is turned
+off, and also after a restart of the vehicle service or the head unit while the mod
+held them, or after the mod's removal. The vehicle service keeps running until they're
+back, retrying until the car's camera service answers. HMG-API's uninstall puts them
+back too.
 
 ## Car events
 
@@ -490,8 +552,8 @@ Each event reaches the mod three ways, all at once:
 HMG-API waits for all three to finish (or their time to run out) before it sends the
 next event (`shutdown` doesn't wait for a `parked` still running), and at `shutdown`
 before it tells the car it's done. It only holds a shutdown up while an
-enabled mod asks for `shutdown`. The vehicle service runs while any enabled mod asks for
-an event. `hmgapid service-log hmgapi vehicle` says what it saw (power, doors) and what
+enabled mod asks for `shutdown`. The vehicle service always runs (HMG-API's own gear check
+before a restart or an install reads `gear.park` through it). `hmgapid service-log hmgapi vehicle` says what it saw (power, doors) and what
 each event did.
 
 ## Packaging
@@ -530,6 +592,29 @@ optional `"repo": "https://…"` in `mod.json` is the link the catalogue shows f
 your source. Keep your key private and backed up: a lost key
 means a new UUID, and owners would have to remove the old mod before installing
 yours again.
+
+### Updates from your own releases
+
+A mod the catalogue doesn't list (installed from USB or adb, private, or waiting for
+its catalogue PR) still gets updates over home Wi-Fi when its `mod.json` has
+`"repo": "https://github.com/<owner>/<repo>"`. The head unit checks that repo's GitHub
+releases (one API call per repo, at most every 6 hours) and offers the newest one
+that is newer than what's installed, in the Updates tab, saying where it came from:
+
+- Tag releases `vX.Y.Z` (or `vX.Y.Z-beta.N`, marked as a pre-release). An owner on a
+  final version gets finals; an owner on a pre-release gets that mod's pre-releases too.
+- Attach the signed zip as `<id>-<version>.zip` or `<id>-v<version>.zip`, or name your
+  own pattern in `mod.json`: `"release_asset": "my-mod-v{version}.zip"` (needed when one
+  release carries several mods).
+- A `SHA256SUMS` asset is optional. Without it, GitHub's digest of the asset is checked,
+  if it has one.
+- Only your key updates your mod: a release signed with another key, a zip whose
+  `mod.json` isn't the tag's id and version, or one over 64 MB is never taken.
+
+For a listed mod the catalogue stays the source; the owner can choose its releases
+instead (a test build from a fork), or turn updates off, on the mod's page
+(`hmgapid engine update-source <id> catalogue | releases | off | default`).
+HMG-API's maintainers can stop a version for both sources in `catalog/withdrawn.json`.
 
 ## Building a mod outside this repo
 

@@ -2,10 +2,274 @@
 
 ## Unreleased
 
+- **The stock copy is on storage before the wrapper goes in.** The installer makes
+  `app_process.hmgapi-stock` under a new name, and the kernel can keep a new file's data in
+  memory for up to ~30 s; the wrapper then goes over `app_process` (or `.real`), which reaches
+  storage at once. A hard reset (Reset pinhole, power loss) in the seconds before the
+  install's final `sync` could leave the wrapper running an empty stock copy: no zygote, and
+  no stock `app_process` left on `/system`. The install now runs `sync` as soon as the stock
+  copy is made. The uninstall was already safe (stock goes back over existing files, then
+  `sync`). The same gap in NEMESIS 1.17's `app_process.real` was reported to NEMESIS.
+  Tested off-car only.
+- **The boot hook keeps the boot scripts' other lines as they are.** Putting HMG-API's block
+  into NEMESIS's `install-recovery.sh` and the stock `qb_runtime.sh` (every install, and
+  `hook-check.sh` at boot) wrote each line again with `echo`, which expands backslashes in the
+  unit's mksh as in dash: `\\` became `\`, and a `\c` ended the output there, so a line like
+  `V="x\cY"; echo ok` lost its closing quote and joined the next one, and the script stopped
+  running. Lines are now written with mksh's `print -r` (in a shell without it, as the
+  off-car tests' dash, with `echo` and every backslash doubled), checked on a test line when
+  the script starts, and the new file is checked before it goes in: without the block it must
+  be the file as it was, or the file is left alone. Tested off-car only (dash and macOS `sh`;
+  CI also runs the checks in mksh), not yet on a car.
+- **An update checks the stock copy by md5.** A new install checks `app_process` against
+  `stock.txt`, but an update only checked that `app_process.hmgapi-stock` started like a
+  binary, so a copy cut short, zero-filled or otherwise damaged passed, and the next start had
+  no zygote. The catalogue's `engine update hmgapi` runs the same installer. Now a stock copy
+  that isn't a known build comes back from the stock backup when that is one, and with no
+  stock backup the update is refused with nothing changed, as a new install is
+  (`HMGAPI_FORCE=1` stays for maintainers). Tested off-car only.
+- **The zygote wrapper falls back to the stock backup.** When the stock copy won't run (lost
+  or damaged on `/system`), the wrapper runs the install's backup of the stock binary,
+  `/data/hmgapi/stock/system/bin/app_process` (made executable first, and only if it starts
+  like an ELF binary), so Android still starts and an install or uninstall can put `/system`
+  right. Where SELinux refuses an exec from `/data` (an Enforcing unit) it exits as before.
+  Not yet tested on a car.
+- **Hooks stay off on a Dalvik other than the EV6's.** The hook runtime's struct offsets come
+  from the EV6's libdvm. Before the first hook it now reads them back from Bridge's own
+  methods (class, name, shorty, flags, argument count, native function), the primitive types
+  and an array's length; on a mismatch it logs which one and leaves hooks off, so the unit runs
+  stock instead of crashing each app as it starts. Not yet tested on a car.
+- **The boot guard now catches late crashes and hangs, and fails closed.** Its watcher used
+  to reset both counts once the zygote had been up 120 s, so a mod crashing Android later
+  (a phone connecting, CarPlay starting) restarted it again and again with hooks on every
+  time, and a hang (a mod's `zygoteInit`, a home screen that crash-loops) was never counted.
+  Now a start counts as good only once Android booted: a `system_server` and a launcher
+  (`com.android.launcher3`) forked by that zygote, the launcher up 30 s, and
+  `sys.boot_completed` 1. Only then does `hook/starts` go back to 0; `hook/boot` (every start
+  in one kernel boot) is never reset within that boot. A zygote with no `system_server` after
+  120 s (a normal one forks it within 3 s) is stopped, so that restart counts. When a limit
+  is reached the wrapper writes `hook/tripped`, and hooks stay off through restarts until the
+  owner resets the guard. The counters fail closed: a read or write error, or a count that
+  isn't a number, means no hooks for that start (it used to mean hooks on, start 1), and each
+  count is written to a `.tmp` file, fsynced and renamed over the old one.
+- **The app says why its hooks are off.** "Hooks not running" becomes "Hooks off: boot
+  guard" when the guard tripped; tapping it says which limit was reached and offers **Reset
+  and restart** (before, only a reinstall or adb reset it). New engine command
+  `boot-guard [reset]`, also in the problem log. The Settings text, Troubleshooting page and
+  problem log now give the real limits (three restarts in one boot, at any time, or six
+  starts in a row that don't reach the home screen), not "three failed starts in a row".
+  Tested off-car only.
+- **An undone trial or a cut-off apply puts settings, live props and binds back too.** The
+  journal kept only files and the state, so a trial's `persist.*` prop (or one set by an apply
+  cut off after its settings) stayed set after "trial undone", the next apply took it for stock,
+  and `engine restore` left it set. `binds.txt` wasn't rolled back either. The journal now keeps
+  each one's value before, and `engine recover` writes them back.
+- **Stock backups are checked before every use.** They're taken as the installer takes its
+  own: copied beside, checked against the stock md5, then renamed, so a cut-off copy never sits
+  under the backup's name. An app's odex backup has its md5 recorded now. A restore, uninstall or
+  rebuild never writes a backup that isn't the recorded md5 (a short odex under a stock apk with
+  no `classes.dex` crashed that app at every launch): a NEMESIS copy with that md5 stands in, or
+  the engine stops and names the backup and the md5 it should have.
+- **Room is checked before an apply** writes anything, on `/system` and `/data`. If `/system`
+  filled up anyway, `engine recover` removes the cut-off copy first and, when there's still no
+  room, the file before its saved copy goes back, instead of failing at every start.
+- **A damaged journal, or a saved copy that's gone, no longer blocks everything.** `engine
+  recover` sets the journal aside (`state/journal.bad.json`) and says so; `engine status` and
+  `engine keep` say what's wrong instead of failing.
+- **More is refused unless `hmgapi.json overrides.allow_critical` lists it** (with a warning):
+  `dalvik.*` and `persist.sys.dalvik.*` keys in `build.prop` and as live props
+  (`"prop:<key>"`, e.g. the runtime switch `persist.sys.dalvik.vm.lib`), `framework-res.apk`,
+  `libz`, `libcrypto`, `libssl`, the ICU libraries and data file, `libgui`, `libui`, `libEGL`,
+  `libGLESv2`, `libhardware`, `libsqlite`, `libexpat`, everything in `/system/lib/hw/` and
+  `/system/lib/egl/`, and `netd`, `mediaserver`, `logwrapper` and `e2fsck`.
+- **HMG-API doesn't update itself while an apply is unfinished or a trial is in place**
+  (`engine update-hmgapi`, `--force` included): `engine keep` or `engine recover` first.
+- **A rebuilt app's Dalvik cache entry is the only one touched.** The clean-up also deleted
+  other apps' entries whose names ended the same way, and the entry filled after a restore was
+  always named `system@app@`, wrong for an app in `/system/priv-app`. Tested off-car only.
+- **Restarts, applies and installs only start with the car in P.** A restart takes the reverse
+  camera's picture away for about a minute (Android shows it on these units), and on 2026-11-27 a
+  NEMESIS install (no HMG-API) cut off by a shift into reverse left a unit that didn't start.
+  `hmgapid reboot` (every restart: the app's buttons, the boot steps), `engine apply` and
+  `engine restore` when they change files on `/system` (and so may stop system apps for the
+  swap), `engine update-hmgapi`, and `install.sh`/`uninstall.sh` (every install route) read
+  `gear.park` first. Not in P: refused (exit 75), nothing changed, no override. No reading (the
+  car's map has no gear point, or the vehicle service isn't up yet): `hmgapid reboot` and the
+  engine refuse (exit 76) unless told `--gear-unknown-ok`, which the app passes once the owner
+  says the car is in P; the USB, NEMESIS and adb routes, with no one to ask, warn and go on. The
+  app tells the owner to stay in P until it's done, as does the USB installer's toast.
+- **HMG-API's vehicle service always runs**, not only while a mod reads the car, so every car
+  with a gear point in its map gives the reading the checks above need.
+- **The restart after a boot-time rollback waits for the car to be parked**, in the background
+  (the boot never waits): HMG-API's parked state, or in P with the car off (in P for two minutes
+  when the power status can't be read). Until then the app shows Restart needed; with no gear
+  reading for 10 minutes there's no restart, and the app's Restart asks the owner.
+- **A cut-off install or apply leaves less behind.** `install.sh`, `uninstall.sh` and the USB
+  installer ignore a closed output pipe and hang-ups (a screen that closed under them, an adb
+  that dropped), and sync each file before renaming it into place, so a reset right after never
+  leaves an empty `app_process`. The engine writes down the apps it stops (`state/held.txt`)
+  before `pm disable`, which lasts across restarts; an apply cut off before it turned them on
+  again has them turned on by the next start's `engine recover`. The USB installer's restart
+  waits while the car isn't in P. Tested off-car only: what shifting into reverse does to a
+  running install on a car is still to be checked (`docs/car-test.md`).
+- **No mod reaches the car's safety functions** (the review of 2026-11-26). The rear
+  camera, the 360 view (AVM/SVM), the parking guide lines (PGS) and the emergency calls
+  (SOS, eCall) are built in as off limits (`hmgapi.engine.Protected`), with no owner
+  override. No mod loads in their app processes (`com.hkmc.system.app.rearcamera`,
+  `com.hkmc.telematics.ECall`, `com.hkmc.telematics.service`, and names that look like
+  a camera or eCall app), at boot or live. The hooks mods put on in the zygote pass
+  through there, and HMG-API adds nothing of its own. No mod may hook the camera and
+  telematics classes that run in `system_server` (`com.hkmc.pgs.*`, `PgsService`,
+  `TMUService`, `com.hkmc.tmu.*`, their MICOM protocols), declared or not. A mod that
+  declares `framework.pgs_service*`, `framework.car_services.pgs` or `framework.tmu*` isn't
+  loaded. Names are from the US Ioniq 5 260507's stock files and logs.
+- **Direct hooks are reported.** A mod's `Bridge.hookMethod`/`Hooks.findAndHookMethod`
+  call outside its declared points still works outside the protected processes and
+  classes (egmp-aa-ev 0.8.4 uses one as a fallback). It's logged once per process
+  (`undeclared hook:`), and the Car Report has a `protection` section listing these, the
+  refused hooks and the protected processes it saw start.
+- **Guide lines a mod changed go back after a restart or the mod's removal.** The
+  `guide_lines` command keeps their stock state in `state/guide-lines.stock` before the
+  first change. The vehicle service puts it back at its start (retrying until the
+  camera service answers) and keeps running while the file is there, and the uninstall
+  puts it back too. Before, the state lived only in memory, so a restart while a mod
+  held the lines off left them off.
+- **A failed apply is rolled back at once.** When a rename, a dexopt, a remount or a copy
+  failed part-way, /system stayed half-applied (one library new, the next stock, an app's
+  odex deleted) until the next start, and every other engine command was refused. Now the
+  same run puts every file and setting back, last changed first, deletes its temp files
+  (`*.hmgapi-new`, `stage/`), and starts the apps it stopped. Only a power cut, a killed
+  engine or a rollback that fails too leaves the journal for the next start (`engine recover`).
+- **Apps stopped during an apply always come back.** The apps whose files change (GPM,
+  DiPO, iAP2, navigation, BtSettings) are `pm disable`d for the swap, and Android keeps them
+  off across restarts. The list lived only in memory, so a power cut (the driver's door, the
+  battery saver) or a killed engine left them off for good. It's now written to the journal
+  and `state/held.txt` before any is stopped; `engine recover` starts them again, and at boot,
+  once Android is up, `engine release-held` does (only with no unfinished apply left, so they
+  never run on half-changed files). Android itself (`framework-res.apk`), persistent apps
+  (`packages.xml`), OTAClient and apps that were off already are never stopped.
+- **File modes, owners and SELinux labels are kept.** Every file was written, restored and
+  rolled back as 644 root:root, whatever it was: uninstalling a mod that patched a binary in
+  `/system/bin` put the stock one back unable to run. Each file's own mode, owner and label
+  are now read before HMG-API first writes it and put back on restore and rollback; a change
+  with no `"mode"` keeps them. A change under `/system/bin` or `/system/xbin` with no `"mode"`
+  is refused. Files recorded by an earlier HMG-API get Android's defaults on restore (755
+  root:shell in `/system/bin` and `/system/xbin`, 644 root:root elsewhere).
+  Tested off-car only.
 - **A root service can read its own settings** (`HmgApi.settings()`, `saveSettings()`): the
   daemon sees such a service as root, so the client names its mod (`HMGAPI_MOD`).
+- **Get mods: HMG-API's catalogue on the head unit.** Mods tab → Get mods lists `catalog/`
+  (each mod's own GitHub release, pinned by SHA-256 and author key) with what installing it
+  would do here; Install downloads it over home Wi-Fi and installs it. No server of our own:
+  the catalogue comes from `catalog/index.json` when there is one (`tools/catalog.py index`),
+  else from GitHub's listing of the folder. Engine: `catalog`, `catalog-plan`, `catalog-install`.
+- **Dependencies are installed with a mod.** A mod's `requires` (copied into its catalogue
+  entry by `catalog.py add`, and read again from the downloaded package's `mod.json`) are met
+  by what's installed, or by the catalogue's version, installed first; a required mod that's
+  turned off is turned on. Loops, conflicts, a requirement newer than the catalogue's or not
+  in it, an unreadable range, and a mod for a newer HMG-API are refused before anything is
+  downloaded or installed. The result is checked as a whole: every mod that will be on keeps
+  what it requires (an update that breaks another mod's range is refused), and conflicts count
+  whichever side lists them. Every package is downloaded and checked (SHA-256, signature,
+  author key, HMG-API, car) before the first install. When a package requires more than the
+  plan said, nothing is installed and the new plan is shown for a second OK. Removing a mod
+  others require says which won't load.
+- **A first install from the catalogue needs a known author.** The catalogue isn't signed, so
+  a new mod's author key from it must already be on the head unit's trusted author list (which
+  only HMG-API's releases bring), or the owner says yes for that mod.
+- **Staged updates wait for apply.** The automatic check stages only plain updates (nothing new
+  installed or turned on, signed with the installed key) into `/data/hmgapi/pending/`, which
+  nothing loads; `engine apply` puts them in place first and keeps the previous version in
+  `/data/hmgapi/previous/`.
+- **Updates.** Mods tab → Updates (with how many) lists installed mods with a newer catalogue
+  version, and a newer HMG-API release (on a pre-release, only that version's next ones), with
+  its release notes, Update and Update all (each mod that can go; the ones that can't are listed
+  with why). "Install anyway" is per mod and says for what: not listed for this head unit, or an
+  author who isn't on the trusted list. A mod's row in the list says "update x.y.z". HMG-API checks by itself each time
+  home Wi-Fi comes up, at most every 6 hours (owner switch `no_update_check` turns that off), and
+  can also download and stage the mods' plain updates then (`auto_stage_updates`, off by
+  default): they wait aside until the owner applies.
+  HMG-API itself only updates on the owner's tap: its update zip is checked against its
+  release's `SHA256SUMS`, then against the release key as from a USB stick. Engine: `updates`,
+  `update <id>... | --all | hmgapi`, `update-check`; `logs/hmgapi/updates.log`.
+- **HMG-API's own HTTPS** (`/data/hmgapi/lib/libhmgapi_fetch.so`, `core/fetch`): Android 4.4's
+  Java TLS can't reach GitHub, so the engine uses the unit's own `libssl.so` (TLS 1.2), on a
+  socket marked for home Wi-Fi only, with its own DNS lookup on home Wi-Fi's server. Tested
+  first as a mod on an Ioniq 5 US 260507 (HMG-API rc.10): the catalogue and three packages
+  over home Wi-Fi, each with its SHA-256.
+- **Home Wi-Fi joins on cars whose Wi-Fi library checks a checksum** (Ioniq 5 US 260507). The
+  stock library starts the car's Wi-Fi client only if `wpa_supplicant_crc32.conf` holds the
+  CRC-32 of `wpa_supplicant.conf`; HMG-API's saved networks didn't update it, so the client
+  never started ("Wi-Fi will not be enabled") and home Wi-Fi stayed "searching". Adding or
+  forgetting a network now updates it, and it's checked before each switch to home Wi-Fi.
+  A first network no longer needs `printf` (not on the unit): the config starts from the car's
+  own template, and the whole text is built before the one write that sets Android's owner and
+  mode. A checksum that can't be written (its `chown` or `chmod` failing) is said in the
+  keeper's log and in the answer to adding or forgetting a network, instead of home Wi-Fi only
+  staying "searching".
+- **Mods' connections over home Wi-Fi are no longer refused** (Ioniq 5 US 260507). The block
+  that keeps mods off mobile data was in `filter OUTPUT`, where `-o` is the route a packet had
+  before HMG-API's mark moved it to home Wi-Fi: every connection that started on the main
+  table (mobile data) was refused. With home Wi-Fi on, the block now runs after the move
+  (`mangle POSTROUTING`, `HMGAPI_HOMECELL`: nothing marked for home Wi-Fi leaves on `rmnet`),
+  and table 95 holds an unreachable default while home Wi-Fi is down, so marked traffic never
+  falls through to mobile data. IPv6, and everything with home Wi-Fi off, stays refused as before.
+  The keeper builds the home Wi-Fi rules (the post-reroute block, the mark, masquerade, table 95
+  and the fwmark rule) before the IPv4 home REJECTs leave, and fills the cellular chain before
+  OUTPUT jumps to it; its check also looks for the DROP inside `HMGAPI_HOMECELL`. Home Wi-Fi off
+  and the uninstaller take table 95's unreachable default out.
+- **Mods' services can look names up on home Wi-Fi** (Ioniq 5 US 260507). Their resolver
+  (`ANDROID_DNS_MODE=local`) has no servers in the service's process and asks 127.0.0.1;
+  HMG-API's redirect to home Wi-Fi's DNS server kept that source address, so no query left the
+  unit. While home Wi-Fi is up, `route_localnet` is on for `wlan0` (the queries are
+  masqueraded) and, for 127.x on `wlan0`, only the DNS server's answers (its address, port 53)
+  get in (`HMGAPI_HOMELO`). The guard is checked on every pass, not only when the lease changes,
+  and put back first in INPUT after the stock firewall reloads; `route_localnet` is on only
+  while it's there.
+- **HMG-API's own HTTPS** (`/data/hmgapi/lib/libhmgapi_fetch.so`, `core/fetch`): Android 4.4's
+  Java TLS can't reach GitHub, so the engine uses the unit's own `libssl.so` (TLS 1.2), on a
+  socket marked for home Wi-Fi only, with its own DNS lookup on home Wi-Fi's server. Tested
+  first as a mod on an Ioniq 5 US 260507 (HMG-API rc.10): the catalogue and three packages
+  over home Wi-Fi, each with its SHA-256. Each socket has home Wi-Fi's mark and is bound to
+  `wlan0`, or the call fails (never an unmarked socket on the main table's mobile data, even
+  before the fwmark rule is in), with 20 s send and receive timeouts (connect, the handshake,
+  each read). The DNS server comes from home Wi-Fi's lease (there only while its route is up,
+  not a leftover `dhcp.wlan0.dns1`), asked on the same kind of socket. An answer the server
+  didn't end with a TLS close counts only when its Content-Length or last chunk says it is
+  whole; chunk sizes are hex digits only (a negative one passed the cap), and a broken body
+  leaves no `.part`. Each call has its own answer file, opened `O_EXCL` and `O_NOFOLLOW`.
 
 ## 1.1.0-rc.10 (2026-11-25)
+
+- **Safe mode: every mod off at once, nothing removed** (review of 2026-11-26). While
+  `/data/hmgapi/SAFE` is there, the runtime loads no mod's hooks, hmgapid runs no mod's
+  service (boot-start ones included, even before the engine has run), the mods' apps are
+  turned off and their network rules come out, except a rule to adbd's port, so adb over the
+  hotspot stays reachable. HMG-API, its own hooks and its app stay on. The mods' file changes
+  stay. On and off: `hmgapid engine safe on|off` (root, adb, the app), Settings → Safe mode,
+  or the file by hand; the top bar says "Safe mode: mods off". Before, the only switch was
+  `hook/disable`, which turns off hooks only (HMG-API's own too) and was documented only in
+  `core/README.md`; mods' services, apps and network rules kept running.
+- **The boot guard turns safe mode on.** Its first trip (3 failed starts in one boot, or 6
+  in a row) writes `SAFE` and starts the count again, so HMG-API's own hooks (its tile, its ★
+  choice, the update block) get one more try without any mod; a trip in safe mode turns the
+  hooks off as before. `engine safe off` resets the counters.
+- **Service logs stay capped while the service runs.** hmgapid read a service's log size only
+  when it started it, so a service that kept running wrote forever (a looping `echo` under the
+  real hmgapid: 885 MB in 8 s). Output now comes through a pipe hmgapid reads: 256 KB, then
+  `.1`, and at most 256 KB kept a minute (a line says how much was left out). HMG-API's own log
+  (LogKeeper) is capped the same way, and keeps each mod's lines to 300 a minute so a mod
+  logging on a hot path can't push HMG-API's own lines out.
+- **Mods' services run at a lower priority**: nice 10 and the lowest best-effort I/O class,
+  unless the service asks for `"priority": "normal"` in `mod.json`. HMG-API's own services
+  are unchanged. A service gets only fds 0-2.
+- **Recovery without the screen** in the wiki: Troubleshooting's "Stuck on the boot animation,
+  no home screen, or an app keeps crashing" (adb first, safe mode, `hook/disable`, `/data`
+  full, back to stock) and Uninstalling's no-screen route over adb. A USB stick can't trigger
+  any of it: Android mounts it, after the point where such a unit is stuck.
+  Tested off-car only, not on a car: the engine's safe mode, network and priority checks
+  (`core/runtime/safe-test.sh`) and `tools/test-all.sh --fast`; hmgapid's and the zygote
+  wrapper's new checks run under qemu-arm (`core/hmgapid/test.sh`, `core/zygote/test.sh`).
 
 - **No owner-facing way to force an unknown `app_process`, for now.** An empty `HMGAPI/FORCE`
   file on the USB stick no longer forces the USB install or the NEMESIS package, and the
