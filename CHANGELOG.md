@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A root service can read its own settings** (`HmgApi.settings()`, `saveSettings()`): the
+  daemon sees such a service as root, so the client names its mod (`HMGAPI_MOD`).
 - **An undone trial or a cut-off apply puts settings, live props and binds back too.** The
   journal kept only files and the state, so a trial's `persist.*` prop (or one set by an apply
   cut off after its settings) stayed set after "trial undone", the next apply took it for stock,
