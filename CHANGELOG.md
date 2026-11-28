@@ -158,6 +158,86 @@
   Tested off-car only.
 - **A root service can read its own settings** (`HmgApi.settings()`, `saveSettings()`): the
   daemon sees such a service as root, so the client names its mod (`HMGAPI_MOD`).
+- **Get mods: HMG-API's catalogue on the head unit.** Mods tab → Get mods lists `catalog/`
+  (each mod's own GitHub release, pinned by SHA-256 and author key) with what installing it
+  would do here; Install downloads it over home Wi-Fi and installs it. No server of our own:
+  the catalogue comes from `catalog/index.json` when there is one (`tools/catalog.py index`),
+  else from GitHub's listing of the folder. Engine: `catalog`, `catalog-plan`, `catalog-install`.
+- **Dependencies are installed with a mod.** A mod's `requires` (copied into its catalogue
+  entry by `catalog.py add`, and read again from the downloaded package's `mod.json`) are met
+  by what's installed, or by the catalogue's version, installed first; a required mod that's
+  turned off is turned on. Loops, conflicts, a requirement newer than the catalogue's or not
+  in it, an unreadable range, and a mod for a newer HMG-API are refused before anything is
+  downloaded or installed. The result is checked as a whole: every mod that will be on keeps
+  what it requires (an update that breaks another mod's range is refused), and conflicts count
+  whichever side lists them. Every package is downloaded and checked (SHA-256, signature,
+  author key, HMG-API, car) before the first install. When a package requires more than the
+  plan said, nothing is installed and the new plan is shown for a second OK. Removing a mod
+  others require says which won't load.
+- **A first install from the catalogue needs a known author.** The catalogue isn't signed, so
+  a new mod's author key from it must already be on the head unit's trusted author list (which
+  only HMG-API's releases bring), or the owner says yes for that mod.
+- **Staged updates wait for apply.** The automatic check stages only plain updates (nothing new
+  installed or turned on, signed with the installed key) into `/data/hmgapi/pending/`, which
+  nothing loads; `engine apply` puts them in place first and keeps the previous version in
+  `/data/hmgapi/previous/`.
+- **Updates.** Mods tab → Updates (with how many) lists installed mods with a newer catalogue
+  version, and a newer HMG-API release (on a pre-release, only that version's next ones), with
+  its release notes, Update and Update all (each mod that can go; the ones that can't are listed
+  with why). "Install anyway" is per mod and says for what: not listed for this head unit, or an
+  author who isn't on the trusted list. A mod's row in the list says "update x.y.z". HMG-API checks by itself each time
+  home Wi-Fi comes up, at most every 6 hours (owner switch `no_update_check` turns that off), and
+  can also download and stage the mods' plain updates then (`auto_stage_updates`, off by
+  default): they wait aside until the owner applies.
+  HMG-API itself only updates on the owner's tap: its update zip is checked against its
+  release's `SHA256SUMS`, then against the release key as from a USB stick. Engine: `updates`,
+  `update <id>... | --all | hmgapi`, `update-check`; `logs/hmgapi/updates.log`.
+- **HMG-API's own HTTPS** (`/data/hmgapi/lib/libhmgapi_fetch.so`, `core/fetch`): Android 4.4's
+  Java TLS can't reach GitHub, so the engine uses the unit's own `libssl.so` (TLS 1.2), on a
+  socket marked for home Wi-Fi only, with its own DNS lookup on home Wi-Fi's server. Tested
+  first as a mod on an Ioniq 5 US 260507 (HMG-API rc.10): the catalogue and three packages
+  over home Wi-Fi, each with its SHA-256.
+- **Home Wi-Fi joins on cars whose Wi-Fi library checks a checksum** (Ioniq 5 US 260507). The
+  stock library starts the car's Wi-Fi client only if `wpa_supplicant_crc32.conf` holds the
+  CRC-32 of `wpa_supplicant.conf`; HMG-API's saved networks didn't update it, so the client
+  never started ("Wi-Fi will not be enabled") and home Wi-Fi stayed "searching". Adding or
+  forgetting a network now updates it, and it's checked before each switch to home Wi-Fi.
+  A first network no longer needs `printf` (not on the unit): the config starts from the car's
+  own template, and the whole text is built before the one write that sets Android's owner and
+  mode. A checksum that can't be written (its `chown` or `chmod` failing) is said in the
+  keeper's log and in the answer to adding or forgetting a network, instead of home Wi-Fi only
+  staying "searching".
+- **Mods' connections over home Wi-Fi are no longer refused** (Ioniq 5 US 260507). The block
+  that keeps mods off mobile data was in `filter OUTPUT`, where `-o` is the route a packet had
+  before HMG-API's mark moved it to home Wi-Fi: every connection that started on the main
+  table (mobile data) was refused. With home Wi-Fi on, the block now runs after the move
+  (`mangle POSTROUTING`, `HMGAPI_HOMECELL`: nothing marked for home Wi-Fi leaves on `rmnet`),
+  and table 95 holds an unreachable default while home Wi-Fi is down, so marked traffic never
+  falls through to mobile data. IPv6, and everything with home Wi-Fi off, stays refused as before.
+  The keeper builds the home Wi-Fi rules (the post-reroute block, the mark, masquerade, table 95
+  and the fwmark rule) before the IPv4 home REJECTs leave, and fills the cellular chain before
+  OUTPUT jumps to it; its check also looks for the DROP inside `HMGAPI_HOMECELL`. Home Wi-Fi off
+  and the uninstaller take table 95's unreachable default out.
+- **Mods' services can look names up on home Wi-Fi** (Ioniq 5 US 260507). Their resolver
+  (`ANDROID_DNS_MODE=local`) has no servers in the service's process and asks 127.0.0.1;
+  HMG-API's redirect to home Wi-Fi's DNS server kept that source address, so no query left the
+  unit. While home Wi-Fi is up, `route_localnet` is on for `wlan0` (the queries are
+  masqueraded) and, for 127.x on `wlan0`, only the DNS server's answers (its address, port 53)
+  get in (`HMGAPI_HOMELO`). The guard is checked on every pass, not only when the lease changes,
+  and put back first in INPUT after the stock firewall reloads; `route_localnet` is on only
+  while it's there.
+- **HMG-API's own HTTPS** (`/data/hmgapi/lib/libhmgapi_fetch.so`, `core/fetch`): Android 4.4's
+  Java TLS can't reach GitHub, so the engine uses the unit's own `libssl.so` (TLS 1.2), on a
+  socket marked for home Wi-Fi only, with its own DNS lookup on home Wi-Fi's server. Tested
+  first as a mod on an Ioniq 5 US 260507 (HMG-API rc.10): the catalogue and three packages
+  over home Wi-Fi, each with its SHA-256. Each socket has home Wi-Fi's mark and is bound to
+  `wlan0`, or the call fails (never an unmarked socket on the main table's mobile data, even
+  before the fwmark rule is in), with 20 s send and receive timeouts (connect, the handshake,
+  each read). The DNS server comes from home Wi-Fi's lease (there only while its route is up,
+  not a leftover `dhcp.wlan0.dns1`), asked on the same kind of socket. An answer the server
+  didn't end with a TLS close counts only when its Content-Length or last chunk says it is
+  whole; chunk sizes are hex digits only (a negative one passed the cap), and a broken body
+  leaves no `.part`. Each call has its own answer file, opened `O_EXCL` and `O_NOFOLLOW`.
 
 ## 1.1.0-rc.10 (2026-11-25)
 

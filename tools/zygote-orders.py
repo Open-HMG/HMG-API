@@ -132,14 +132,14 @@ def payload(work, name, scripts, wrapper, known):
     os.makedirs(P)
     for f, b in scripts.items():
         wr(os.path.join(P, f), b)
-    for f in ('hmgapid', 'lpatch', 'libhmgapi_hook.so', 'hmgapi-hook.jar', 'HmgApi.apk'):
+    for f in ('hmgapid', 'lpatch', 'libhmgapi_hook.so', 'libhmgapi_fetch.so', 'hmgapi-hook.jar', 'HmgApi.apk'):
         wr(os.path.join(P, f), blob(name + f, 500))
     wr(os.path.join(P, 'app_process'), wrapper)
     for f, b in (('VERSION', name.encode()), ('BUILD', b'test'), ('MAPS.md5', b'')):
         wr(os.path.join(P, f), b)
     lines = ['%s test stock\n' % hashlib.md5(b).hexdigest() for b in (STOCK, STOCK2)] if known else ['0 no build\n']
     wr(os.path.join(P, 'stock.txt'), ''.join(lines).encode())
-    names = ['hmgapid', 'lpatch', 'app_process', 'libhmgapi_hook.so', 'hmgapi-hook.jar', 'HmgApi.apk', 'MAPS.md5'] + sorted(scripts) + ['stock.txt']
+    names = ['hmgapid', 'lpatch', 'app_process', 'libhmgapi_hook.so', 'libhmgapi_fetch.so', 'hmgapi-hook.jar', 'HmgApi.apk', 'MAPS.md5'] + sorted(scripts) + ['stock.txt']
     wr(os.path.join(P, 'MANIFEST'), ''.join('%s  %s\n' % (hashlib.md5(rd(os.path.join(P, n))).hexdigest(), n) for n in names).encode())
     return P
 

@@ -25,6 +25,9 @@ carries the list. The wiki's Community mods page is made from the entries.
         newer than the entry, signed with the entry's author key
   tools/catalog.py wiki <out.md>
         the Community mods page
+  tools/catalog.py index [<out>]
+        catalog/index.json: every entry in one file, for the head unit's catalogue (one request);
+        once the repo has one, add writes it again and check refuses one that isn't the entries
 """
 import argparse, hashlib, json, os, re, shutil, subprocess, sys, tempfile, urllib.request, zipfile
 
@@ -38,7 +41,15 @@ UUID = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9
 VERSION = re.compile(r'^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$')
 FINAL = re.compile(r'^\d+\.\d+\.\d+$')   # what an entry's "version" is: no pre-releases (docs/releasing.md)
 HTTPS = re.compile(r'^https://[A-Za-z0-9.-]+(:\d+)?/[^\s<>()\[\]"\']*$')
-FIELDS = {'id', 'name', 'description', 'authors', 'license', 'uuid', 'version', 'repo', 'download', 'sha256', 'system', 'hmgapi'}
+FIELDS = {'id', 'name', 'description', 'authors', 'license', 'uuid', 'version', 'repo', 'download', 'sha256', 'system', 'hmgapi',
+          'requires', 'conflicts', 'wifi'}   # requires/conflicts: as the package's mod.json (HMG-API's catalogue installs requires first);
+#                                            wifi: {"hotspot": true} as mod.json (a chip the unit never powers will do, SystemCheck)
+# the only hosts the head unit downloads from (Http.HOSTS): a download anywhere else could never install
+GITHUB = {'github.com', 'api.github.com', 'raw.githubusercontent.com', 'objects.githubusercontent.com',
+          'release-assets.githubusercontent.com', 'codeload.github.com'}
+# a version range as the engine reads it (Version.one): each part an operator and a version, or "" / "*"
+RANGE_PART = re.compile(r'^(>=|<=|>|<|=|\^|~)?v?\d+(\.\d+){0,2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$')
+INDEX = os.path.join(CATALOG, 'index.json')
 NEEDED = ['id', 'name', 'description', 'authors', 'uuid', 'version', 'repo', 'download', 'sha256']
 
 
@@ -145,10 +156,42 @@ def fetch(url, dest):
             f.write(b)
 
 
+def range_error(r):
+    """why the engine couldn't read version range r, or None"""
+    if not isinstance(r, str):
+        return f'{r!r} isn\'t text'
+    if r.strip() in ('', '*'):
+        return None
+    bad = [x for x in r.split() if not RANGE_PART.match(x)]
+    return f'"{r}" isn\'t a version range ({", ".join(bad)})' if bad else None
+
+
+def dep_error(d):
+    """why a requires/conflicts item can't be read, or None"""
+    if isinstance(d, str):
+        mid, _, r = d.strip().partition(' ')
+    elif isinstance(d, dict):
+        mid, r = str(d.get('id', '')), d.get('version')
+    else:
+        return f'{d!r} isn\'t "<id> [range]" or {{"id": ..., "version": ...}}'
+    if not ID.match(mid):
+        return f'{mid!r} isn\'t a mod id'
+    return range_error(r) if r not in (None, '') else None
+
+
+def host(url):
+    m = re.match(r'^https://([^/:]+)', str(url))
+    return m[1].lower() if m else ''
+
+
+def index_of(es):
+    return {'mods': [es[n] for n in sorted(es)]}
+
+
 def entries():
     if not os.path.isdir(CATALOG):
         return {}
-    return {f[:-5]: load(os.path.join(CATALOG, f)) for f in sorted(os.listdir(CATALOG)) if f.endswith('.json')}
+    return {f[:-5]: load(os.path.join(CATALOG, f)) for f in sorted(os.listdir(CATALOG)) if f.endswith('.json') and f != 'index.json'}
 
 
 # ---- add
@@ -181,6 +224,11 @@ def cmd_add(a):
         e['hmgapi'] = mod['hmgapi']
     if mod.get('system'):
         e['system'] = mod['system']
+    for k in ('requires', 'conflicts'):   # what the head unit's catalogue resolves before downloading
+        if mod.get(k):
+            e[k] = mod[k]
+    if isinstance(mod.get('wifi'), dict) and mod['wifi'].get('hotspot') is True:
+        e['wifi'] = {'hotspot': True}   # so the head unit judges "system" as the install will (an unpowered chip will do)
     if not e['license']:
         del e['license']
     os.makedirs(CATALOG, exist_ok=True)
@@ -195,9 +243,12 @@ def cmd_add(a):
             listed['repos'].append(repo)
     save(AUTHORS, au)
     print(f'catalog/{mid}.json: {mid} {ver}, author key {uuid}' + ('' if listed else f' (added to maps/authors.json as {authors[0]})'))
-    problems = check_all(entries(), au)
+    problems = check_all(entries(), au, index=False)
     if problems:
         die('\n'.join(problems))
+    if os.path.exists(INDEX):   # the repo keeps one: it stays the entries
+        save(INDEX, index_of(entries()))
+        print('catalog/index.json: written again')
 
 
 # ---- check
@@ -229,6 +280,8 @@ def check_entry(name, e, authors):
     for k in ('repo', 'download'):
         if e.get(k) and not HTTPS.match(str(e[k])):
             say(f'"{k}" isn\'t an https:// link')
+    if e.get('download') and HTTPS.match(str(e['download'])) and host(e['download']) not in GITHUB:
+        say(f'"download" is on {host(e["download"])}: the head unit only downloads from GitHub ({", ".join(sorted(GITHUB))})')
     if e.get('sha256') and not re.match(r'^[0-9a-f]{64}$', str(e['sha256'])):
         say('"sha256" isn\'t 64 lowercase hex digits')
     if not isinstance(e.get('authors', []), list) or not all(isinstance(x, str) and x for x in e.get('authors', [])):
@@ -236,10 +289,21 @@ def check_entry(name, e, authors):
     for k in ('name', 'description', 'license'):
         if k in e and (not isinstance(e[k], str) or '\n' in e[k]):
             say(f'"{k}" is one line of text')
+    for k in ('requires', 'conflicts'):
+        if k in e and not isinstance(e[k], list):
+            say(f'"{k}" is a list of "<id> [range]" or {{"id": ..., "version": ...}}, as in mod.json')
+        for d in e.get(k) or [] if isinstance(e.get(k), list) else []:
+            why = dep_error(d)
+            if why:
+                say(f'"{k}": {why}')
+    if 'hmgapi' in e and range_error(e['hmgapi']):
+        say(f'"hmgapi": {range_error(e["hmgapi"])}')
+    if 'wifi' in e and e['wifi'] != {'hotspot': True}:
+        say('"wifi" is {"hotspot": true}, as in mod.json, or left out')
     return p
 
 
-def check_all(es, au):
+def check_all(es, au, index=True):
     authors = au.get('authors', {})
     p = []
     for uuid, a in authors.items():
@@ -252,6 +316,8 @@ def check_all(es, au):
                 p.append(f'maps/authors.json: {uuid}: {r!r} isn\'t an https:// link')
     for name, e in es.items():
         p += check_entry(name, e, authors)
+    if index and os.path.exists(INDEX) and load(INDEX) != index_of(es):
+        p.append('catalog/index.json isn\'t the entries: write it again (tools/catalog.py index)')
     return p
 
 
@@ -311,7 +377,7 @@ def cmd_check(a):
     print(f'ok    {len(es)} catalogue entries, {len(au.get("authors", {}))} authors')
 
 
-BUMP = {'version', 'download', 'sha256', 'description'}   # what a version bump may change
+BUMP = {'version', 'download', 'sha256', 'description', 'requires', 'conflicts', 'wifi'}   # what a version bump may change
 
 
 def cmd_bump(a):
@@ -324,6 +390,15 @@ def cmd_bump(a):
     if r.returncode != 0:
         die(f'git diff {a.base}...{a.head}: {r.stderr.strip()}')
     files = r.stdout.split()
+    if 'catalog/index.json' in files and len(files) == 2:   # the repo's index, written again with the bump: it must be just that
+        head = {}
+        lt = subprocess.run(['git', '-C', REPO, 'ls-tree', '--name-only', a.head, 'catalog/'], capture_output=True, text=True)
+        for f in lt.stdout.split():
+            if f.endswith('.json') and f != 'catalog/index.json':
+                head[os.path.basename(f)[:-5]] = git_show(a.head, f)
+        if git_show(a.head, 'catalog/index.json') != index_of(head):
+            no.append('catalog/index.json isn\'t the entries')
+        files.remove('catalog/index.json')
     m = re.fullmatch(r'catalog/([a-z0-9][a-z0-9-]{0,63})\.json', files[0]) if len(files) == 1 else None
     if not m:
         no.append(f'changes {len(files)} files ({", ".join(files[:5])}), not one catalogue entry')
@@ -352,10 +427,15 @@ def cmd_bump(a):
                     z, why = download(n, new, work)
                     if why:
                         no.append(why)
-                    elif 'description' in changed:
-                        desc = load(os.path.join(unpack(z, os.path.join(work, 'mod')), 'mod.json')).get('description', '')
-                        if desc != new['description']:
+                    elif changed & {'description', 'requires', 'conflicts', 'wifi'}:
+                        pm = load(os.path.join(unpack(z, os.path.join(work, 'mod')), 'mod.json'))
+                        if 'description' in changed and pm.get('description', '') != new['description']:
                             no.append(f'{files[0]}: the description isn\'t the package\'s mod.json description')
+                        if 'wifi' in changed and (new.get('wifi') or None) != ({'hotspot': True} if (pm.get('wifi') or {}).get('hotspot') is True else None):
+                            no.append(f'{files[0]}: "wifi" isn\'t the package\'s mod.json "wifi.hotspot"')
+                        for k in ('requires', 'conflicts'):
+                            if k in changed and (pm.get(k) or None) != (new.get(k) or None):
+                                no.append(f'{files[0]}: "{k}" isn\'t the package\'s mod.json "{k}"')
                 finally:
                     shutil.rmtree(work, ignore_errors=True)
     for x in no:
@@ -486,6 +566,18 @@ def cars(system):
     return '; '.join(out)
 
 
+def cmd_index(a):
+    """catalog/index.json: every entry in one file, so a head unit fetches the catalogue in one request
+    (without it, HMG-API asks GitHub's API for the folder's listing, then each entry)"""
+    es = entries()
+    p = check_all(es, load(AUTHORS), index=False)
+    if p:
+        die('\n'.join(p))
+    out = a.out or INDEX
+    save(out, index_of(es))
+    print(f'{os.path.relpath(out, REPO) if out.startswith(REPO) else out}: {len(es)} mods')
+
+
 def cmd_wiki(a):
     es, au = entries(), load(AUTHORS).get('authors', {})
     L = ['# Community mods', '',
@@ -541,12 +633,16 @@ def main():
     s.add_argument('--list', help='the ids (and pre-release pins) from this file, e.g. tools/release-mods.txt')
     s = sub.add_parser('wiki')
     s.add_argument('out')
+    s = sub.add_parser('index')
+    s.add_argument('out', nargs='?')
     a = ap.parse_args()
     if a.cmd == 'add' and not HTTPS.match(a.download):
         die('--download is an https:// link')
+    if a.cmd == 'add' and host(a.download) not in GITHUB:
+        die(f'--download is on {host(a.download)}: the head unit only downloads from GitHub ({", ".join(sorted(GITHUB))})')
     if a.cmd == 'add' and a.repo and not HTTPS.match(a.repo):
         die('--repo is an https:// link')
-    {'add': cmd_add, 'check': cmd_check, 'bump': cmd_bump, 'fetch': cmd_fetch, 'wiki': cmd_wiki}[a.cmd](a)
+    {'add': cmd_add, 'check': cmd_check, 'bump': cmd_bump, 'fetch': cmd_fetch, 'wiki': cmd_wiki, 'index': cmd_index}[a.cmd](a)
     if _engine and _engine != os.environ.get('HMGAPI_ENGINE_CLASSES'):   # ours, not the caller's
         shutil.rmtree(_engine, ignore_errors=True)
 

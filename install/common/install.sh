@@ -280,6 +280,13 @@ fi
 [ -s "$BAK" ] && not_stock "$BAK" && fail "the app_process backup isn't a stock binary (an HMG-API wrapper, NEMESIS LivePatch's script or not a binary), so nothing on /system was changed. Please send this line to the HMG-API maintainers."
 backup /system/etc/install-recovery.sh
 backup /system/etc/qb_runtime.sh
+# the engine's HTTPS (the catalogue and updates over home Wi-Fi, Catalog): in /data, nothing on
+# /system for it. Before /system changes: a failure here would otherwise stop the install with
+# the wrapper and boot hook in but the maps, the app and the records after it skipped
+if [ -f "$P/libhmgapi_fetch.so" ]; then
+    mkdir -p "$D/lib" && cp "$P/libhmgapi_fetch.so" "$D/lib/libhmgapi_fetch.so.new" && chmod 644 "$D/lib/libhmgapi_fetch.so.new" \
+        && mv "$D/lib/libhmgapi_fetch.so.new" "$D/lib/libhmgapi_fetch.so" || fail "keep the engine's HTTPS library in $D/lib, so nothing on /system was changed"
+fi
 
 remount rw || fail "can't remount /system rw (needs NEMESIS or a running hmgapid)"
 REMOUNTED=1

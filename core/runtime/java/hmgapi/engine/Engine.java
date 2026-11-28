@@ -153,6 +153,8 @@ public final class Engine {
 
     boolean lock(String cmd) throws IOException, InterruptedException {
         if ("status".equals(cmd) || "map".equals(cmd) || "problem".equals(cmd) || "boot-guard".equals(cmd) || "1".equals(env(LOCKED_ENV, null))) return true;
+        // the catalogue's reads (and refreshes: written whole, each in its own temporary folder) don't wait for an apply
+        if ("catalog".equals(cmd) || "updates".equals(cmd) || "catalog-plan".equals(cmd)) return true;
         return lock(cmd, Long.parseLong(env("HMGAPI_LOCK_WAIT", "900")));
     }
 
@@ -389,6 +391,8 @@ public final class Engine {
         if ("problem".equals(cmd)) return ProblemLog.run(this, args);
         if ("boot-guard".equals(cmd)) return BootGuard.run(this, args);
         if ("usb-scan".equals(cmd)) return UsbUpdates.scan(this);
+        if ("catalog".equals(cmd) || "catalog-plan".equals(cmd) || "catalog-install".equals(cmd) || "updates".equals(cmd)
+                || "update".equals(cmd) || "update-check".equals(cmd)) return Catalog.run(this, args);
         if ("publish-state".equals(cmd)) return LiveState.publish(this);
         if ("apps".equals(cmd)) return ModApps.sync(this);
         if ("probe".equals(cmd)) {   // a mod's install-time probe again (its answer is kept until then)
@@ -422,6 +426,9 @@ public final class Engine {
             boolean fromNemesis = java.util.Arrays.asList(args).contains("--from-nemesis");
             int rc;
             if ("remove".equals(cmd)) {
+                for (String d : Catalog.dependents(this, args[1])) {
+                    out.add("note     " + d + " requires " + args[1] + ": it won't load until " + args[1] + " is installed again");
+                }
                 rc = Packages.remove(this, args[1]);
             } else {
                 String uuid = null;
@@ -456,7 +463,16 @@ public final class Engine {
             out.add("usage: engine plan | apply [--trial] [--gear-unknown-ok] | keep | restore | status | recover | release-held | firmware-reset | install <zip|dir> | remove <id> | safe [on | off] | nemesis-sync | map | map-car [--local [--if-needed] | --write | --forget] | verify-map | report [--usb] | boot-guard [reset] | usb-scan | update-hmgapi <zip> | publish-state | apps");
             return 2;
         }
-        Plan p = plan(restoreAll, force);
+        // updates the automatic check staged (pending/): in place right before an apply plans, never earlier
+        List<String> staged = "apply".equals(cmd) ? Catalog.stagedIn(this) : new ArrayList<String>();
+        if ("plan".equals(cmd)) Catalog.stagedReport(this);
+        Plan p;
+        try {
+            p = plan(restoreAll, force);
+        } catch (Exception x) {
+            Catalog.stagedBack(this, staged);
+            throw x;
+        }
         p.report(this);
         if (!restoreAll) {
             out.addAll(hookPlan().report());
@@ -470,6 +486,7 @@ public final class Engine {
         if (!problems.isEmpty()) {
             out.add("nothing changed: " + problems.size() + " problem(s)");
             for (String s : problems) out.add("  " + s);
+            Catalog.stagedBack(this, staged);
             return 3;
         }
         if ("plan".equals(cmd)) return 0;

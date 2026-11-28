@@ -26,9 +26,12 @@ final class ModsTab {
     LinearLayout list, detail;
     List<Mod> mods = new ArrayList<Mod>();
     String chosen;
+    int updates;   // public/updates.json's count (mods and HMG-API)
 
     static final class Mod {
         String id, name, version = "", description = "", authors = "", license = "", state, error;
+        String update;   // a newer version in the catalogue (public/updates.json), or null
+        List<String> requires = new ArrayList<String>();
         boolean enabled, hasCode;
         List<String> services = new ArrayList<String>();
 
@@ -81,6 +84,14 @@ final class ModsTab {
                     // hooks not running: states unknown
                 }
                 List<Mod> out = new ArrayList<Mod>();
+                JSONObject up = null;
+                try {
+                    up = new JSONObject(UsbFolders.read(new java.io.File("/data/hmgapi/public/updates.json")));
+                } catch (Exception ignored) {
+                    // no check yet
+                }
+                updates = up == null ? 0 : up.optInt("count");
+                JSONArray ups = up == null ? null : up.optJSONArray("mods");
                 for (String line : Hmgapid.call("mods").output.split("\n")) {
                     String[] w = line.split("\t");
                     if (w.length < 2) continue;
@@ -97,6 +108,12 @@ final class ModsTab {
                         JSONArray au = j.optJSONArray("authors");
                         for (int i = 0; au != null && i < au.length(); i++) m.authors += (i > 0 ? ", " : "") + au.optString(i);
                         m.hasCode = j.has("hooks");
+                        JSONArray rq = j.optJSONArray("requires");
+                        for (int i = 0; rq != null && i < rq.length(); i++) {
+                            Object o = rq.get(i);
+                            String rid = o instanceof JSONObject ? ((JSONObject) o).optString("id") : String.valueOf(o).trim().split(" ")[0];
+                            if (!(o instanceof JSONObject && ((JSONObject) o).optBoolean("optional"))) m.requires.add(rid);
+                        }
                         JSONArray sv = j.optJSONArray("services");
                         for (int i = 0; sv != null && i < sv.length(); i++) m.services.add(sv.getJSONObject(i).optString("name"));
                     } catch (Exception e) {
@@ -109,6 +126,10 @@ final class ModsTab {
                         if (!m.id.equals(s.optString("id"))) continue;
                         if (m.state == null) m.state = s.optString("state");
                         if (m.error == null && s.has("error")) m.error = s.optString("error");
+                    }
+                    for (int i = 0; ups != null && i < ups.length(); i++) {
+                        JSONObject u = ups.getJSONObject(i);
+                        if (m.id.equals(u.optString("id")) && m.version.equals(u.optString("installed"))) m.update = u.optString("version");
                     }
                     out.add(m);
                 }
@@ -124,8 +145,9 @@ final class ModsTab {
                 }
                 mods = r;
                 if (r.isEmpty()) {
-                    Ui.text(list, "  No mods installed. Put mod packages in HMGAPI/updates/ on a USB stick and use Check USB updates.",
-                            17, false, Ui.GREY);
+                    drawStore();
+                    Ui.text(list, "  No mods installed. Get mods from the catalogue (over home Wi-Fi), or put mod packages in "
+                            + "HMGAPI/updates/ on a USB stick and use Check USB updates.", 17, false, Ui.GREY);
                     return;
                 }
                 if (chosen == null) chosen = r.get(0).id;
@@ -135,8 +157,28 @@ final class ModsTab {
         }.start(a);
     }
 
+    /** the catalogue's two ways in, at the top of the list: Get mods, and Updates (with how many) */
+    void drawStore() {
+        LinearLayout b = Ui.row(a);
+        b.setPadding(Ui.dp(a, 12), Ui.dp(a, 8), Ui.dp(a, 12), Ui.dp(a, 4));
+        Ui.button(b, "Get mods", new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                a.startActivityForResult(new android.content.Intent(a, CatalogActivity.class), MainActivity.UPDATES);
+            }
+        });
+        Ui.button(b, updates > 0 ? "Updates (" + updates + ")" : "Updates", updates > 0, new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                a.startActivityForResult(new android.content.Intent(a, ModUpdatesActivity.class), MainActivity.UPDATES);
+            }
+        });
+        list.addView(b);
+    }
+
     void drawList() {
         list.removeAllViews();
+        drawStore();
         for (final Mod m : mods) {
             LinearLayout row = Ui.row(a);
             row.setPadding(Ui.dp(a, 18), Ui.dp(a, 10), Ui.dp(a, 12), Ui.dp(a, 10));
@@ -144,7 +186,8 @@ final class ModsTab {
             row.addView(Ui.dot(a, m.color(), 18));
             LinearLayout t = Ui.column(a);
             Ui.text(t, m.name, 19, false, Ui.TEXT).setPadding(0, 0, 0, 0);
-            TextView sub = Ui.text(t, m.version + "  ·  " + m.label(), 15, false, m.color() == Ui.ACCENT || m.color() == Ui.OFF ? Ui.GREY : m.color());
+            TextView sub = Ui.text(t, m.version + "  ·  " + m.label() + (m.update != null ? "  ·  update " + m.update : ""), 15, false,
+                    m.color() == Ui.ACCENT || m.color() == Ui.OFF ? (m.update != null ? Ui.GREEN : Ui.GREY) : m.color());
             sub.setPadding(0, 0, 0, 0);
             row.addView(t);
             row.setOnClickListener(new View.OnClickListener() {
@@ -216,6 +259,34 @@ final class ModsTab {
             Ui.pill(detail, m.label(), m.color());
         }
         if (!m.description.isEmpty()) Ui.text(detail, m.description, 16, false, Ui.GREY);
+        if (m.update != null) {
+            Ui.text(detail, "Version " + m.update + " is in the catalogue.", 17, false, Ui.GREEN);
+            Ui.button(detail, "Update to " + m.update, true, new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    CatalogFlow.start(a, java.util.Arrays.asList(m.id), true, new CatalogFlow.Done() {
+                        @Override
+                        public void installed(String output) {
+                            a.message("Updated " + m.name, MainActivity.readable(output));
+                            load();
+                            a.plan();
+                        }
+
+                        @Override
+                        public void failed(String output) {
+                            a.message("Not updated", output);
+                        }
+
+                        @Override
+                        void lost(String message) {
+                            a.message("Still updating", message);
+                            a.plan();   // waits for the engine, then shows what changed
+                        }
+                    });
+                }
+            });
+        }
+        if (!m.requires.isEmpty()) Ui.text(detail, "Needs " + join(m.requires.toArray(new String[0])).replace("  ·  ", ", "), 15, false, Ui.GREY);
 
         Ui.line(detail);
         Ui.text(detail, "Settings", 21, true, Ui.GREEN);
@@ -282,9 +353,13 @@ final class ModsTab {
 
     /** A mod off the head unit: its folder goes now; what it changed goes back to stock with the next apply. */
     void confirmRemove(final Mod m) {
+        List<String> need = new ArrayList<String>();
+        for (Mod o : mods) if (o.requires.contains(m.id)) need.add(o.name);
         new AlertDialog.Builder(a)
                 .setTitle("Remove " + m.name + "?")
-                .setMessage("Everything it changed goes back to stock when you apply the changes. Its settings are kept "
+                .setMessage((need.isEmpty() ? "" : join(need.toArray(new String[0])).replace("  ·  ", ", ") + (need.size() == 1 ? " needs" : " need")
+                        + " it: " + (need.size() == 1 ? "it" : "they") + " won't load until it's installed again.\n\n")
+                        + "Everything it changed goes back to stock when you apply the changes. Its settings are kept "
                         + "in case you install it again.")
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Remove", new DialogInterface.OnClickListener() {

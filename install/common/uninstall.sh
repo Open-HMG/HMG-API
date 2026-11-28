@@ -152,6 +152,9 @@ if [ -f "$D/state/services.txt" ]; then
     log "mods' services stopped"
 fi
 # mods' network rules, routes and settings out (the keeper does it when stopped; again in case it couldn't)
+if [ -z "$ROOT" ] && [ -f "$D/state/wifi.sh" ]; then
+    sh "$D/state/wifi.sh" down >/dev/null 2>&1 && log "home Wi-Fi off, its routes out"
+fi
 if [ -z "$ROOT" ] && [ -f "$D/state/net.sh" ]; then
     sh "$D/state/net.sh" down >/dev/null 2>&1 && log "mods' network rules out"
 fi
