@@ -1,7 +1,9 @@
 # Changelog
 
-## 1.1.0-rc.10 (2026-11-25)
+## Unreleased
 
+- **A root service can read its own settings** (`HmgApi.settings()`, `saveSettings()`): the
+  daemon sees such a service as root, so the client names its mod (`HMGAPI_MOD`).
 - **Safe mode: every mod off at once, nothing removed** (review of 2026-11-26). While
   `/data/hmgapi/SAFE` is there, the runtime loads no mod's hooks, hmgapid runs no mod's
   service (boot-start ones included, even before the engine has run), the mods' apps are
@@ -31,6 +33,8 @@
   Tested off-car only, not on a car: the engine's safe mode, network and priority checks
   (`core/runtime/safe-test.sh`) and `tools/test-all.sh --fast`; hmgapid's and the zygote
   wrapper's new checks run under qemu-arm (`core/hmgapid/test.sh`, `core/zygote/test.sh`).
+
+## 1.1.0-rc.10 (2026-11-25)
 
 - **No owner-facing way to force an unknown `app_process`, for now.** An empty `HMGAPI/FORCE`
   file on the USB stick no longer forces the USB install or the NEMESIS package, and the
