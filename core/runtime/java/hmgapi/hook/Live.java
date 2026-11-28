@@ -30,6 +30,8 @@ final class Live {
     static final File STATE = new File("/data/hmgapi/public/state.json");
     static long serial = -1;
     static LoadedApp app;
+    /** the last public state's "mods" read in this app (null before the first), for ModContext.modOn */
+    static volatile Map<String, Object> stateMods;
 
     static void start(LoadedApp a) {
         app = a;
@@ -63,6 +65,7 @@ final class Live {
         serial = now;
         Map<String, Object> mods = (Map<String, Object>) state.get("mods");
         if (mods == null) return;
+        stateMods = mods;
         for (Mods.Loaded m : new java.util.ArrayList<Mods.Loaded>(Mods.withHooks)) {
             ModContext ctx = m.context;
             Map<String, Object> s = (Map<String, Object>) mods.get(ctx.id);

@@ -152,6 +152,49 @@ public final class HookPlanTest {
         loaded.put("r2", r2);
         p = HookPlan.late(loaded, "r1", r1, on, KNOWN, null);
         check("live: a second replace hook on a point isn't loaded, even first in load order", has(why(p, "r1"), "both replace framework.context_impl.start_service"), why(p, "r1"));
+
+        // optional "requires": one build of egmp-aa-ev that does more with the Wireless mod
+        for (String id : new String[] {"full", "lite"}) {
+            new File(mods, id + "/mod.json").delete();
+            new File(mods, id).delete();
+        }
+        mod("ev", ", \"requires\": [{\"id\": \"zwire\", \"version\": \">=2\", \"optional\": true, \"adds\": \"preconditioning\"}, \"wire\"]");
+        p = boot();
+        check("optional, not installed: loads", why(p, "ev") == null && p.points.get("launcher.menu_list.load").containsKey("ev"), p.refused);
+        check("... and says what it goes without", p.without.get("ev") != null && p.without.get("ev").contains("zwire (adds: preconditioning): isn't installed and turned on"), p.without);
+        check("... in the plan's lines", p.report().contains("optional ev runs without zwire (adds: preconditioning): isn't installed and turned on"), p.report());
+        mod("zwire", ", \"version\": \"2.1.0\"");
+        p = boot();
+        check("optional, there: loaded first (before ev, though its id sorts after)", p.order.indexOf("zwire") < p.order.indexOf("ev") && why(p, "ev") == null, p.order);
+        check("... nothing said", p.without.get("ev") == null, p.without);
+        mod("zwire", ", \"version\": \"1.0.0\"");
+        p = boot();
+        check("optional, out of range: loads without it", why(p, "ev") == null && has(String.valueOf(p.without.get("ev")), "zwire 1.0.0 is installed, it works with zwire >=2"), p.without);
+        mod("zwire", ", \"version\": \"2.1.0\", \"hooks\": {\"points\": {\"not.a.point\": \"observe\"}}");
+        p = boot();
+        check("optional, refused: loads without it", why(p, "ev") == null && has(String.valueOf(p.without.get("ev")), "zwire (adds: preconditioning): isn't loaded (hook point not.a.point"), p.without);
+        off("zwire", true);
+        p = boot();
+        check("optional, off: loads", why(p, "ev") == null, p.refused);
+        off("wire", true);
+        p = boot();
+        check("a plain requires next to it still holds", has(why(p, "ev"), "requires wire, which isn't installed and turned on"), why(p, "ev"));
+        off("wire", false);
+        on.clear();
+        on.put("wire", "1.0.0");
+        loaded.clear();
+        loaded.put("wire", json("wire"));
+        p = HookPlan.late(loaded, "ev", json("ev"), on, KNOWN, null);
+        check("live: optional not there: loads", why(p, "ev") == null, p.refused);
+
+        // ModContext.modOn
+        Set<String> here = new HashSet<String>(Arrays.asList("wire", "ev"));
+        Map<String, Object> state = Json.object("{\"wire\": {\"enabled\": true}, \"ev\": {\"enabled\": false}, \"zwire\": {\"enabled\": true}}");
+        check("modOn: loaded here, before the state is read: on", HookPlan.on("wire", here, null), "false");
+        check("modOn: loaded and on in the state", HookPlan.on("wire", here, state), "false");
+        check("modOn: loaded, switched off since", !HookPlan.on("ev", here, state), "true");
+        check("modOn: on, but not loaded in this process", !HookPlan.on("zwire", here, state), "true");
+        check("modOn: not installed", !HookPlan.on("nope", here, state), "true");
         System.exit(fail);
     }
 }

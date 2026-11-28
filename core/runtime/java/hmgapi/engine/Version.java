@@ -18,7 +18,9 @@ import java.util.Map;
  *   "~1.2.3"    same minor, at least 1.2.3
  *   ">=2.1 <3"  every part must hold          "" or "*": any version
  *
- * A dependency is "id", "id <range>", or {"id": ..., "version": <range>}.
+ * A dependency is "id", "id <range>", or {"id": ..., "version": <range>}. In "requires"
+ * the object form may add "optional": true (the mod runs without it; see HookPlan) and
+ * "adds": what it brings when it's there, for the owner.
  */
 public final class Version implements Comparable<Version> {
     final int[] n = new int[3];
@@ -119,16 +121,32 @@ public final class Version implements Comparable<Version> {
     /** A dependency entry: {id, range}. */
     public static final class Dep {
         public final String id, range;
+        /** "requires" only: the mod runs without it; adds: what it brings (null: not said) */
+        public final boolean optional;
+        public final String adds;
 
         Dep(String id, String range) {
+            this(id, range, false, null);
+        }
+
+        Dep(String id, String range, boolean optional, String adds) {
             this.id = id;
             this.range = range;
+            this.optional = optional;
+            this.adds = adds;
         }
 
         @Override
         public String toString() {
             return range == null || range.isEmpty() ? id : id + " " + range;
         }
+    }
+
+    /** "requires" without the optional ones: what a mod can't run without */
+    public static List<Dep> needs(Object list) {
+        List<Dep> out = new ArrayList<Dep>();
+        for (Dep d : deps(list)) if (!d.optional) out.add(d);
+        return out;
     }
 
     @SuppressWarnings("unchecked")
@@ -138,7 +156,8 @@ public final class Version implements Comparable<Version> {
         for (Object o : (List<Object>) list) {
             if (o instanceof Map) {
                 Map<String, Object> m = (Map<String, Object>) o;
-                out.add(new Dep(String.valueOf(m.get("id")), m.get("version") == null ? null : String.valueOf(m.get("version"))));
+                out.add(new Dep(String.valueOf(m.get("id")), m.get("version") == null ? null : String.valueOf(m.get("version")),
+                        Boolean.TRUE.equals(m.get("optional")), m.get("adds") == null ? null : String.valueOf(m.get("adds"))));
             } else {
                 String s = String.valueOf(o).trim();
                 int sp = s.indexOf(' ');

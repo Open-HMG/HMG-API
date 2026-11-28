@@ -159,7 +159,13 @@ final class Packages {
         for (Version.Dep d : Version.deps(mod.get("requires"))) {
             File dm = new File(e.data, "mods/" + d.id + "/mod.json");
             String dv = dm.isFile() ? String.valueOf(Json.object(Engine.read(dm)).get("version")) : null;
-            if (dv == null) v.notes.add("note     " + v.id + " requires " + d + ", which isn't installed: install it before applying");
+            if (d.optional) {
+                String adds = d.adds == null ? "" : " (it adds: " + d.adds + ")";
+                if (dv == null) v.notes.add("note     " + v.id + " works with " + d + adds + ", which isn't installed: it runs without it");
+                else if (!Version.satisfies(dv, d.range)) {
+                    v.notes.add("note     " + v.id + " works with " + d + adds + ", but " + d.id + " " + dv + " is installed: it runs without it");
+                }
+            } else if (dv == null) v.notes.add("note     " + v.id + " requires " + d + ", which isn't installed: install it before applying");
             else if (!Version.satisfies(dv, d.range)) {
                 v.notes.add("note     " + v.id + " requires " + d + ", but " + d.id + " " + dv + " is installed: update it before applying");
             }
